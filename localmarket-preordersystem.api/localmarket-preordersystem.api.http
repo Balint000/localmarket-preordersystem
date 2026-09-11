@@ -1,0 +1,6 @@
+@localmarket_preordersystem.api_HostAddress = http://localhost:5205
+
+GET {{localmarket_preordersystem.api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
