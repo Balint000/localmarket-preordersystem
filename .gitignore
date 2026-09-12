@@ -1,0 +1,55 @@
+# Build results
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Ll]og/
+[Ll]ogs/
+
+# Rider / JetBrains IDE
+.idea/
+*.sln.iml
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# ASP.NET Core / Blazor generated
+wwwroot/lib/
+*.pfx
+*.pubxml
+*.pubxml.user
+*.publishproj
+
+# NuGet
+*.nupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# Test results
+[Tt]est[Rr]esult*/
+coverage*.info
+coverage*.json
+coverage*.xml
+
+# Environment / secrets
+*.env
+.env.local
+appsettings.*.local.json
+secrets.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Node (if we want to add a npm frontend later)
+node_modules/
+npm-debug.log*
