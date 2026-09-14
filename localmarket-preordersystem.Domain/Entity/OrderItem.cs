@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using localmarket_preordersystem.Domain.ValueObject;
 
 namespace localmarket_preordersystem.Domain.Entity
 {
@@ -16,5 +14,6 @@ namespace localmarket_preordersystem.Domain.Entity
         public int Quantity { get; set; }
         public decimal Total => UnitPrice * Quantity;
 
+        public OrderItemStatus ItemStaus { get; set; } = OrderItemStatus.Pending;
     }
 }

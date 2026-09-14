@@ -12,8 +12,14 @@ namespace localmarket_preordersystem.Domain.Entity
         public User User { get; set; } = null!;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public OrderStatus Status { get; set; } = OrderStatus.Pending;
-        public decimal TotalAmount { get; set; }
+        // public decimal TotalAmount { get; set; }
         public List<OrderItem> Items { get; set; } = new();
 
+        public int PickupSlotId { get; set; }
+        public PickupSlot PickupSlot { get; set; } = null!;
+        public string? DisputeNote { get; set; } // felülvizsgálat komment
+        public Payment? Payment { get; set; }
+
+        public decimal TotalAmount => Items.Sum(i => i.Total);
     }
 }

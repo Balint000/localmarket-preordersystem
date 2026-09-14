@@ -9,8 +9,12 @@ namespace localmarket_preordersystem.Domain.Entity
     {
         public int Id { get; private set; }
         public string Name { get; set; } = string.Empty;
+
+        public int MarketId { get; set; }
+        public Market Market { get; set; } = null!;
+
         [Range(0, 10)]
-        public int Place { get; set; } = 0;
+        public int StallNumber { get; set; } = 0;
         public List<Product?> Products { get; set; } = new();
 
     }

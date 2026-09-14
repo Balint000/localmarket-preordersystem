@@ -16,5 +16,8 @@ namespace localmarket_preordersystem.Domain.Entity
         public Role Role { get; set; } = Role.Customer;
         public Producer? Producer { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        public string PhoneNumber { get; set; } = string.Empty;
+        public bool IsActive { get; set; } = true;
     }
 }
