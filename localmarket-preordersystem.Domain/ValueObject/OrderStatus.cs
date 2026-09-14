@@ -7,7 +7,10 @@ namespace localmarket_preordersystem.Domain.ValueObject
     public enum OrderStatus
     {
         Pending = 1,
-        Completed = 2,
-        Cancelledr = 3,
+        Accepted = 2,
+        PartiallyFulfilled = 3,
+        PickedUp = 4,
+        Cancelled = 5,
+        Disputed = 6 // felülvizsgálás alatt; vitás rendeléshez status
     }
 }

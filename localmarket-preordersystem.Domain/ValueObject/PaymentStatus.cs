@@ -10,5 +10,6 @@ namespace localmarket_preordersystem.Domain.ValueObject
         Completed = 2,
         Cancelled = 3,
         Error = 4,
+        Refunded = 5 // cancel után, ha előre utalta
     }
 }
