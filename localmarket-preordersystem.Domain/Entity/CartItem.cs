@@ -12,5 +12,6 @@ namespace localmarket_preordersystem.Domain.Entity
         public int ProductId { get; set; }
         public Product Product { get; set; } = null!;
         public int Quantity { get; set; }
+        public decimal UnitPriceSnapshot{ get; set; } // a kosárba tételkori ár
     }
 }

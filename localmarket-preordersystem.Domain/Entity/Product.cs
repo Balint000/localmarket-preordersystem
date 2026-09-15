@@ -12,7 +12,7 @@ namespace localmarket_preordersystem.Domain.Entity
         public int Id { get; private set; }
 
         [Required]
-        [MaxLength(100)]
+        [Required, MaxLength(100)]
         public string Name { get; set; } = string.Empty;
 
         [MaxLength(500)]
@@ -20,9 +20,10 @@ namespace localmarket_preordersystem.Domain.Entity
         public ProductStock? Stock { get; set; }
         public int StockId { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-        public List<Allergy?> Allergy { get; set; } = new();
+        public List<Allergy?> Allergies { get; set; } = new();
         public int CategoryId { get; set; }
         public List<Category?> Category { get; set; } = new();
 
+        public List<ProductStock> WeeklyStocks { get; set; } = new();
     }
 }
