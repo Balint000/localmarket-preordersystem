@@ -9,7 +9,6 @@
 
     <ItemGroup>
       <ProjectReference Include="..\localmarket-preordersystem.Domain\localmarket-preordersystem.Domain.csproj" />
-      <ProjectReference Include="..\localmarket-preordersystem.Infrastructure\localmarket-preordersystem.Infrastructure.csproj" />
     </ItemGroup>
 
     <ItemGroup>
