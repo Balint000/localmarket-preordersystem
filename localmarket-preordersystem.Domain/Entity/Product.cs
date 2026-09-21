@@ -12,7 +12,7 @@ namespace localmarket_preordersystem.Domain.Entity
         public int Id { get; private set; }
 
         [Required]
-        [Required, MaxLength(100)]
+        [MaxLength(100)]
         public string Name { get; set; } = string.Empty;
 
         [MaxLength(500)]
