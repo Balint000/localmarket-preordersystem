@@ -1,4 +1,8 @@
-﻿namespace localmarket_preordersystem.Domain.Entity
+﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using localmarket_preordersystem.Domain.ValueObject;
+
+namespace localmarket_preordersystem.Domain.Entity
 {
     public class ProductStock
     {
