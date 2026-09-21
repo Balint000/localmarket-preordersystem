@@ -1,6 +1,4 @@
-﻿using localmarket_preordersystem.Domain.ValueObject;
-
-namespace localmarket_preordersystem.Domain.Entity
+﻿namespace localmarket_preordersystem.Domain.Entity
 {
     public class OrderItem
     {
@@ -14,6 +12,6 @@ namespace localmarket_preordersystem.Domain.Entity
         public int Quantity { get; set; }
         public decimal Total => UnitPrice * Quantity;
 
-        public OrderItemStatus ItemStaus { get; set; } = OrderItemStatus.Pending;
+        public ValueObject.OrderItemStatus ItemStaus { get; set; } = ValueObject.OrderItemStatus.Pending;
     }
 }
