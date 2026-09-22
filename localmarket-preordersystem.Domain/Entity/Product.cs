@@ -44,6 +44,8 @@ namespace localmarket_preordersystem.Domain.Entity
             ArgumentNullException.ThrowIfNull(producer);
             if (string.IsNullOrWhiteSpace(name))
                 throw new DomainException("A termék nevének megadása kötelező.");
+            if (!producer.CanListProducts())
+                throw new DomainException("Csak jóváhagyott (Approved) árus hozhat létre terméket.");
 
             var product = new Product
             {
