@@ -56,6 +56,25 @@ namespace localmarket_preordersystem.Domain.Entity
             };
         }
 
+        public void Update(DateTime weekStartDate, decimal quantity, Units unit, decimal unitPrice)
+        {
+            if (quantity <= 0)
+                throw new DomainException("A heti mennyiségnek pozitívnak kell lennie.");
+
+            if (unitPrice <= 0)
+                throw new DomainException("Az egységárnak pozitívnak kell lennie.");
+
+            if (quantity < ReservedQuantity)
+                throw new DomainException(
+                    "A készlet nem lehet kisebb a már lefoglalt mennyiségnél.");
+
+            WeekStartDate = weekStartDate.Date;
+            Quantity = quantity;
+            Unit = unit;
+            UnitPrice = unitPrice;
+            LastUpdated = DateTime.UtcNow;
+        }
+
         public void Reserve(decimal quantity)
         {
             if (quantity <= 0)

@@ -37,7 +37,27 @@ namespace localmarket_preordersystem.Domain.Entity
             };
         }
 
-        internal void IncreaseQuantity(int amount) => Quantity += amount;
+        internal void IncreaseQuantity(int amount)
+        {
+            if (amount <= 0)
+                throw new DomainException(
+                    "A növelendő mennyiségnek pozitívnak kell lennie.");
+
+            Quantity += amount;
+        }
+
+        internal void DecreaseQuantity(int amount)
+        {
+            if (amount <= 0)
+                throw new DomainException(
+                    "A csökkentendő mennyiségnek pozitívnak kell lennie.");
+
+            if (amount >= Quantity)
+                throw new DomainException(
+                    "A kosártétel mennyisége nem csökkenhet nullára.");
+
+            Quantity -= amount;
+        }
 
         internal void SetQuantity(int quantity)
         {
