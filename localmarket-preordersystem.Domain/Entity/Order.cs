@@ -5,6 +5,19 @@ using System.Text;
 
 namespace localmarket_preordersystem.Domain.Entity
 {
+    private static readonly Dictionary<OrderStatus, OrderStatus[]> AllowedTransitions = new()
+    {
+        [OrderStatus.Pending]            = [OrderStatus.Accepted, OrderStatus.PartiallyFulfilled, OrderStatus.Rejected, OrderStatus.Cancelled],
+        [OrderStatus.Accepted]           = [OrderStatus.Ready, OrderStatus.PickedUp, OrderStatus.Cancelled, OrderStatus.NotPickedUp, OrderStatus.Disputed],
+        [OrderStatus.PartiallyFulfilled] = [OrderStatus.Ready, OrderStatus.PickedUp, OrderStatus.Cancelled, OrderStatus.NotPickedUp, OrderStatus.Disputed],
+        [OrderStatus.Ready]              = [OrderStatus.PickedUp, OrderStatus.Cancelled, OrderStatus.NotPickedUp, OrderStatus.Disputed],
+        [OrderStatus.PickedUp]           = [OrderStatus.Disputed],
+        [OrderStatus.NotPickedUp]        = [OrderStatus.Disputed],
+        [OrderStatus.Disputed]           = [OrderStatus.PickedUp, OrderStatus.Cancelled],
+        [OrderStatus.Cancelled]          = [],
+        [OrderStatus.Rejected]           = [],
+    };
+
     public class Order
     {
         public int Id { get; private set; }
