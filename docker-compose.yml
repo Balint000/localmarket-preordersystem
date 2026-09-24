@@ -1,0 +1,63 @@
+name: localmarket
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-localmarket}
+      POSTGRES_USER: ${POSTGRES_USER:-localmarket}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Állítsd be a POSTGRES_PASSWORD-öt a .env fájlban}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: localmarket-preordersystem.api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=${POSTGRES_DB:-localmarket};Username=${POSTGRES_USER:-localmarket};Password=${POSTGRES_PASSWORD}"
+      Database__MigrateOnStartup: "true"
+    ports:
+      - "5205:8080"
+
+  web:
+    build:
+      context: .
+      dockerfile: localmarket-preordersystem-blazerClient/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Api__BaseUrl: http://api:8080
+    ports:
+      - "5219:8080"
+
+  # Database admin interface
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    profiles: ["tools"]
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:5050:80"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
