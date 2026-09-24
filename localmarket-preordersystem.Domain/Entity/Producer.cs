@@ -24,6 +24,9 @@ namespace localmarket_preordersystem.Domain.Entity
 
         public List<PickupSlot> PickupSlots { get; private set; } = new();
 
+        public string? RejectionReason { get; private set; } // elutasítás indoklásának tárolása
+        public DateTime RegisteredAt { get; private set; } = DateTime.UtcNow; // mikor lett elfogadva
+
         private Producer()
         {
             // EF Core-nak
@@ -43,7 +46,8 @@ namespace localmarket_preordersystem.Domain.Entity
                 Market = market,
                 Name = name.Trim(),
                 StallNumber = stallNumber,
-                Status = ProducerStatus.Pending
+                Status = ProducerStatus.Pending,
+                RegisteredAt = DateTime.UtcNow,
             };
         }
 
@@ -64,6 +68,7 @@ namespace localmarket_preordersystem.Domain.Entity
                 throw new DomainException("Elutasításhoz indoklás megadása kötelező.");
 
             Status = ProducerStatus.Rejected;
+            RejectionReason = reason;
         }
 
         /// <summary>A Product.Create ezt hívja meg, csak jóváhagyott árus listázhat terméket.</summary>
