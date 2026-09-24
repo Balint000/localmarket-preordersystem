@@ -14,7 +14,7 @@ namespace localmarket_preordersystem.Domain.Entity
         public int ProductId { get; set; }
         public Product Product { get; set; } = null!;
 
-        public int Quantity { get; set; }
+        public decimal Quantity { get; set; }
         public decimal UnitPriceSnapshot{ get; set; } // a kosárba tételkori ár
 
         private CartItem()
@@ -22,7 +22,7 @@ namespace localmarket_preordersystem.Domain.Entity
             // EF Core-nak
         }
 
-        internal static CartItem Create(Product product, int quantity, decimal unitPriceSnapshot)
+        internal static CartItem Create(Product product, decimal quantity, decimal unitPriceSnapshot)
         {
             ArgumentNullException.ThrowIfNull(product);
             if (quantity <= 0)
@@ -37,7 +37,7 @@ namespace localmarket_preordersystem.Domain.Entity
             };
         }
 
-        internal void IncreaseQuantity(int amount)
+        internal void IncreaseQuantity(decimal amount)
         {
             if (amount <= 0)
                 throw new DomainException(
@@ -46,7 +46,7 @@ namespace localmarket_preordersystem.Domain.Entity
             Quantity += amount;
         }
 
-        internal void DecreaseQuantity(int amount)
+        internal void DecreaseQuantity(decimal amount)
         {
             if (amount <= 0)
                 throw new DomainException(
@@ -59,7 +59,7 @@ namespace localmarket_preordersystem.Domain.Entity
             Quantity -= amount;
         }
 
-        internal void SetQuantity(int quantity)
+        internal void SetQuantity(decimal quantity)
         {
             if (quantity <= 0)
                 throw new DomainException("A kosártétel mennyiségének pozitívnak kell lennie.");
