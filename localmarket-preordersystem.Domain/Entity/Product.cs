@@ -1,10 +1,6 @@
-﻿using localmarket_preordersystem.Domain.Exceptions;
+﻿using System.ComponentModel.DataAnnotations;
+using localmarket_preordersystem.Domain.Exceptions;
 using localmarket_preordersystem.Domain.ValueObject;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
-using System.Text;
 
 namespace localmarket_preordersystem.Domain.Entity
 {
@@ -12,21 +8,20 @@ namespace localmarket_preordersystem.Domain.Entity
     {
         public int Id { get; private set; }
 
-
         public int ProducerId { get; private set; }
         public Producer Producer { get; private set; } = null!;
 
-        //[Required]
-        [Required, MaxLength(100)]
-        public string Name { get; set; } = string.Empty;
+        [MaxLength(100)]
+        public string Name { get; private set; } = string.Empty;
 
         [MaxLength(500)]
-        public string Description { get; set; } = string.Empty;
+        public string Description { get; private set; } = string.Empty;
 
+        // Egy termék több kategóriába is tartozhat (N:N). Az EF Core konfiguráció
         private readonly List<Category> _categories = new();
         public IReadOnlyCollection<Category> Categories => _categories.AsReadOnly();
 
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
 
         private readonly List<Allergy> _allergies = new();
         public IReadOnlyCollection<Allergy> Allergies => _allergies.AsReadOnly();
@@ -36,16 +31,18 @@ namespace localmarket_preordersystem.Domain.Entity
 
         private Product()
         {
-            // EF Core-nak 
+            // EF Core-nak kell
         }
 
         public static Product Create(Producer producer, string name, string description, IEnumerable<Category> categories, IEnumerable<Allergy>? allergies = null)
         {
             ArgumentNullException.ThrowIfNull(producer);
-            if (string.IsNullOrWhiteSpace(name))
-                throw new DomainException("A termék nevének megadása kötelező.");
             if (!producer.CanListProducts())
                 throw new DomainException("Csak jóváhagyott (Approved) árus hozhat létre terméket.");
+            if (string.IsNullOrWhiteSpace(name))
+                throw new DomainException("A termék nevének megadása kötelező.");
+
+            var distinctCategories = NormalizeCategories(categories);
 
             var product = new Product
             {
@@ -56,12 +53,10 @@ namespace localmarket_preordersystem.Domain.Entity
                 CreatedAt = DateTime.UtcNow
             };
 
+            product._categories.AddRange(distinctCategories);
+
             if (allergies is not null)
                 product._allergies.AddRange(allergies.Distinct());
-
-            if (categories is not null)
-                product._categories.AddRange(categories.Distinct());
-
 
             return product;
         }
@@ -71,14 +66,28 @@ namespace localmarket_preordersystem.Domain.Entity
             if (string.IsNullOrWhiteSpace(name))
                 throw new DomainException("A termék nevének megadása kötelező.");
 
+            var distinctCategories = NormalizeCategories(categories);
+            ArgumentNullException.ThrowIfNull(allergies);
+
             Name = name.Trim();
             Description = description?.Trim() ?? string.Empty;
 
             _categories.Clear();
-            _categories.AddRange(categories.Distinct());
+            _categories.AddRange(distinctCategories);
 
             _allergies.Clear();
             _allergies.AddRange(allergies.Distinct());
+        }
+
+        // Invariáns: legalább egy kategória kell (különben a termék a kategória-szűrésekben
+        // sehol nem jelenne meg).
+        private static List<Category> NormalizeCategories(IEnumerable<Category>? categories)
+        {
+            var distinct = categories?.Distinct().ToList() ?? new List<Category>();
+            if (distinct.Count == 0)
+                throw new DomainException("A terméknek legalább egy kategóriába tartoznia kell.");
+
+            return distinct;
         }
 
         public void AddWeeklyStock(DateTime weekStartDate, decimal quantity, Units unit, decimal unitPrice)

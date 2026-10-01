@@ -15,7 +15,7 @@ namespace localmarket_preordersystem.Domain.Entity
 
         private Cart()
         {
-            // EF Core-nak 
+            // EF Core-nak
         }
 
         public static Cart CreateEmpty(User user)
@@ -29,7 +29,7 @@ namespace localmarket_preordersystem.Domain.Entity
             };
         }
 
-        public void AddItem(Product product, int quantity, decimal currentUnitPrice)
+        public void AddItem(Product product, decimal quantity, decimal currentUnitPrice)
         {
             ArgumentNullException.ThrowIfNull(product);
             if (quantity <= 0)
@@ -45,7 +45,7 @@ namespace localmarket_preordersystem.Domain.Entity
             _items.Add(CartItem.Create(product, quantity, currentUnitPrice));
         }
 
-        public void UpdateItemQuantity(int productId, int quantity)
+        public void UpdateItemQuantity(int productId, decimal quantity)
         {
             var item = _items.FirstOrDefault(i => i.ProductId == productId)
                 ?? throw new DomainException("Ez a termék nincs a kosárban.");
@@ -53,19 +53,10 @@ namespace localmarket_preordersystem.Domain.Entity
             item.SetQuantity(quantity);
         }
 
-        public void RemoveItem(int productId)
-        {
-            _items.RemoveAll(i => i.ProductId == productId);
-        }
+        public void RemoveItem(int productId) => _items.RemoveAll(i => i.ProductId == productId);
 
-        public void Clear()
-        {
-            _items.Clear();
-        }
+        public void Clear() => _items.Clear();
 
-        public ILookup<int, CartItem> GroupItemsByProducer()
-        {
-            return _items.ToLookup(i => i.Product.ProducerId);
-        }
+        public ILookup<int, CartItem> GroupItemsByProducer() => _items.ToLookup(i => i.Product.ProducerId);
     }
 }
