@@ -24,3 +24,5 @@ The solution follows a **Clean Architecture** (layered) approach, separating con
 - **ASP.NET Core** — Web API backend
 - **Blazor** — client-side/server-side UI
 - Configuration via `appsettings.json` / `appsettings.Development.json`
+
+This project is created for the Portálfejlesztés .NET-ben subject at Széchenyi István University (SZE).
