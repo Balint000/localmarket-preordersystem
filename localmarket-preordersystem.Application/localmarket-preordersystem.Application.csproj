@@ -8,14 +8,39 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\localmarket-preordersystem.Domain\localmarket-preordersystem.Domain.csproj" />
+      <Compile Remove="Interfaces\**" />
+      <Compile Remove="Services\**" />
+      <Compile Remove="UseCases\**" />
+      <EmbeddedResource Remove="Interfaces\**" />
+      <EmbeddedResource Remove="Services\**" />
+      <EmbeddedResource Remove="UseCases\**" />
+      <None Remove="Interfaces\**" />
+      <None Remove="Services\**" />
+      <None Remove="UseCases\**" />
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="DTOs\" />
-      <Folder Include="Interfaces\" />
-      <Folder Include="Services\" />
-      <Folder Include="UseCases\" />
+      <ProjectReference Include="..\localmarket-preordersystem.Domain\localmarket-preordersystem.Domain.csproj" />
+    </ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
+	</ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Cart\" />
+      <Folder Include="Export\ExportOrderSummarry\" />
+      <Folder Include="Export\ExportPickingList\" />
+      <Folder Include="Markets\" />
+      <Folder Include="Reports\CancellationRate\" />
+      <Folder Include="Reports\UnclaimedOrders\" />
+      <Folder Include="Reports\VendorRevenue\" />
+      <Folder Include="Reports\TopProducts\" />
+      <Folder Include="Weather\" />
+      <Folder Include="Orders\" />
+      <Folder Include="PickupSlots\" />
+      <Folder Include="Products\" />
+      <Folder Include="Producers\" />
     </ItemGroup>
 
 </Project>
