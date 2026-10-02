@@ -26,7 +26,7 @@ public sealed class MarketDbContext(DbContextOptions<MarketDbContext> options) :
         base.OnModelCreating(modelBuilder);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(MarketDbContext).Assembly);
 
-        // This type currently duplicates the OrderItemStatus enum and is not part of the model.
-        modelBuilder.Ignore<localmarket_preordersystem.Domain.Entity.OrderItemStatus>();
+        // This type currently duplicates the OrderItemStatusEntity and is not part of the model.
+        modelBuilder.Ignore<localmarket_preordersystem.Domain.Entity.OrderItemStatusEntity>();
     }
 }
