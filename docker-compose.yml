@@ -17,6 +17,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 10s
 
   api:
     build:
@@ -28,8 +29,8 @@ services:
         condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=${POSTGRES_DB:-localmarket};Username=${POSTGRES_USER:-localmarket};Password=${POSTGRES_PASSWORD}"
-      Database__MigrateOnStartup: "true"
+      ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=${POSTGRES_DB:-localmarket};Username=${POSTGRES_USER:-localmarket};Password=${POSTGRES_PASSWORD:?Állítsd be a POSTGRES_PASSWORD-öt a .env fájlban}"
+      Database__MigrateOnStartup: "${MIGRATE_ON_STARTUP:-false}"
     ports:
       - "5205:8080"
 
@@ -46,18 +47,22 @@ services:
     ports:
       - "5219:8080"
 
-  # Database admin interface
+  # Adatbázis-kezelő felület: docker compose --profile tools up -d
   pgadmin:
-    image: dpage/pgadmin4:latest
+    image: dpage/pgadmin4:9
+    restart: unless-stopped
     profiles: ["tools"]
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@example.com
-      PGADMIN_DEFAULT_PASSWORD: ${POSTGRES_PASSWORD}
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:?Állítsd be a PGADMIN_PASSWORD-öt a .env fájlban}
     ports:
       - "127.0.0.1:5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
     depends_on:
       db:
         condition: service_healthy
 
 volumes:
   pgdata:
+  pgadmin_data:
