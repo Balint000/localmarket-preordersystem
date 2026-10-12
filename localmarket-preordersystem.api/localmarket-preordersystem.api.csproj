@@ -14,6 +14,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\localmarket-preordersystem.Application\localmarket-preordersystem.Application.csproj" />
+      <ProjectReference Include="..\localmarket-preordersystem.Infrastructure\localmarket-preordersystem.Infrastructure.csproj" />
     </ItemGroup>
 
     <ItemGroup>
