@@ -2,6 +2,8 @@ using localmarket_preordersystem.Infrastructure.Persistence.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using localmarket_preordersystem.Application.Common.Interfaces;
+using localmarket_preordersystem.Infrastructure.Persistence.Repositories;
 
 namespace localmarket_preordersystem.Infrastructure;
 
@@ -27,6 +29,17 @@ public static class DependencyInjection
         services.AddDbContext<MarketDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>
                 npgsql.EnableRetryOnFailure(maxRetryCount: 3)));
+        
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IMarketRepository, MarketRepository>();
+        services.AddScoped<IProducerRepository, ProducerRepository>();
+        services.AddScoped<ICategoryRepository, CategoryRepository>();
+        services.AddScoped<IProductRepository, ProductRepository>();
+        services.AddScoped<IPickupSlotRepository, PickupSlotRepository>();
+        services.AddScoped<ICartRepository, CartRepository>();
+        services.AddScoped<IOrderRepository, OrderRepository>();
+        services.AddScoped<IAuditLogRepository, AuditLogRepository>();
 
         return services;
     }
