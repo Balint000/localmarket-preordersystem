@@ -90,19 +90,60 @@ namespace localmarket_preordersystem.Domain.Entity
             return distinct;
         }
 
+        /// <summary>A megadott dátumot tartalmazó hét kínálatának rögzítése (a hét hétfőjére normalizálva).</summary>
         public void AddWeeklyStock(DateTime weekStartDate, decimal quantity, Units unit, decimal unitPrice)
         {
-            var normalizedWeek = weekStartDate.Date;
+            var normalizedWeek = ProductStock.GetWeekStart(weekStartDate);
             if (_weeklyStocks.Any(s => s.WeekStartDate == normalizedWeek))
                 throw new DomainException("Erre a hétre már van rögzített kínálat ehhez a termékhez.");
 
             _weeklyStocks.Add(ProductStock.Create(this, normalizedWeek, quantity, unit, unitPrice));
         }
 
-        public ProductStock? GetStockForWeek(DateTime weekStartDate)
+        /// <summary>Már rögzített heti kínálat módosítása. A hét nem változtatható, csak a mennyiség, egység, ár.</summary>
+        public void UpdateWeeklyStock(DateTime weekStartDate, decimal quantity, Units unit, decimal unitPrice)
         {
-            var normalizedWeek = weekStartDate.Date;
+            var stock = GetStockForWeek(weekStartDate)
+                ?? throw new DomainException("Erre a hétre nincs rögzített kínálat ennél a terméknél.");
+
+            stock.Update(stock.WeekStartDate, quantity, unit, unitPrice);
+        }
+
+        /// <summary>A megadott dátumot tartalmazó hét kínálata (bármelyik napot megadhatod).</summary>
+        public ProductStock? GetStockForWeek(DateTime date)
+        {
+            var normalizedWeek = ProductStock.GetWeekStart(date);
             return _weeklyStocks.FirstOrDefault(s => s.WeekStartDate == normalizedWeek);
+        }
+
+        /// <summary>Az aktuális, vagy ha az nincs, a legközelebbi jövőbeli hét kínálata (árjelzéshez).</summary>
+        public ProductStock? GetNextAvailableStock(DateTime today)
+        {
+            var currentWeek = ProductStock.GetWeekStart(today);
+            return _weeklyStocks
+                .Where(s => s.WeekStartDate >= currentWeek)
+                .OrderBy(s => s.WeekStartDate)
+                .FirstOrDefault();
+        }
+
+        /// <summary>
+        /// Készlet lefoglalása egy átvételi napra. A kínálat az átvételi nap hetéhez tartozik, így
+        /// "nem rendelhető olyan termék, ami az adott héten nem elérhető" itt dől el.
+        /// </summary>
+        public ProductStock ReserveStockForPickup(DateTime pickupDate, decimal quantity)
+        {
+            var stock = GetStockForWeek(pickupDate)
+                ?? throw new DomainException(
+                    $"A(z) '{Name}' termék nem elérhető a(z) {pickupDate:yyyy-MM-dd} napot tartalmazó héten.");
+
+            stock.Reserve(quantity);
+            return stock;
+        }
+
+        /// <summary>Korábban lefoglalt készlet felszabadítása (lemondás, elutasítás, részleges teljesítés).</summary>
+        public void ReleaseStockForPickup(DateTime pickupDate, decimal quantity)
+        {
+            GetStockForWeek(pickupDate)?.Release(quantity);
         }
     }
 }

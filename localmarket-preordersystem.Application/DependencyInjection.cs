@@ -1,24 +1,25 @@
-﻿using localmarket_preordersystem.Application.Auth.Login;
-using localmarket_preordersystem.Application.Users.RegisterCustomer;
-using localmarket_preordersystem.Application.Users.RegisterProducer;
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace localmarket_preordersystem.Application
 {
     /// <summary>
-    /// A "config" mappa helyett/mellett ez egyetlen fájl regisztrálja az Application
-    /// réteg saját osztályait (a Handler-eket). Az Infrastructure/api projekt hívja meg
-    /// a Program.cs-ből: builder.Services.AddApplication(). Nem MediatR-alapú, mert
-    /// egyelőre nincs rá konkrét szükség (nincs pipeline behavior, amit meg kellene
-    /// oldani) — sima, explicit DI-regisztráció.
+    /// Az Application réteg regisztrációja. Minden "*Handler" nevű, nem absztrakt osztályt
+    /// automatikusan scoped-ként vesz fel (új use case-nél nem kell ide nyúlni). Nem MediatR:
+    /// a controller közvetlenül a konkrét handlert kapja injektálva.
     /// </summary>
     public static class DependencyInjection
     {
         public static IServiceCollection AddApplication(this IServiceCollection services)
         {
-            services.AddScoped<RegisterCustomerHandler>();
-            services.AddScoped<RegisterProducerHandler>();
-            services.AddScoped<LoginHandler>();
+            services.TryAddSingleton(TimeProvider.System);
+
+            var handlerTypes = typeof(DependencyInjection).Assembly
+                .GetTypes()
+                .Where(t => t is { IsClass: true, IsAbstract: false } && t.Name.EndsWith("Handler", StringComparison.Ordinal));
+
+            foreach (var type in handlerTypes)
+                services.AddScoped(type);
 
             return services;
         }

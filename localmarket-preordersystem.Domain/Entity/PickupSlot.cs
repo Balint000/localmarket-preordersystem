@@ -27,6 +27,8 @@ namespace localmarket_preordersystem.Domain.Entity
         public static PickupSlot Create(Producer producer, DateTime date, TimeOnly startTime, TimeOnly endTime, int capacity)
         {
             ArgumentNullException.ThrowIfNull(producer);
+            if (!producer.CanListProducts())
+                throw new DomainException("Csak jóváhagyott árus hirdethet átvételi időpontot.");
             if (producer.Market is null)
                 throw new DomainException("Az árushoz nincs betöltve a piac adata, az átvételi idősáv nem ellenőrizhető.");
             if (!producer.Market.OpeningDays.Contains(date.DayOfWeek))
@@ -54,8 +56,12 @@ namespace localmarket_preordersystem.Domain.Entity
         /// Egy hely lefoglalása (pl. új Order létrehozásakor). Konkurens foglalás elleni
         /// védelemhez EF Core szinten optimistic concurrency token is kell majd (
         /// </summary>
-        public void Book()
+        public bool HasEnded(DateTime now) => Date.Date.Add(EndTime.ToTimeSpan()) <= now;
+
+        public void Book(DateTime now)
         {
+            if (HasEnded(now))
+                throw new DomainException("Ez az átvételi időpont már lejárt.");
             if (!HasFreeCapacity())
                 throw new DomainException("Ez az átvételi időpont betelt, nem foglalható le további rendelés.");
 

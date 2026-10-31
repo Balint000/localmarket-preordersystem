@@ -23,7 +23,6 @@ namespace localmarket_preordersystem.Domain.Entity
         public IReadOnlyCollection<DayOfWeek> OpeningDays => _openingDays.AsReadOnly();
 
         public List<Producer> Producers { get; private set; } = new();
-        public List<PickupSlot> PickupSlots { get; set; } = new();
 
         private Market()
         {
@@ -72,6 +71,24 @@ namespace localmarket_preordersystem.Domain.Entity
         }
 
         public void RemoveOpeningDay(DayOfWeek day) => _openingDays.Remove(day);
+
+        public void UpdateDetails(string name, string address)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                throw new DomainException("A piac nevének megadása kötelező.");
+            if (string.IsNullOrWhiteSpace(address))
+                throw new DomainException("A piac címének megadása kötelező.");
+            Name = name.Trim();
+            Address = address.Trim();
+        }
+
+        public void SetOpeningDays(IEnumerable<DayOfWeek> days)
+        {
+            ArgumentNullException.ThrowIfNull(days);
+            var distinct = days.Distinct().ToList();
+            _openingDays.Clear();
+            _openingDays.AddRange(distinct);
+        }
 
         public void Activate() => IsActive = true;
         public void Deactivate() => IsActive = false;

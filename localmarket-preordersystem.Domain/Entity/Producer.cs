@@ -10,13 +10,12 @@ namespace localmarket_preordersystem.Domain.Entity
     public class Producer
     {
         public int Id { get; private set; }
-        public string Name { get; set; } = string.Empty;
+        public string Name { get; private set; } = string.Empty;
 
         public int MarketId { get; set; }
         public Market Market { get; set; } = null!;
 
-        [Range(0, 10)]
-        public int StallNumber { get; set; } = 0;
+        public int StallNumber { get; private set; } = 0;
 
         public ProducerStatus Status { get; private set; } = ProducerStatus.Pending;
 
@@ -73,6 +72,13 @@ namespace localmarket_preordersystem.Domain.Entity
 
         /// <summary>A Product.Create ezt hívja meg, csak jóváhagyott árus listázhat terméket.</summary>
         public bool CanListProducts() => Status == ProducerStatus.Approved;
+
+        public void Rename(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                throw new DomainException("Az árus nevének megadása kötelező.");
+            Name = name.Trim();
+        }
 
         public void UpdateStallNumber(int stallNumber)
         {
