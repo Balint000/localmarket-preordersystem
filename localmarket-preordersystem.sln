@@ -1,5 +1,8 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 18
+VisualStudioVersion = 18.10.12210.168 stable
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "localmarket-preordersystem-blazerClient", "localmarket-preordersystem-blazerClient\localmarket-preordersystem-blazerClient.csproj", "{0DB608AE-8CB9-4759-9EAB-3A46423733F2}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "localmarket-preordersystem.Domain", "localmarket-preordersystem.Domain\localmarket-preordersystem.Domain.csproj", "{DE2D6254-9569-4A86-83F3-4579CC99E80F}"
@@ -9,6 +12,11 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "localmarket-preordersystem.Infrastructure", "localmarket-preordersystem.Infrastructure\localmarket-preordersystem.Infrastructure.csproj", "{2E30F061-3D92-4012-AD4E-0BF36AF4082F}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "localmarket-preordersystem.api", "localmarket-preordersystem.api\localmarket-preordersystem.api.csproj", "{45E26085-9E1A-495E-98BE-A5FB1AE77BAF}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{E4BA1EA0-7BDF-4AF4-9B9D-8F7118717058}"
+	ProjectSection(SolutionItems) = preProject
+		.editorconfig = .editorconfig
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -36,5 +44,8 @@ Global
 		{45E26085-9E1A-495E-98BE-A5FB1AE77BAF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{45E26085-9E1A-495E-98BE-A5FB1AE77BAF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{45E26085-9E1A-495E-98BE-A5FB1AE77BAF}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
 	EndGlobalSection
 EndGlobal
