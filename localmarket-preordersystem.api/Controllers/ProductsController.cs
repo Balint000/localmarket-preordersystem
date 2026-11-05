@@ -2,6 +2,7 @@ using localmarket_preordersystem.Application.Products.CreateProduct;
 using localmarket_preordersystem.Application.Products.GetProduct;
 using localmarket_preordersystem.Application.Products.SetWeeklyStock;
 using localmarket_preordersystem.Application.Products.UpdateProduct;
+using localmarket_preordersystem.Application.Products.SearchProducts;
 using localmarket_preordersystem.Domain.ValueObject;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -15,6 +16,17 @@ public sealed record StockRequest(DateTime WeekDate, decimal Quantity, Units Uni
 [Route("api/products")]
 public class ProductsController : ControllerBase
 {
+    [HttpGet]
+    [AllowAnonymous]
+    public async Task<IActionResult> Search(
+        [FromQuery] string? text,
+        [FromQuery] int? categoryId,
+        [FromQuery] int? producerId,
+        [FromQuery] Allergy[]? excludeAllergies,
+        SearchProductsHandler handler,
+        CancellationToken ct)
+        => Ok(await handler.HandleAsync(new SearchProductsQuery(text, categoryId, producerId, excludeAllergies), ct));
+
     [HttpGet("{id:int}")]
     [AllowAnonymous]
     public async Task<IActionResult> Get(int id, GetProductHandler handler, CancellationToken ct)
