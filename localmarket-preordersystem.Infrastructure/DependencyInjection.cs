@@ -1,9 +1,11 @@
+using localmarket_preordersystem.Application.Common.Interfaces;
 using localmarket_preordersystem.Infrastructure.Persistence.Context;
+using localmarket_preordersystem.Infrastructure.Persistence.Repositories;
+using localmarket_preordersystem.Infrastructure.Auth;
+using localmarket_preordersystem.Infrastructure.ExternalAPIs.Weather;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using localmarket_preordersystem.Application.Common.Interfaces;
-using localmarket_preordersystem.Infrastructure.Persistence.Repositories;
 
 namespace localmarket_preordersystem.Infrastructure;
 
@@ -41,6 +43,22 @@ public static class DependencyInjection
         services.AddScoped<IOrderRepository, OrderRepository>();
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
         services.AddScoped<IReportQueries, ReportQueries>();
+
+        services.AddOptions<JwtOptions>()
+            .Bind(configuration.GetSection(JwtOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddHttpContextAccessor();
+        services.AddSingleton<IPasswordHasher, PasswordHasher>();
+        services.AddScoped<ITokenService, JwtTokenService>();
+        services.AddScoped<ICurrentUserService, CurrentUserService>();
+
+        services.AddHttpClient<IWeatherService, OpenMeteoWeatherService>(client =>
+        {
+            client.BaseAddress = new Uri("https://api.open-meteo.com/");
+            client.Timeout = TimeSpan.FromSeconds(10);
+        });
 
         return services;
     }
