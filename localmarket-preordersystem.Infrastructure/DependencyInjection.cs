@@ -29,7 +29,7 @@ public static class DependencyInjection
         services.AddDbContext<MarketDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>
                 npgsql.EnableRetryOnFailure(maxRetryCount: 3)));
-        
+
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IMarketRepository, MarketRepository>();
@@ -40,6 +40,7 @@ public static class DependencyInjection
         services.AddScoped<ICartRepository, CartRepository>();
         services.AddScoped<IOrderRepository, OrderRepository>();
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+        services.AddScoped<IReportQueries, ReportQueries>();
 
         return services;
     }
