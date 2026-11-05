@@ -8,11 +8,8 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\localmarket-preordersystem.Application\localmarket-preordersystem.Application.csproj" />
       <ProjectReference Include="..\localmarket-preordersystem.Domain\localmarket-preordersystem.Domain.csproj" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <Folder Include="Persistence\Repositories\" />
     </ItemGroup>
 
     <ItemGroup>
