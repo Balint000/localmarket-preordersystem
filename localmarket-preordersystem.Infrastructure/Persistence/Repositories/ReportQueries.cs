@@ -9,56 +9,147 @@ using Microsoft.EntityFrameworkCore;
 
 namespace localmarket_preordersystem.Infrastructure.Persistence.Repositories;
 
-internal sealed class ReportQueries(MarketDbContext context) : IReportQueries
+internal sealed class ReportQueries(MarketDbContext context, TimeProvider time) : IReportQueries
 {
-    public async Task<IReadOnlyList<TopProductDto>> GetTopProductsAsync(DateTime from, DateTime to, int top, CancellationToken ct = default)
+    private static DateTime Utc(DateTime d) => DateTime.SpecifyKind(d, DateTimeKind.Utc);
+
+    public async Task<IReadOnlyList<TopProductDto>> GetTopProductsAsync(
+        DateTime from, DateTime to, int top, CancellationToken ct = default)
     {
-        // TODO: igazítsd a TopProductDto konstruktorához
+        var f = Utc(from);
+        var t = Utc(to);
+
         var rows = await context.Orders.AsNoTracking()
-            .Where(o => o.CreatedAt >= from && o.CreatedAt <= to
-                        && o.Status != OrderStatus.Cancelled && o.Status != OrderStatus.Rejected)
+            .Where(o => o.CreatedAt >= f && o.CreatedAt <= t
+                        && o.Status != OrderStatus.Cancelled
+                        && o.Status != OrderStatus.Rejected)
             .SelectMany(o => o.Items)
-            .GroupBy(i => new { i.ProductId, i.Product.Name })
-            .Select(g => new { g.Key.ProductId, g.Key.Name, Qty = g.Sum(i => i.Quantity) })
-            .OrderByDescending(x => x.Qty)
+            .GroupBy(i => new { i.ProductId, i.ProductName })
+            .Select(g => new
+            {
+                g.Key.ProductId,
+                g.Key.ProductName,
+                TotalQuantity = g.Sum(i => i.FulfilledQuantity),
+                TotalRevenue = g.Sum(i => i.UnitPrice * i.FulfilledQuantity),
+                OrderCount = g.Select(i => i.OrderId).Distinct().Count()
+            })
+            .OrderByDescending(x => x.TotalQuantity)
+            .ThenBy(x => x.ProductName)
             .Take(top)
             .ToListAsync(ct);
 
-        return rows.Select(r => new TopProductDto(r.ProductId, r.Name, r.Qty)).ToList();
+        return rows
+            .Select(r => new TopProductDto(r.ProductId, r.ProductName, r.TotalQuantity, r.TotalRevenue, r.OrderCount))
+            .ToList();
     }
 
-    public async Task<CancellationRateDto> GetCancellationRateAsync(DateTime from, DateTime to, CancellationToken ct = default)
+    public async Task<CancellationRateDto> GetCancellationRateAsync(
+        DateTime from, DateTime to, CancellationToken ct = default)
     {
-        var orders = context.Orders.AsNoTracking().Where(o => o.CreatedAt >= from && o.CreatedAt <= to);
-        var total = await orders.CountAsync(ct);
-        var cancelled = await orders.CountAsync(o => o.Status == OrderStatus.Cancelled, ct);
-        var rate = total == 0 ? 0m : Math.Round((decimal)cancelled / total * 100m, 2);
+        var f = Utc(from);
+        var t = Utc(to);
 
-        // TODO: igazítsd a CancellationRateDto konstruktorához
-        return new CancellationRateDto(total, cancelled, rate);
+        var counts = await context.Orders.AsNoTracking()
+            .Where(o => o.CreatedAt >= f && o.CreatedAt <= t)
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Total = g.Count(),
+                Cancelled = g.Count(o => o.Status == OrderStatus.Cancelled),
+                Rejected = g.Count(o => o.Status == OrderStatus.Rejected)
+            })
+            .FirstOrDefaultAsync(ct);
+
+        if (counts is null || counts.Total == 0)
+            return new CancellationRateDto(0, 0, 0, 0m);
+
+        var rate = Math.Round((decimal)counts.Cancelled / counts.Total, 4);
+        return new CancellationRateDto(counts.Total, counts.Cancelled, counts.Rejected, rate);
     }
 
-    public async Task<IReadOnlyList<VendorRevenueDto>> GetVendorRevenueAsync(DateTime from, DateTime to, CancellationToken ct = default)
+    public async Task<IReadOnlyList<VendorRevenueDto>> GetVendorRevenueAsync(
+        DateTime from, DateTime to, CancellationToken ct = default)
     {
-        var rows = await context.Orders.AsNoTracking()
-            .Where(o => o.CreatedAt >= from && o.CreatedAt <= to && o.Status == OrderStatus.PickedUp)
-            .SelectMany(o => o.Items)
-            .GroupBy(i => new { i.Product.ProducerId, i.Product.Producer.Name })
-            .Select(g => new { g.Key.ProducerId, g.Key.Name, Revenue = g.Sum(i => i.UnitPrice * i.Quantity) })
-            .OrderByDescending(x => x.Revenue)
+        var f = Utc(from);
+        var t = Utc(to);
+
+        var orders = await context.Orders.AsNoTracking()
+            .Where(o => o.CreatedAt >= f && o.CreatedAt <= t && o.Status == OrderStatus.PickedUp)
+            .Select(o => new
+            {
+                o.ProducerId,
+                Total = o.Items.Sum(i => i.UnitPrice * i.FulfilledQuantity)
+            })
             .ToListAsync(ct);
 
-        return rows.Select(r => new VendorRevenueDto(r.ProducerId, r.Name, r.Revenue)).ToList();
+        if (orders.Count == 0)
+            return [];
+
+        var ids = orders.Select(o => o.ProducerId).Distinct().ToList();
+        var names = await context.Producers.AsNoTracking()
+            .Where(p => ids.Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id, p => p.Name, ct);
+
+        return orders
+            .GroupBy(o => o.ProducerId)
+            .Select(g => new VendorRevenueDto(
+                g.Key,
+                names.GetValueOrDefault(g.Key, string.Empty),
+                g.Count(),
+                g.Sum(o => o.Total)))
+            .OrderByDescending(r => r.Revenue)
+            .ToList();
     }
 
-    public async Task<IReadOnlyList<UnclaimedOrderDto>> GetUnclaimedOrdersAsync(DateTime from, DateTime to, CancellationToken ct = default)
+    public async Task<IReadOnlyList<UnclaimedOrderDto>> GetUnclaimedOrdersAsync(
+        DateTime from, DateTime to, CancellationToken ct = default)
     {
+        var f = Utc(from);
+        var t = Utc(to);
+        var now = time.GetUtcNow().UtcDateTime;
+        var today = now.Date;
+        var nowTime = TimeOnly.FromDateTime(now);
+
         var rows = await context.Orders.AsNoTracking()
-            .Where(o => o.CreatedAt >= from && o.CreatedAt <= to && o.Status == OrderStatus.NotPickedUp)
-            .OrderByDescending(o => o.CreatedAt)
-            .Select(o => new { o.Id, o.UserId, o.CreatedAt })
+            .Where(o => o.CreatedAt >= f && o.CreatedAt <= t
+                        && (o.Status == OrderStatus.NotPickedUp
+                            || ((o.Status == OrderStatus.Accepted
+                                 || o.Status == OrderStatus.Ready
+                                 || o.Status == OrderStatus.PartiallyFulfilled)
+                                && (o.PickupSlot.Date < today
+                                    || (o.PickupSlot.Date == today && o.PickupSlot.EndTime <= nowTime)))))
+            .OrderByDescending(o => o.PickupSlot.Date)
+            .Select(o => new
+            {
+                OrderId = o.Id,
+                o.ProducerId,
+                CustomerId = o.UserId,
+                CustomerFirst = o.User.FirstName,
+                CustomerLast = o.User.LastName,
+                PickupDate = o.PickupSlot.Date,
+                Total = o.Items.Sum(i => i.UnitPrice * i.FulfilledQuantity),
+                o.Status
+            })
             .ToListAsync(ct);
 
-        return rows.Select(r => new UnclaimedOrderDto(r.Id, r.UserId, r.CreatedAt)).ToList();
+        if (rows.Count == 0)
+            return [];
+
+        var ids = rows.Select(r => r.ProducerId).Distinct().ToList();
+        var names = await context.Producers.AsNoTracking()
+            .Where(p => ids.Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id, p => p.Name, ct);
+
+        return rows
+            .Select(r => new UnclaimedOrderDto(
+                r.OrderId,
+                r.ProducerId,
+                names.GetValueOrDefault(r.ProducerId, string.Empty),
+                r.CustomerId,
+                $"{r.CustomerLast} {r.CustomerFirst}".Trim(),
+                r.PickupDate,
+                r.Total,
+                r.Status.ToString()))
+            .ToList();
     }
 }
