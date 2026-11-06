@@ -30,7 +30,9 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=${POSTGRES_DB:-localmarket};Username=${POSTGRES_USER:-localmarket};Password=${POSTGRES_PASSWORD:?Állítsd be a POSTGRES_PASSWORD-öt a .env fájlban}"
-      Database__MigrateOnStartup: "${MIGRATE_ON_STARTUP:-false}"
+      Database__MigrateOnStartup: "${MIGRATE_ON_STARTUP:-true}"
+      Jwt__Secret: "${JWT_SECRET:?Állítsd be a JWT_SECRET-et a .env fájlban (min. 32 karakter)}"
+      Cors__Origins__0: "http://localhost:5219"
     ports:
       - "5205:8080"
 
