@@ -11,8 +11,8 @@ internal sealed class ProductRepository(MarketDbContext context) : IProductRepos
     private IQueryable<Product> WithDetails() => context.Products
         .Include(p => p.Producer)
         .Include(p => p.Categories)
-        .Include(p => p.Allergies)
-        .Include(p => p.WeeklyStocks);
+        .Include(p => p.WeeklyStocks)
+        .AsSplitQuery();
 
     public Task<Product?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
         => WithDetails().FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
@@ -49,7 +49,9 @@ internal sealed class ProductRepository(MarketDbContext context) : IProductRepos
         return result;
     }
 
-    public async Task AddAsync(Product product, CancellationToken cancellationToken = default) => await context.Products.AddAsync(product, cancellationToken);
+    public async Task AddAsync(Product product, CancellationToken cancellationToken = default)
+        => await context.Products.AddAsync(product, cancellationToken);
 
-    private static string EscapeLike(string value) => value.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+    private static string EscapeLike(string value)
+        => value.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
 }

@@ -14,7 +14,9 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(order => order.CreatedAt).HasColumnType("timestamp with time zone");
         builder.Property(order => order.Status).HasConversion<string>().HasMaxLength(30).IsRequired();
         builder.Property(order => order.DisputeNote).HasMaxLength(2000);
+        builder.Property(order => order.RejectionReason).HasMaxLength(1000);
         builder.Ignore(order => order.TotalAmount);
+        builder.Ignore(order => order.HoldsReservations);
 
         builder.HasOne(order => order.User)
             .WithMany()
@@ -30,6 +32,7 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
             .WithOne(item => item.Order)
             .HasForeignKey(item => item.OrderId)
             .OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(order => order.Items).UsePropertyAccessMode(PropertyAccessMode.Field);
 
         builder.HasOne(order => order.Payment)
             .WithOne(payment => payment.Order)
@@ -37,6 +40,7 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasIndex(order => order.UserId);
+        builder.HasIndex(order => order.ProducerId);
         builder.HasIndex(order => order.PickupSlotId);
         builder.HasIndex(order => order.Status);
     }

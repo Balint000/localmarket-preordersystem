@@ -9,4 +9,12 @@ internal sealed class MarketRepository(MarketDbContext context) : IMarketReposit
 {
     public Task<Market?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
         => context.Markets.FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
+
+    public async Task<IReadOnlyList<Market>> ListAsync(CancellationToken cancellationToken = default)
+        => await context.Markets.AsNoTracking()
+            .OrderBy(m => m.Name)
+            .ToListAsync(cancellationToken);
+
+    public async Task AddAsync(Market market, CancellationToken cancellationToken = default)
+        => await context.Markets.AddAsync(market, cancellationToken);
 }
