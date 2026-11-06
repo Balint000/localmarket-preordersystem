@@ -49,11 +49,9 @@ services:
     ports:
       - "5219:8080"
 
-  # Adatbázis-kezelő felület: docker compose --profile tools up -d
   pgadmin:
     image: dpage/pgadmin4:9
     restart: unless-stopped
-    profiles: ["tools"]
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:?Állítsd be a PGADMIN_PASSWORD-öt a .env fájlban}
