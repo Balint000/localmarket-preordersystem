@@ -1,0 +1,32 @@
+﻿<dl class="row mb-0">
+    <dt class="col-sm-4">Azonosító</dt><dd class="col-sm-8">#@Order.Id</dd>
+    <dt class="col-sm-4">Állapot</dt><dd class="col-sm-8"><StatusBadge Status="@Order.Status" /></dd>
+    <dt class="col-sm-4">Leadva</dt><dd class="col-sm-8">@Labels.DateTimeText(Order.CreatedAt)</dd>
+    <dt class="col-sm-4">Átvétel</dt><dd class="col-sm-8">@Labels.Date(Order.PickupDate) @Labels.Time(Order.PickupStart)–@Labels.Time(Order.PickupEnd)</dd>
+    @if (ShowCustomer)
+    {
+        <dt class="col-sm-4">Vásárló</dt><dd class="col-sm-8">@(Order.CustomerName ?? $"#{Order.CustomerId}")</dd>
+    }
+    else
+    {
+        <dt class="col-sm-4">Termelő</dt><dd class="col-sm-8">@(Order.ProducerName ?? $"#{Order.ProducerId}")</dd>
+    }
+    @if (Order.Payment is { } p)
+    {
+        <dt class="col-sm-4">Fizetés</dt><dd class="col-sm-8">@Labels.Payment(p.Method) – @Labels.Money(p.Amount) (@p.Status)</dd>
+    }
+    @if (!string.IsNullOrWhiteSpace(Order.RejectionReason))
+    {
+        <dt class="col-sm-4">Elutasítás oka</dt><dd class="col-sm-8">@Order.RejectionReason</dd>
+    }
+    @if (!string.IsNullOrWhiteSpace(Order.DisputeNote))
+    {
+        <dt class="col-sm-4">Vita</dt><dd class="col-sm-8">@Order.DisputeNote</dd>
+    }
+</dl>
+
+@code {
+    [Parameter, EditorRequired] public OrderInfo Order { get; set; } = default!;
+    /// <summary>Eladói nézetben a vásárló, vásárlói nézetben a termelő adatai látszanak.</summary>
+    [Parameter] public bool ShowCustomer { get; set; }
+}

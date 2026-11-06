@@ -1,0 +1,76 @@
+﻿@page "/login"
+@inject AuthApi Api
+@inject AuthStateService Auth
+@inject ToastService Toasts
+@inject NavigationManager Navigation
+
+<PageTitle>Bejelentkezés – LocalMarket</PageTitle>
+
+<div class="lm-auth">
+    <PageContainer Title="Bejelentkezés">
+        <div class="lm-card">
+            <EditForm Model="_form" OnValidSubmit="SubmitAsync" FormName="login">
+                <DataAnnotationsValidator />
+
+                @if (_problem is not null)
+                {
+                    <ErrorMessage Problem="_problem" />
+                }
+
+                <div class="mb-3">
+                    <label class="form-label" for="email">E-mail cím</label>
+                    <InputText id="email" type="email" class="form-control" @bind-Value="_form.Email" autocomplete="username" />
+                    <ValidationMessage For="() => _form.Email" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="password">Jelszó</label>
+                    <InputText id="password" type="password" class="form-control" @bind-Value="_form.Password" autocomplete="current-password" />
+                    <ValidationMessage For="() => _form.Password" />
+                </div>
+
+                <SubmitButton Busy="_busy" CssClass="btn-primary w-100">Bejelentkezés</SubmitButton>
+            </EditForm>
+        </div>
+        <p class="mt-3 text-center">Még nincs fiókod? <a href="register">Regisztráció</a></p>
+    </PageContainer>
+</div>
+
+@code {
+    [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
+
+    private readonly LoginForm _form = new();
+    private ApiProblem? _problem;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Auth.GetAuthenticationStateAsync();
+        if (Auth.IsAuthenticated) Navigation.NavigateTo("dashboard", replace: true);
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (_busy) return;
+        _busy = true;
+        _problem = null;
+
+        var result = await Api.LoginAsync(new LoginRequest(_form.Email.Trim(), _form.Password));
+        if (result.IsSuccess)
+        {
+            await Auth.SignInAsync(result.Value!.Token, result.Value.ExpiresAtUtc);
+            Toasts.Success("Sikeres bejelentkezés.");
+            Navigation.NavigateTo(SafeReturnUrl(), replace: true);
+            return;
+        }
+
+        _problem = result.Problem;
+        _form.Password = "";
+        _busy = false;
+    }
+
+    // csak helyi (a saját alkalmazáson belüli) útvonalra irányítunk vissza
+    private string SafeReturnUrl()
+        => !string.IsNullOrWhiteSpace(ReturnUrl) && !ReturnUrl.Contains("://") && !ReturnUrl.StartsWith("//") && !ReturnUrl.StartsWith('\\')
+            ? ReturnUrl
+            : "dashboard";
+}

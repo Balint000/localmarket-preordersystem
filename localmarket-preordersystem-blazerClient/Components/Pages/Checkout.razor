@@ -1,0 +1,155 @@
+﻿@page "/checkout"
+@attribute [Authorize(Roles = "Customer")]
+@inject CartService CartSvc
+@inject CatalogApi Catalog
+@inject OrdersApi Orders
+@inject ToastService Toasts
+@inject NavigationManager Navigation
+
+<PageTitle>Rendelés leadása – LocalMarket</PageTitle>
+
+<PageContainer Title="Rendelés leadása" Subtitle="Válassz átvételi időpontot minden termelőhöz">
+    @if (_loading)
+    {
+        <LoadingIndicator />
+    }
+    else if (_loadProblem is not null)
+    {
+        <ErrorMessage Problem="_loadProblem" OnRetry="LoadAsync" />
+    }
+    else if (_cart is null || _cart.Groups.Count == 0)
+    {
+        <EmptyState Title="A kosarad üres" Text="Rendelést csak nem üres kosárból lehet leadni.">
+            <a class="btn btn-primary" href="products">Termékek böngészése</a>
+        </EmptyState>
+    }
+    else
+    {
+        <EditForm Model="this" OnSubmit="SubmitAsync" FormName="checkout">
+            @if (_problem is not null)
+            {
+                <ErrorMessage Problem="_problem" />
+            }
+
+            @foreach (var group in _cart.Groups)
+            {
+                var slots = _slots.GetValueOrDefault(group.ProducerId) ?? [];
+                <section class="lm-card mb-3" aria-label="@(group.ProducerName ?? "Termelő")">
+                    <h2 class="h5">@(group.ProducerName ?? $"Termelő #{group.ProducerId}")</h2>
+                    <ul class="list-unstyled mb-3">
+                        @foreach (var item in group.Items)
+                        {
+                            <li class="d-flex justify-content-between"><span>@item.ProductName × @Labels.Qty(item.Quantity)</span><span>@Labels.Money(item.LineTotal)</span></li>
+                        }
+                    </ul>
+
+                    <label class="form-label" for="slot-@group.ProducerId">Átvételi időpont</label>
+                    @if (_slotProblems.TryGetValue(group.ProducerId, out var slotProblem))
+                    {
+                        <ErrorMessage Problem="slotProblem" OnRetry="LoadAsync" />
+                    }
+                    else if (slots.Count == 0)
+                    {
+                        <div class="alert alert-warning mb-0">Ennél a termelőnél jelenleg nincs szabad átvételi időpont, ezért ez a rendelés nem adható le.</div>
+                    }
+                    else
+                    {
+                        <select id="slot-@group.ProducerId" class="form-select" @bind="_selected[group.ProducerId]">
+                            <option value="0">Válassz időpontot...</option>
+                            @foreach (var slot in slots)
+                            {
+                                <option value="@slot.Id" disabled="@(slot.FreeCapacity <= 0)">
+                                    @Labels.Date(slot.Date) @Labels.Time(slot.StartTime)–@Labels.Time(slot.EndTime) (@slot.FreeCapacity szabad hely)
+                                </option>
+                            }
+                        </select>
+                        @if (_submitted && _selected.GetValueOrDefault(group.ProducerId) == 0)
+                        {
+                            <div class="validation-message">Válassz átvételi időpontot.</div>
+                        }
+                    }
+                </section>
+            }
+
+            <section class="lm-card mb-3">
+                <h2 class="h5">Fizetési mód</h2>
+                @foreach (var method in Labels.PaymentMethods)
+                {
+                    var m = method;
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" id="pay-@m" name="payment" checked="@(_payment == m)" @onchange="() => _payment = m" />
+                        <label class="form-check-label" for="pay-@m">@Labels.Payment(m)</label>
+                    </div>
+                }
+                <p class="text-muted small mt-2 mb-0">A fizetés módját a rendelés rögzíti; online fizetés nem történik.</p>
+            </section>
+
+            <section class="lm-card">
+                <div class="lm-summary"><span>Becsült végösszeg</span><span>@Labels.Money(_cart.EstimatedTotal)</span></div>
+                <p class="text-muted small">A végső összeget és a készlet-foglalást a szerver számolja a leadáskor.</p>
+                <div class="d-flex justify-content-end gap-2">
+                    <a class="btn btn-outline-secondary" href="cart">Vissza a kosárhoz</a>
+                    <SubmitButton Busy="_busy">Rendelés leadása</SubmitButton>
+                </div>
+            </section>
+        </EditForm>
+    }
+</PageContainer>
+
+@code {
+    private CartInfo? _cart;
+    private readonly Dictionary<int, IReadOnlyList<PickupSlotInfo>> _slots = new();
+    private readonly Dictionary<int, ApiProblem> _slotProblems = new();
+    private readonly Dictionary<int, int> _selected = new();
+    private string _payment = "Cash";
+    private ApiProblem? _loadProblem, _problem;
+    private bool _loading = true, _busy, _submitted;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _loadProblem = null;
+        _slotProblems.Clear();
+
+        var cart = await CartSvc.GetAsync();
+        if (!cart.IsSuccess) { _loadProblem = cart.Problem; _loading = false; return; }
+        _cart = cart.Value;
+
+        foreach (var group in _cart!.Groups)
+        {
+            _selected.TryAdd(group.ProducerId, 0);
+            var slots = await Catalog.PickupSlotsAsync(group.ProducerId);
+            if (slots.IsSuccess) _slots[group.ProducerId] = slots.Value!;
+            else _slotProblems[group.ProducerId] = slots.Problem!;
+        }
+        _loading = false;
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (_busy || _cart is null || _cart.Groups.Count == 0) return;
+        _submitted = true;
+        _problem = null;
+
+        if (_cart.Groups.Any(g => _selected.GetValueOrDefault(g.ProducerId) == 0)) return;
+
+        _busy = true;
+        var pickups = _cart.Groups.Select(g => new PickupChoiceRequest(g.ProducerId, _selected[g.ProducerId])).ToList();
+        var result = await Orders.PlaceAsync(new PlaceOrderRequest(_payment, pickups));
+
+        if (result.IsSuccess)
+        {
+            var placed = result.Value!;
+            Toasts.Success(placed.Count == 1 ? "A rendelésedet leadtuk." : $"{placed.Count} rendelést adtunk le (termelőnként egyet).");
+            Navigation.NavigateTo(placed.Count == 1 ? $"orders/{placed[0].Id}" : "orders");
+            return;
+        }
+
+        _problem = result.Problem;
+        if (result.Problem!.Kind is ApiFailure.Conflict or ApiFailure.BadRequest or ApiFailure.Validation)
+            await LoadAsync(); // a kosár/foglaltság közben megváltozhatott
+        _busy = false;
+    }
+}

@@ -1,0 +1,18 @@
+﻿<a class="lm-order-row" href="@Href">
+    <div>
+        <div class="fw-semibold">#@Order.Id · @(ShowCustomer ? (Order.CustomerName ?? $"Vásárló #{Order.CustomerId}") : (Order.ProducerName ?? $"Termelő #{Order.ProducerId}"))</div>
+        <div class="text-muted small">
+            Leadva: @Labels.DateTimeText(Order.CreatedAt) · Átvétel: @Labels.Date(Order.PickupDate) @Labels.Time(Order.PickupStart) · @Order.Items.Count tétel
+        </div>
+    </div>
+    <div class="text-end">
+        <StatusBadge Status="@Order.Status" />
+        <div class="fw-semibold mt-1">@Labels.Money(Order.TotalAmount)</div>
+    </div>
+</a>
+
+@code {
+    [Parameter, EditorRequired] public OrderInfo Order { get; set; } = default!;
+    [Parameter, EditorRequired] public string Href { get; set; } = "";
+    [Parameter] public bool ShowCustomer { get; set; }
+}

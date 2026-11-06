@@ -1,0 +1,31 @@
+﻿<article class="lm-product">
+    <div class="lm-product-img" aria-hidden="true">🥕</div>
+    <div class="lm-product-body">
+        <a class="lm-product-name" href="products/@Product.Id">@Product.Name</a>
+        <div class="text-muted small">@(Product.ProducerName ?? "Termelő")</div>
+        <div>
+            @foreach (var c in Product.Categories)
+            {
+                <span class="lm-chip">@c.Name</span>
+            }
+        </div>
+        @if (Product.NextStock is { } stock)
+        {
+            <div class="lm-price">@Labels.Money(stock.UnitPrice) <span class="text-muted fw-normal small">/ @Labels.Unit(stock.Unit)</span></div>
+            <div class="small @(stock.AvailableQuantity > 0 ? "text-success" : "text-danger")">
+                @(stock.AvailableQuantity > 0 ? $"Elérhető: {Labels.Qty(stock.AvailableQuantity)} {Labels.Unit(stock.Unit)}" : "Elfogyott erre a hétre")
+            </div>
+        }
+        else
+        {
+            <div class="small text-muted">Még nincs meghirdetett kínálat.</div>
+        }
+        <div class="mt-auto pt-2">
+            <a class="btn btn-outline-primary btn-sm" href="products/@Product.Id">Részletek</a>
+        </div>
+    </div>
+</article>
+
+@code {
+    [Parameter, EditorRequired] public ProductInfo Product { get; set; } = default!;
+}

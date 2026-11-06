@@ -1,0 +1,36 @@
+﻿@* A szerver mezőnkénti validációs hibái (400) felsorolva. *@
+@if (Problem is { Errors.Count: > 0 })
+{
+    <ul class="lm-problem-list">
+        @foreach (var (field, messages) in Problem.Errors)
+        {
+            foreach (var message in messages)
+            {
+                <li><span class="fw-semibold">@FieldName(field):</span> @message</li>
+            }
+        }
+    </ul>
+}
+
+@code {
+    [Parameter] public ApiProblem? Problem { get; set; }
+
+    private static string FieldName(string field) => field switch
+    {
+        "FirstName" => "Keresztnév",
+        "LastName" => "Vezetéknév",
+        "Email" => "E-mail",
+        "Password" => "Jelszó",
+        "PhoneNumber" => "Telefonszám",
+        "ProducerName" => "Gazdaság neve",
+        "StallNumber" => "Standszám",
+        "MarketId" => "Piac",
+        "Quantity" => "Mennyiség",
+        "Reason" => "Indoklás",
+        "Note" => "Megjegyzés",
+        "Pickups" => "Átvételi időpont",
+        "PaymentMethod" => "Fizetési mód",
+        "Lines" => "Tételek",
+        _ => field
+    };
+}

@@ -1,0 +1,149 @@
+﻿@page "/vendor/orders/{Id:int}"
+@attribute [Authorize(Roles = "Producer")]
+@inject OrdersApi Api
+@inject FileDownloader Downloader
+@inject ToastService Toasts
+
+<PageTitle>Rendelés #@Id – LocalMarket</PageTitle>
+
+<PageContainer Title="@($"Rendelés #{Id}")">
+    <Actions><a class="btn btn-outline-secondary" href="vendor/orders">← Beérkező rendelések</a></Actions>
+    <ChildContent>
+
+    @if (_loading)
+    {
+        <LoadingIndicator />
+    }
+    else if (_problem is not null && _order is null)
+    {
+        <ErrorMessage Problem="_problem" OnRetry="LoadAsync" />
+    }
+    else if (_order is not null)
+    {
+        <div class="row g-3">
+            <div class="col-lg-5"><div class="lm-card"><OrderInfoPanel Order="_order" ShowCustomer="true" /></div></div>
+            <div class="col-lg-7"><div class="lm-card"><OrderItemsTable Order="_order" /></div></div>
+        </div>
+
+        @* A tényleges állapotátmenetet a backend ellenőrzi; itt csak az adott állapotban értelmes gombokat mutatjuk. *@
+        <div class="d-flex flex-wrap gap-2 mt-3">
+            @switch (_order.Status)
+            {
+                case "Pending":
+                    <button class="btn btn-primary" disabled="@_busy" @onclick='() => RunAsync(() => Api.AcceptAsync(Id), "Rendelés elfogadva.")'>Elfogadás</button>
+                    <button class="btn btn-outline-primary" disabled="@_busy" @onclick="OpenPartial">Részleges teljesítés</button>
+                    <button class="btn btn-outline-danger" disabled="@_busy" @onclick="() => _dialog = Dialog.Reject">Elutasítás</button>
+                    break;
+                case "Accepted" or "PartiallyFulfilled":
+                    <button class="btn btn-primary" disabled="@_busy" @onclick='() => RunAsync(() => Api.ReadyAsync(Id), "Átvehetőnek jelölve.")'>Átvehető</button>
+                    break;
+                case "Ready":
+                    <button class="btn btn-primary" disabled="@_busy" @onclick='() => RunAsync(() => Api.PickedUpAsync(Id), "Átvettnek jelölve.")'>Átvéve</button>
+                    <button class="btn btn-outline-danger" disabled="@_busy" @onclick='() => RunAsync(() => Api.NotPickedUpAsync(Id), "Nem átvettnek jelölve.")'>Nem vette át</button>
+                    break;
+            }
+            @if (_order.Status is "PickedUp" or "NotPickedUp")
+            {
+                <button class="btn btn-outline-danger" disabled="@_busy" @onclick="() => _dialog = Dialog.Dispute">Vitatás</button>
+            }
+            <button class="btn btn-outline-secondary ms-auto" disabled="@_exporting" @onclick='() => ExportAsync("Json")'>Export (JSON)</button>
+            <button class="btn btn-outline-secondary" disabled="@_exporting" @onclick='() => ExportAsync("Csv")'>Export (CSV)</button>
+        </div>
+
+        <ConfirmDialog Visible="_dialog == Dialog.Reject" Title="Rendelés elutasítása" Danger="true" Busy="_busy"
+                       ConfirmText="Elutasítom" ConfirmDisabled="string.IsNullOrWhiteSpace(_text)"
+                       OnConfirm='() => RunAsync(() => Api.RejectAsync(Id, _text.Trim()), "Rendelés elutasítva.")' OnCancel="CloseDialog">
+            <label class="form-label" for="reason">Indoklás (kötelező)</label>
+            <textarea id="reason" class="form-control" rows="3" maxlength="1000" @bind="_text" @bind:event="oninput"></textarea>
+        </ConfirmDialog>
+
+        <ConfirmDialog Visible="_dialog == Dialog.Dispute" Title="Rendelés vitatása" Danger="true" Busy="_busy"
+                       ConfirmText="Vitatom" ConfirmDisabled="string.IsNullOrWhiteSpace(_text)"
+                       OnConfirm='() => RunAsync(() => Api.DisputeAsync(Id, _text.Trim()), "A vitát rögzítettük, a piacvezető dönt.")' OnCancel="CloseDialog">
+            <label class="form-label" for="note">Indoklás (kötelező)</label>
+            <textarea id="note" class="form-control" rows="3" maxlength="1000" @bind="_text" @bind:event="oninput"></textarea>
+        </ConfirmDialog>
+
+        <ConfirmDialog Visible="_dialog == Dialog.Partial" Title="Részleges teljesítés" Busy="_busy"
+                       Message="Add meg, mennyit vállalsz tételenként. A 0 mennyiségű tétel nem teljesül."
+                       ConfirmText="Elfogadom" OnConfirm="AcceptPartialAsync" OnCancel="CloseDialog">
+            @foreach (var line in _order.Items)
+            {
+                var pid = line.ProductId;
+                <div class="mb-2">
+                    <label class="form-label" for="@($"q{pid}")">@line.ProductName (rendelt: @Labels.Qty(line.Quantity) @Labels.Unit(line.Unit))</label>
+                    <input id="@($"q{pid}")" type="number" min="0" max="@line.Quantity" step="any" class="form-control"
+                           value="@_partial[pid]" @onchange="e => SetPartial(pid, e.Value)" />
+                </div>
+            }
+        </ConfirmDialog>
+    }
+</ChildContent>
+</PageContainer>
+
+@code {
+    private enum Dialog { None, Reject, Dispute, Partial }
+
+    [Parameter] public int Id { get; set; }
+
+    private OrderInfo? _order;
+    private ApiProblem? _problem;
+    private bool _loading = true, _busy, _exporting;
+    private Dialog _dialog;
+    private string _text = "";
+    private readonly Dictionary<int, decimal> _partial = new();
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _problem = null;
+        var result = await Api.GetAsync(Id);
+        if (result.IsSuccess) _order = result.Value; else { _order = null; _problem = result.Problem; }
+        _loading = false;
+    }
+
+    private void CloseDialog() { _dialog = Dialog.None; _text = ""; }
+
+    private void OpenPartial()
+    {
+        _partial.Clear();
+        foreach (var i in _order!.Items) _partial[i.ProductId] = i.Quantity;
+        _dialog = Dialog.Partial;
+    }
+
+    private void SetPartial(int productId, object? raw)
+    {
+        _partial[productId] = decimal.TryParse(raw?.ToString(), System.Globalization.NumberStyles.Number,
+            System.Globalization.CultureInfo.InvariantCulture, out var v) && v >= 0 ? v : 0;
+    }
+
+    private Task AcceptPartialAsync()
+    {
+        var lines = _partial.Where(p => p.Value > 0).Select(p => new FulfilledLineRequest(p.Key, p.Value)).ToList();
+        return RunAsync(() => Api.AcceptPartiallyAsync(Id, lines), "Rendelés részben elfogadva.");
+    }
+
+    private async Task RunAsync(Func<Task<ApiResult<OrderInfo>>> action, string successText)
+    {
+        if (_busy) return;
+        _busy = true;
+        var result = await action();
+        _dialog = Dialog.None;
+        _text = "";
+        if (result.IsSuccess) { _order = result.Value; Toasts.Success(successText); }
+        else { Toasts.Error(result.Problem!.Message); await LoadAsync(); }
+        _busy = false;
+    }
+
+    private async Task ExportAsync(string format)
+    {
+        if (_exporting) return;
+        _exporting = true;
+        var result = await Api.ExportOrderAsync(Id, format);
+        if (result.IsSuccess) await Downloader.SaveAsync(result.Value!);
+        else Toasts.Error(result.Problem!.Message);
+        _exporting = false;
+    }
+}

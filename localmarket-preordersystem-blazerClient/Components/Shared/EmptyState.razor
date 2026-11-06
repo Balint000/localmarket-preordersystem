@@ -1,0 +1,14 @@
+﻿<div class="lm-empty">
+    <h2 class="h5">@Title</h2>
+    @if (!string.IsNullOrWhiteSpace(Text))
+    {
+        <p class="text-muted mb-3">@Text</p>
+    }
+    @ChildContent
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public string? Text { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

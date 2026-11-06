@@ -1,0 +1,89 @@
+﻿@page "/orders/{Id:int}"
+@attribute [Authorize(Roles = "Customer")]
+@inject OrdersApi Api
+@inject FileDownloader Downloader
+@inject ToastService Toasts
+
+<PageTitle>Rendelés #@Id – LocalMarket</PageTitle>
+
+<PageContainer Title="@($"Rendelés #{Id}")">
+    <Actions><a class="btn btn-outline-secondary" href="orders">← Rendeléseim</a></Actions>
+    <ChildContent>
+
+    @if (_loading)
+    {
+        <LoadingIndicator />
+    }
+    else if (_problem is not null && _order is null)
+    {
+        <ErrorMessage Problem="_problem" OnRetry="LoadAsync" />
+    }
+    else if (_order is not null)
+    {
+        @if (_problem is not null)
+        {
+            <ErrorMessage Problem="_problem" />
+        }
+
+        <div class="row g-3">
+            <div class="col-lg-5"><div class="lm-card"><OrderInfoPanel Order="_order" /></div></div>
+            <div class="col-lg-7"><div class="lm-card"><OrderItemsTable Order="_order" /></div></div>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 mt-3">
+            <button type="button" class="btn btn-outline-primary" disabled="@_exporting" @onclick='() => ExportAsync("Json")'>Összesítő (JSON)</button>
+            <button type="button" class="btn btn-outline-primary" disabled="@_exporting" @onclick='() => ExportAsync("Csv")'>Összesítő (CSV)</button>
+            @* A lemondhatóságot a backend dönti el; a gomb csak az aktív (még le nem zárt) állapotokban jelenik meg. *@
+            @if (_order.Status is "Pending" or "Accepted" or "PartiallyFulfilled" or "Ready")
+            {
+                <button type="button" class="btn btn-outline-danger ms-auto" @onclick="() => _confirmCancel = true">Rendelés lemondása</button>
+            }
+        </div>
+
+        <ConfirmDialog Visible="_confirmCancel" Title="Lemondod a rendelést?" Danger="true" Busy="_busy"
+                       Message="A lemondás után a lefoglalt készlet és az átvételi időpont felszabadul. Ez nem vonható vissza."
+                       ConfirmText="Igen, lemondom" CancelText="Mégsem"
+                       OnConfirm="CancelAsync" OnCancel="() => _confirmCancel = false" />
+    }
+</ChildContent>
+</PageContainer>
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private OrderInfo? _order;
+    private ApiProblem? _problem;
+    private bool _loading = true, _busy, _confirmCancel, _exporting;
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _problem = null;
+        var result = await Api.GetAsync(Id);
+        if (result.IsSuccess) _order = result.Value; else { _order = null; _problem = result.Problem; }
+        _loading = false;
+    }
+
+    private async Task CancelAsync()
+    {
+        if (_busy) return;
+        _busy = true;
+        var result = await Api.CancelAsync(Id);
+        _confirmCancel = false;
+        if (result.IsSuccess) { _order = result.Value; _problem = null; Toasts.Success("A rendelést lemondtad."); }
+        else { Toasts.Error(result.Problem!.Message); await LoadAsync(); }
+        _busy = false;
+    }
+
+    private async Task ExportAsync(string format)
+    {
+        if (_exporting) return;
+        _exporting = true;
+        var result = await Api.ExportOrderAsync(Id, format);
+        if (result.IsSuccess) await Downloader.SaveAsync(result.Value!);
+        else Toasts.Error(result.Problem!.Message);
+        _exporting = false;
+    }
+}

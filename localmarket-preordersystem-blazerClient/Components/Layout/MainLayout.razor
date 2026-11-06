@@ -1,23 +1,40 @@
 ﻿@inherits LayoutComponentBase
+@implements IDisposable
+@inject AuthStateService Auth
+@inject ToastService Toasts
+@inject NavigationManager Navigation
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu/>
+<a class="lm-skip-link" href="#main-content">Ugrás a tartalomra</a>
+<NavMenu />
+
+<main id="main-content" class="lm-main">
+    <div class="container lm-container">
+        @Body
     </div>
+</main>
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
-        </div>
+<footer class="lm-footer">
+    <div class="container">LocalMarket – helyi termelői piac előrendelés</div>
+</footer>
 
-        <article class="content px-4">
-            @Body
-        </article>
-    </main>
-</div>
+<ToastHost />
 
 <div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
+    Váratlan hiba történt.
+    <a href="." class="reload">Újratöltés</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    protected override void OnInitialized() => Auth.SessionExpired += OnSessionExpired;
+
+    // lejárt vagy érvénytelen token: értesítés és vissza a bejelentkezéshez
+    private void OnSessionExpired() => _ = InvokeAsync(() =>
+    {
+        Toasts.Error("A munkamenet lejárt, jelentkezz be újra.");
+        var returnUrl = Uri.EscapeDataString(Navigation.ToBaseRelativePath(Navigation.Uri));
+        Navigation.NavigateTo($"login?returnUrl={returnUrl}");
+    });
+
+    public void Dispose() => Auth.SessionExpired -= OnSessionExpired;
+}

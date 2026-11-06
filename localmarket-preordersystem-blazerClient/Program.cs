@@ -1,18 +1,43 @@
 using localmarket_preordersystem.Components;
+using localmarket_preordersystem.Services;
+using Microsoft.AspNetCore.Components.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+// hitelesítési állapot: egy közös szolgáltatás, amit az AuthenticationStateProvider is használ
+builder.Services.AddCascadingAuthenticationState();
+builder.Services.AddAuthorizationCore();
+builder.Services.AddScoped<AuthStateService>();
+builder.Services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredService<AuthStateService>());
+
+// az API címe konfigurációból jön (Api:BaseUrl), docker-compose-ban: Api__BaseUrl
+var apiBaseUrl = builder.Configuration["Api:BaseUrl"];
+if (string.IsNullOrWhiteSpace(apiBaseUrl) || !Uri.TryCreate(apiBaseUrl, UriKind.Absolute, out var apiBaseUri))
+{
+    throw new InvalidOperationException("Az 'Api:BaseUrl' konfiguráció hiányzik vagy érvénytelen (pl. http://localhost:5205). Állítsd be az appsettings.Development.json-ban vagy az Api__BaseUrl környezeti változóval.");
+}
+
+builder.Services.AddHttpClient<ApiClient>(client =>
+{
+    client.BaseAddress = new Uri(apiBaseUri.ToString().TrimEnd('/') + "/");
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+
+builder.Services.AddScoped<ToastService>();
+builder.Services.AddScoped<FileDownloader>();
+builder.Services.AddScoped<AuthApi>();
+builder.Services.AddScoped<CatalogApi>();
+builder.Services.AddScoped<CartService>();
+builder.Services.AddScoped<OrdersApi>();
+
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
 

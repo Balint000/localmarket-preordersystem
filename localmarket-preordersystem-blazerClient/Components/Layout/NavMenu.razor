@@ -1,29 +1,86 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">localmarket-preordersystem-blazerClient</a>
+﻿@implements IDisposable
+@inject AuthStateService Auth
+@inject CartService Cart
+@inject NavigationManager Navigation
+
+<header class="lm-header">
+    <div class="container lm-header-inner">
+        <a class="lm-brand" href="@(Auth.IsAuthenticated ? "dashboard" : "")" aria-label="LocalMarket kezdőlap">
+            <span class="lm-brand-mark" aria-hidden="true">LM</span>
+            <span>LocalMarket</span>
+        </a>
+
+        <button type="button" class="lm-menu-toggle" aria-label="Menü" aria-expanded="@_open" aria-controls="lm-nav" @onclick="() => _open = !_open">
+            <span aria-hidden="true">☰</span>
+        </button>
+
+        <nav id="lm-nav" class="lm-nav @(_open ? "open" : "")" aria-label="Főmenü" @onclick="() => _open = false">
+            <NavLink class="lm-nav-link" href="products">Termékek</NavLink>
+
+            <AuthorizeView Roles="Customer">
+                <NavLink class="lm-nav-link" href="dashboard">Irányítópult</NavLink>
+                <NavLink class="lm-nav-link" href="orders">Rendeléseim</NavLink>
+                <NavLink class="lm-nav-link" href="cart">
+                    Kosár
+                    @if (Cart.ItemCount > 0)
+                    {
+                        <span class="lm-cart-badge" aria-label="@Cart.ItemCount tétel a kosárban">@Cart.ItemCount</span>
+                    }
+                </NavLink>
+            </AuthorizeView>
+            <AuthorizeView Roles="Producer">
+                <NavLink class="lm-nav-link" href="dashboard">Irányítópult</NavLink>
+                <NavLink class="lm-nav-link" href="vendor/orders">Beérkező rendelések</NavLink>
+            </AuthorizeView>
+            <AuthorizeView Roles="MarketManager">
+                <NavLink class="lm-nav-link" href="dashboard">Irányítópult</NavLink>
+                <NavLink class="lm-nav-link" href="manager/disputes">Viták</NavLink>
+            </AuthorizeView>
+
+            <span class="lm-nav-spacer"></span>
+
+            <AuthorizeView>
+                <Authorized>
+                    <UserMenu />
+                </Authorized>
+                <NotAuthorized>
+                    <NavLink class="lm-nav-link" href="login">Bejelentkezés</NavLink>
+                    <a class="btn btn-primary btn-sm" href="register">Regisztráció</a>
+                </NotAuthorized>
+            </AuthorizeView>
+        </nav>
     </div>
-</div>
+</header>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler"/>
+@code {
+    private bool _open;
 
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
-            </NavLink>
-        </div>
+    protected override async Task OnInitializedAsync()
+    {
+        Auth.AuthenticationStateChanged += OnAuthChanged;
+        Cart.Changed += OnCartChanged;
+        await RefreshCartCountAsync();
+    }
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
-            </NavLink>
-        </div>
+    private void OnAuthChanged(Task<AuthenticationState> state) => _ = InvokeAsync(async () =>
+    {
+        await RefreshCartCountAsync();
+        StateHasChanged();
+    });
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="weather">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
-            </NavLink>
-        </div>
-    </nav>
-</div>
+    private void OnCartChanged() => _ = InvokeAsync(StateHasChanged);
+
+    // a navbar-számláló a kosár tényleges (szerver oldali) tartalmából jön, nem kliensoldali számolásból
+    private async Task RefreshCartCountAsync()
+    {
+        await Auth.GetAuthenticationStateAsync();
+        if (Auth.Role == "Customer") await Cart.GetAsync();
+        else Cart.Reset();
+    }
+
+    public void Dispose()
+    {
+        Auth.AuthenticationStateChanged -= OnAuthChanged;
+        Cart.Changed -= OnCartChanged;
+    }
+}

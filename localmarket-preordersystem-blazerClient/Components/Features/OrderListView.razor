@@ -1,0 +1,75 @@
+﻿@* Közös rendeléslista: állapot szerinti szűrés (a szerveren), dátum szerinti rendezés (a letöltött listán). *@
+<div class="lm-card mb-3">
+    <div class="row g-3 align-items-end">
+        <div class="col-sm-5 col-md-4">
+            <label class="form-label" for="status-filter">Állapot</label>
+            <select id="status-filter" class="form-select" value="@_status" @onchange="OnStatusChangedAsync">
+                <option value="">Összes</option>
+                @foreach (var s in Labels.OrderStatuses)
+                {
+                    <option value="@s">@Labels.OrderStatus(s)</option>
+                }
+            </select>
+        </div>
+        <div class="col-sm-5 col-md-4">
+            <label class="form-label" for="order-sort">Rendezés</label>
+            <select id="order-sort" class="form-select" @bind="_newestFirst">
+                <option value="true">Legújabb elöl</option>
+                <option value="false">Legrégebbi elöl</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+@if (_loading)
+{
+    <LoadingIndicator Text="Rendelések betöltése..." />
+}
+else if (_problem is not null)
+{
+    <ErrorMessage Problem="_problem" OnRetry="LoadAsync" />
+}
+else if (_orders.Count == 0)
+{
+    <EmptyState Title="Nincs megjeleníthető rendelés" Text="@EmptyText">@EmptyContent</EmptyState>
+}
+else
+{
+    <div class="lm-order-list">
+        @foreach (var order in (_newestFirst ? _orders.OrderByDescending(o => o.CreatedAt) : _orders.OrderBy(o => o.CreatedAt)))
+        {
+            <OrderListItem Order="order" Href="@($"{DetailsBase}/{order.Id}")" ShowCustomer="ShowCustomer" />
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Func<string?, Task<ApiResult<IReadOnlyList<OrderInfo>>>> Loader { get; set; } = default!;
+    [Parameter, EditorRequired] public string DetailsBase { get; set; } = "";
+    [Parameter] public bool ShowCustomer { get; set; }
+    [Parameter] public string? EmptyText { get; set; }
+    [Parameter] public RenderFragment? EmptyContent { get; set; }
+
+    private IReadOnlyList<OrderInfo> _orders = [];
+    private ApiProblem? _problem;
+    private bool _loading = true;
+    private bool _newestFirst = true;
+    private string _status = "";
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task OnStatusChangedAsync(ChangeEventArgs e)
+    {
+        _status = e.Value?.ToString() ?? "";
+        await LoadAsync();
+    }
+
+    public async Task LoadAsync()
+    {
+        _loading = true;
+        _problem = null;
+        var result = await Loader(string.IsNullOrEmpty(_status) ? null : _status);
+        if (result.IsSuccess) _orders = result.Value!; else _problem = result.Problem;
+        _loading = false;
+    }
+}

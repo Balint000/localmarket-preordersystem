@@ -1,0 +1,16 @@
+﻿@page "/profile"
+@attribute [Authorize]
+@inject AuthStateService Auth
+
+<PageTitle>Profil – LocalMarket</PageTitle>
+
+<PageContainer Title="Profilom">
+    @* A backend nem ad profil-lekérdező/módosító végpontot, ezért csak a tokenben lévő adatokat mutatjuk. *@
+    <div class="lm-card" style="max-width:32rem">
+        <dl class="mb-0">
+            <dt>E-mail</dt><dd>@Auth.Email</dd>
+            <dt>Szerepkör</dt><dd>@Labels.Role(Auth.Role ?? "")</dd>
+            @if (Auth.ProducerId is { } pid) { <dt>Termelő azonosító</dt><dd>@pid</dd> }
+        </dl>
+    </div>
+</PageContainer>

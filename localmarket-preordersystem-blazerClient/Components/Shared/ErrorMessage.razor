@@ -1,0 +1,20 @@
+﻿<div class="alert alert-danger lm-error" role="alert">
+    <strong>@(Problem?.Title ?? "Hiba történt.")</strong>
+    @if (!string.IsNullOrWhiteSpace(Problem?.Detail))
+    {
+        <div>@Problem!.Detail</div>
+    }
+    @if (Problem is { Errors.Count: > 0 })
+    {
+        <ProblemList Problem="Problem" />
+    }
+    @if (OnRetry.HasDelegate && Problem?.Kind is not (ApiFailure.Forbidden or ApiFailure.NotFound))
+    {
+        <button type="button" class="btn btn-outline-danger btn-sm mt-2" @onclick="OnRetry">Újrapróbálás</button>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ApiProblem? Problem { get; set; }
+    [Parameter] public EventCallback OnRetry { get; set; }
+}
