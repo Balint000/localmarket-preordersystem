@@ -1,0 +1,11 @@
+﻿@page "/orders"
+@attribute [Authorize(Roles = "Customer")]
+@inject OrdersApi Api
+
+<PageTitle>Rendeléseim – LocalMarket</PageTitle>
+
+<PageContainer Title="Rendeléseim" Subtitle="Korábbi és aktív előrendeléseid">
+    <OrderListView Loader="s => Api.MineAsync(s)" DetailsBase="orders" EmptyText="Még nem adtál le rendelést.">
+        <EmptyContent><a class="btn btn-primary" href="products">Termékek böngészése</a></EmptyContent>
+    </OrderListView>
+</PageContainer>

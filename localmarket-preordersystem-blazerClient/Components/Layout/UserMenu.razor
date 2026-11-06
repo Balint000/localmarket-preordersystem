@@ -1,0 +1,32 @@
+﻿@inject AuthStateService Auth
+@inject NavigationManager Navigation
+@inject CartService Cart
+
+<div class="lm-user-menu">
+    <button type="button" class="lm-user-button" aria-haspopup="true" aria-expanded="@_open" @onclick="() => _open = !_open">
+        <span class="lm-avatar" aria-hidden="true">@Initial</span>
+        <span class="lm-user-text">
+            <span class="lm-user-email">@Auth.Email</span>
+            <span class="lm-user-role">@Labels.Role(Auth.Role ?? "")</span>
+        </span>
+    </button>
+    @if (_open)
+    {
+        <div class="lm-user-dropdown" role="menu" @onclick="() => _open = false">
+            <a role="menuitem" href="profile">Profilom</a>
+            <button type="button" role="menuitem" @onclick="SignOutAsync">Kijelentkezés</button>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _open;
+    private string Initial => string.IsNullOrEmpty(Auth.Email) ? "?" : Auth.Email[..1].ToUpperInvariant();
+
+    private async Task SignOutAsync()
+    {
+        await Auth.SignOutAsync();
+        Cart.Reset();
+        Navigation.NavigateTo("login");
+    }
+}

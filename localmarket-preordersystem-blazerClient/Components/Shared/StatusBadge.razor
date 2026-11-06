@@ -1,0 +1,5 @@
+﻿<span class="lm-badge @Labels.OrderStatusClass(Status)">@Labels.OrderStatus(Status)</span>
+
+@code {
+    [Parameter, EditorRequired] public string Status { get; set; } = "";
+}

@@ -1,0 +1,66 @@
+﻿@page "/dashboard"
+@attribute [Authorize]
+@inject AuthStateService Auth
+@inject OrdersApi Api
+
+<PageTitle>Irányítópult – LocalMarket</PageTitle>
+
+<PageContainer Title="Irányítópult" Subtitle="@Labels.Role(Auth.Role ?? "")">
+    @if (Auth.Role == "MarketManager")
+    {
+        <EmptyState Title="Piacvezetői felület" Text="A vitatott rendeléseket a Viták menüpontban találod.">
+            <a class="btn btn-primary" href="manager/disputes">Viták megtekintése</a>
+        </EmptyState>
+    }
+    else if (_loading)
+    {
+        <LoadingIndicator />
+    }
+    else if (_problem is not null)
+    {
+        <ErrorMessage Problem="_problem" OnRetry="LoadAsync" />
+    }
+    else
+    {
+        <div class="lm-stats">
+            <StatCard Label="Összes rendelés" Value="@_orders.Count.ToString()" />
+            <StatCard Label="Függőben" Value="@Count("Pending").ToString()" />
+            <StatCard Label="Átvehető" Value="@Count("Ready").ToString()" />
+            <StatCard Label="Átvéve" Value="@Count("PickedUp").ToString()" />
+        </div>
+        <div class="mt-3 d-flex gap-2">
+            @if (Auth.Role == "Producer")
+            {
+                <a class="btn btn-primary" href="vendor/orders">Beérkező rendelések</a>
+            }
+            else
+            {
+                <a class="btn btn-primary" href="orders">Rendeléseim</a>
+                <a class="btn btn-outline-primary" href="products">Termékek</a>
+            }
+        </div>
+    }
+</PageContainer>
+
+@code {
+    private IReadOnlyList<OrderInfo> _orders = [];
+    private ApiProblem? _problem;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Auth.GetAuthenticationStateAsync();
+        if (Auth.Role != "MarketManager") await LoadAsync(); else _loading = false;
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _problem = null;
+        var r = Auth.Role == "Producer" ? await Api.ForProducerAsync(null) : await Api.MineAsync(null);
+        if (r.IsSuccess) _orders = r.Value!; else _problem = r.Problem;
+        _loading = false;
+    }
+
+    private int Count(string status) => _orders.Count(o => o.Status == status);
+}

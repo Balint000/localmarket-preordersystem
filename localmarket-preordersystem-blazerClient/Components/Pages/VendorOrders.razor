@@ -1,0 +1,12 @@
+﻿@page "/vendor/orders"
+@attribute [Authorize(Roles = "Producer")]
+@inject OrdersApi Api
+
+<PageTitle>Beérkező rendelések – LocalMarket</PageTitle>
+
+<PageContainer Title="Beérkező rendelések" Subtitle="A gazdaságodhoz tartozó előrendelések">
+    <Actions><a class="btn btn-outline-primary" href="vendor/picking-list">Átvételi lista</a></Actions>
+    <ChildContent>
+    <OrderListView Loader="s => Api.ForProducerAsync(s)" DetailsBase="vendor/orders" ShowCustomer="true" EmptyText="Még nem érkezett rendelés." />
+</ChildContent>
+</PageContainer>

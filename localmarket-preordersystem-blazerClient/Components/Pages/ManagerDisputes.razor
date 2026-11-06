@@ -1,0 +1,50 @@
+﻿@page "/manager/disputes"
+@attribute [Authorize(Roles = "MarketManager")]
+@inject OrdersApi Api
+@inject ToastService Toasts
+
+<PageTitle>Viták – LocalMarket</PageTitle>
+
+<PageContainer Title="Vitatott rendelések">
+    @if (_loading) { <LoadingIndicator /> }
+    else if (_problem is not null) { <ErrorMessage Problem="_problem" OnRetry="LoadAsync" /> }
+    else if (_orders.Count == 0) { <EmptyState Title="Nincs vitatott rendelés" /> }
+    else
+    {
+        @foreach (var o in _orders)
+        {
+            <div class="lm-card mb-3">
+                <div class="d-flex justify-content-between"><strong>Rendelés #@o.Id</strong><StatusBadge Status="@o.Status" /></div>
+                <p class="mb-2">@o.DisputeNote</p>
+                <button class="btn btn-primary btn-sm" disabled="@_busy" @onclick='() => ResolveAsync(o.Id, "PickedUp")'>Átvettnek tekint</button>
+                <button class="btn btn-outline-danger btn-sm" disabled="@_busy" @onclick='() => ResolveAsync(o.Id, "Cancelled")'>Lemondás</button>
+            </div>
+        }
+    }
+</PageContainer>
+
+@code {
+    private IReadOnlyList<OrderInfo> _orders = [];
+    private ApiProblem? _problem;
+    private bool _loading = true, _busy;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true; _problem = null;
+        var r = await Api.DisputedAsync();
+        if (r.IsSuccess) _orders = r.Value!; else _problem = r.Problem;
+        _loading = false;
+    }
+
+    private async Task ResolveAsync(int id, string decision)
+    {
+        if (_busy) return;
+        _busy = true;
+        var r = await Api.ResolveDisputeAsync(id, decision, null);
+        if (r.IsSuccess) { Toasts.Success("A vitát lezártad."); await LoadAsync(); }
+        else Toasts.Error(r.Problem!.Message);
+        _busy = false;
+    }
+}

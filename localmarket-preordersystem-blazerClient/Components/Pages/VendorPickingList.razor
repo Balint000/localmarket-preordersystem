@@ -1,0 +1,33 @@
+﻿@page "/vendor/picking-list"
+@attribute [Authorize(Roles = "Producer")]
+@inject OrdersApi Api
+@inject FileDownloader Downloader
+@inject ToastService Toasts
+
+<PageTitle>Átvételi lista – LocalMarket</PageTitle>
+
+<PageContainer Title="Átvételi lista" Subtitle="Egy napra szóló összesítő exportálása">
+    <div class="lm-card" style="max-width:32rem">
+        <label class="form-label" for="pl-date">Dátum</label>
+        <input id="pl-date" type="date" class="form-control mb-3" @bind="_date" />
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-primary" disabled="@_busy" @onclick='() => ExportAsync("Json")'>Letöltés (JSON)</button>
+            <button type="button" class="btn btn-outline-primary" disabled="@_busy" @onclick='() => ExportAsync("Csv")'>Letöltés (CSV)</button>
+        </div>
+    </div>
+</PageContainer>
+
+@code {
+    private DateTime _date = DateTime.Today;
+    private bool _busy;
+
+    private async Task ExportAsync(string format)
+    {
+        if (_busy) return;
+        _busy = true;
+        var result = await Api.ExportPickingListAsync(_date, format);
+        if (result.IsSuccess) await Downloader.SaveAsync(result.Value!);
+        else Toasts.Error(result.Problem!.Message);
+        _busy = false;
+    }
+}

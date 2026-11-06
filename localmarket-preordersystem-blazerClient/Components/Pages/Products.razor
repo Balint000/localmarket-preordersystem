@@ -1,0 +1,121 @@
+﻿@page "/products"
+@inject CatalogApi Catalog
+
+<PageTitle>Termékek – LocalMarket</PageTitle>
+
+<PageContainer Title="Termékek" Subtitle="A termelők aktuális kínálata">
+    <div class="lm-card mb-4">
+        <EditForm Model="_filter" OnSubmit="SearchAsync" FormName="product-filter">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label" for="text">Keresés névre</label>
+                    <InputText id="text" class="form-control" @bind-Value="_filter.Text" placeholder="pl. paradicsom" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="category">Kategória</label>
+                    <InputSelect id="category" class="form-select" @bind-Value="_filter.CategoryId">
+                        <option value="">Összes kategória</option>
+                        @foreach (var c in _categories)
+                        {
+                            <option value="@c.Id">@c.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="sort">Rendezés</label>
+                    <select id="sort" class="form-select" @bind="_sort">
+                        <option value="name">Név szerint</option>
+                        <option value="price-asc">Ár szerint növekvő</option>
+                        <option value="price-desc">Ár szerint csökkenő</option>
+                    </select>
+                </div>
+                <div class="col-md-2 d-grid">
+                    <SubmitButton Busy="_loading">Keresés</SubmitButton>
+                </div>
+            </div>
+
+            <fieldset class="mt-3">
+                <legend class="form-label fs-6 mb-1">Ne tartalmazzon:</legend>
+                <div class="d-flex flex-wrap gap-2">
+                    @foreach (var a in Labels.Allergies)
+                    {
+                        var allergy = a;
+                        <label class="lm-chip @(_excluded.Contains(allergy) ? "lm-chip-warn" : "")" style="cursor:pointer">
+                            <input type="checkbox" class="form-check-input me-1" checked="@_excluded.Contains(allergy)" @onchange="e => ToggleAllergy(allergy, (bool)(e.Value ?? false))" />
+                            @Labels.Allergy(allergy)
+                        </label>
+                    }
+                </div>
+            </fieldset>
+        </EditForm>
+    </div>
+
+    @if (_loading)
+    {
+        <LoadingIndicator Text="Termékek betöltése..." />
+    }
+    else if (_problem is not null)
+    {
+        <ErrorMessage Problem="_problem" OnRetry="SearchAsync" />
+    }
+    else if (_products.Count == 0)
+    {
+        <EmptyState Title="Nincs a szűrésnek megfelelő termék" Text="Próbálj meg más keresőszót vagy szűrőt." />
+    }
+    else
+    {
+        <p class="text-muted" aria-live="polite">@_products.Count termék</p>
+        <div class="lm-grid">
+            @foreach (var product in Sorted())
+            {
+                <ProductCard Product="product" />
+            }
+        </div>
+    }
+</PageContainer>
+
+@code {
+    private sealed class Filter
+    {
+        public string? Text { get; set; }
+        public int? CategoryId { get; set; }
+    }
+
+    private readonly Filter _filter = new();
+    private readonly HashSet<string> _excluded = [];
+    private IReadOnlyList<CategoryInfo> _categories = [];
+    private IReadOnlyList<ProductInfo> _products = [];
+    private ApiProblem? _problem;
+    private bool _loading = true;
+    private string _sort = "name";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var categories = await Catalog.CategoriesAsync();
+        if (categories.IsSuccess) _categories = categories.Value!;
+        await SearchAsync();
+    }
+
+    private void ToggleAllergy(string allergy, bool on)
+    {
+        if (on) _excluded.Add(allergy); else _excluded.Remove(allergy);
+    }
+
+    private async Task SearchAsync()
+    {
+        _loading = true;
+        _problem = null;
+        var result = await Catalog.SearchProductsAsync(_filter.Text, _filter.CategoryId, _excluded);
+        if (result.IsSuccess) _products = result.Value!;
+        else _problem = result.Problem;
+        _loading = false;
+    }
+
+    // a backend nem rendez: a már letöltött listát a kliens rendezi (csak megjelenítés)
+    private IEnumerable<ProductInfo> Sorted() => _sort switch
+    {
+        "price-asc" => _products.OrderBy(p => p.NextStock?.UnitPrice ?? decimal.MaxValue),
+        "price-desc" => _products.OrderByDescending(p => p.NextStock?.UnitPrice ?? decimal.MinValue),
+        _ => _products.OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)
+    };
+}

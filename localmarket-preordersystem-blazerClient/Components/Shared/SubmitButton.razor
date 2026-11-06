@@ -1,0 +1,16 @@
+﻿@* Küldés közben letiltja magát, így a dupla beküldés nem fordulhat elő. *@
+<button type="@(OnClick.HasDelegate ? "button" : "submit")" class="btn @CssClass" disabled="@(Busy || Disabled)" @onclick="OnClick" aria-busy="@Busy">
+    @if (Busy)
+    {
+        <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+    }
+    @ChildContent
+</button>
+
+@code {
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string CssClass { get; set; } = "btn-primary";
+    [Parameter] public EventCallback OnClick { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

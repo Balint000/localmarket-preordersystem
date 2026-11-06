@@ -1,0 +1,168 @@
+﻿@page "/register"
+@inject AuthApi Auth
+@inject CatalogApi Catalog
+@inject ToastService Toasts
+@inject NavigationManager Navigation
+
+<PageTitle>Regisztráció – LocalMarket</PageTitle>
+
+<div class="lm-auth">
+    <PageContainer Title="Regisztráció">
+        <div class="btn-group w-100 mb-3" role="group" aria-label="Fióktípus">
+            <button type="button" class="btn @(!_producer ? "btn-primary" : "btn-outline-primary")" aria-pressed="@(!_producer)" @onclick="() => SetProducer(false)">Vásárló vagyok</button>
+            <button type="button" class="btn @(_producer ? "btn-primary" : "btn-outline-primary")" aria-pressed="@_producer" @onclick="() => SetProducer(true)">Árus vagyok</button>
+        </div>
+
+        <div class="lm-card">
+            @if (_producer && _marketsLoading)
+            {
+                <LoadingIndicator Text="Piacok betöltése..." />
+            }
+            else if (_producer && _marketsProblem is not null)
+            {
+                <ErrorMessage Problem="_marketsProblem" OnRetry="LoadMarketsAsync" />
+            }
+            else
+            {
+                <EditForm Model="_form" OnValidSubmit="SubmitAsync" FormName="register">
+                    <DataAnnotationsValidator />
+
+                    @if (_problem is not null)
+                    {
+                        <ErrorMessage Problem="_problem" />
+                    }
+
+                    <div class="row g-3">
+                        <div class="col-sm-6">
+                            <label class="form-label" for="lastName">Vezetéknév</label>
+                            <InputText id="lastName" class="form-control" @bind-Value="_form.LastName" autocomplete="family-name" />
+                            <ValidationMessage For="() => _form.LastName" />
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label" for="firstName">Keresztnév</label>
+                            <InputText id="firstName" class="form-control" @bind-Value="_form.FirstName" autocomplete="given-name" />
+                            <ValidationMessage For="() => _form.FirstName" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="email">E-mail cím</label>
+                            <InputText id="email" type="email" class="form-control" @bind-Value="_form.Email" autocomplete="email" />
+                            <ValidationMessage For="() => _form.Email" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="phone">Telefonszám <span class="text-muted">(nem kötelező)</span></label>
+                            <InputText id="phone" type="tel" class="form-control" @bind-Value="_form.PhoneNumber" autocomplete="tel" />
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label" for="password">Jelszó</label>
+                            <InputText id="password" type="password" class="form-control" @bind-Value="_form.Password" autocomplete="new-password" aria-describedby="pwHelp" />
+                            <div id="pwHelp" class="form-text">Legalább 8 karakter.</div>
+                            <ValidationMessage For="() => _form.Password" />
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label" for="passwordConfirm">Jelszó megerősítése</label>
+                            <InputText id="passwordConfirm" type="password" class="form-control" @bind-Value="_form.PasswordConfirm" autocomplete="new-password" />
+                            <ValidationMessage For="() => _form.PasswordConfirm" />
+                        </div>
+
+                        @if (_producer)
+                        {
+                            <div class="col-12"><hr class="my-1" /><h2 class="h6 mb-0">Gazdaság adatai</h2></div>
+                            <div class="col-12">
+                                <label class="form-label" for="producerName">Gazdaság / árus neve</label>
+                                <InputText id="producerName" class="form-control" @bind-Value="_form.ProducerName" />
+                                @if (_producerFieldErrors.TryGetValue("name", out var nameError))
+                                {
+                                    <div class="validation-message">@nameError</div>
+                                }
+                            </div>
+                            <div class="col-sm-8">
+                                <label class="form-label" for="market">Piac</label>
+                                <InputSelect id="market" class="form-select" @bind-Value="_form.MarketId">
+                                    <option value="">Válassz piacot...</option>
+                                    @foreach (var market in _markets)
+                                    {
+                                        <option value="@market.Id">@market.Name – @market.Address</option>
+                                    }
+                                </InputSelect>
+                                @if (_producerFieldErrors.TryGetValue("market", out var marketError))
+                                {
+                                    <div class="validation-message">@marketError</div>
+                                }
+                            </div>
+                            <div class="col-sm-4">
+                                <label class="form-label" for="stall">Standszám</label>
+                                <InputNumber id="stall" class="form-control" @bind-Value="_form.StallNumber" min="0" />
+                            </div>
+                            <div class="col-12 form-text">Az árus fiókot a piacvezetőnek jóvá kell hagynia, mielőtt termékeket hirdethetnél.</div>
+                        }
+                    </div>
+
+                    <SubmitButton Busy="_busy" CssClass="btn-primary w-100 mt-3">Regisztráció</SubmitButton>
+                </EditForm>
+            }
+        </div>
+        <p class="mt-3 text-center">Már van fiókod? <a href="login">Bejelentkezés</a></p>
+    </PageContainer>
+</div>
+
+@code {
+    private readonly RegisterForm _form = new();
+    private IReadOnlyList<MarketInfo> _markets = [];
+    private ApiProblem? _problem;
+    private ApiProblem? _marketsProblem;
+    private readonly Dictionary<string, string> _producerFieldErrors = new();
+    private bool _producer, _marketsLoading, _busy;
+
+    private async Task SetProducer(bool value)
+    {
+        _producer = value;
+        _problem = null;
+        if (value && _markets.Count == 0) await LoadMarketsAsync();
+    }
+
+    private async Task LoadMarketsAsync()
+    {
+        _marketsLoading = true;
+        _marketsProblem = null;
+        var result = await Catalog.MarketsAsync();
+        if (result.IsSuccess) _markets = result.Value!.Where(m => m.IsActive).ToList();
+        else _marketsProblem = result.Problem;
+        _marketsLoading = false;
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (_busy) return;
+
+        _producerFieldErrors.Clear();
+        if (_producer)
+        {
+            if (string.IsNullOrWhiteSpace(_form.ProducerName)) _producerFieldErrors["name"] = "A gazdaság nevének megadása kötelező.";
+            if (_form.MarketId is null) _producerFieldErrors["market"] = "Válaszd ki a piacot.";
+            if (_producerFieldErrors.Count > 0) return;
+        }
+
+        _busy = true;
+        _problem = null;
+
+        ApiResult<RegisteredResult> result = _producer
+            ? await Auth.RegisterProducerAsync(new RegisterProducerRequest(
+                _form.FirstName.Trim(), _form.LastName.Trim(), _form.Email.Trim(), _form.Password, _form.PhoneNumber.Trim(),
+                _form.ProducerName.Trim(), _form.MarketId!.Value, _form.StallNumber))
+            : await Auth.RegisterCustomerAsync(new RegisterCustomerRequest(
+                _form.FirstName.Trim(), _form.LastName.Trim(), _form.Email.Trim(), _form.Password, _form.PhoneNumber.Trim()));
+
+        if (result.IsSuccess)
+        {
+            // a backend regisztráció után nem ad tokent, ezért a bejelentkezéshez irányítunk
+            Toasts.Success(_producer
+                ? "Sikeres regisztráció. A piacvezető jóváhagyása után hirdethetsz termékeket – addig is bejelentkezhetsz."
+                : "Sikeres regisztráció, most már bejelentkezhetsz.");
+            Navigation.NavigateTo("login");
+            return;
+        }
+
+        _problem = result.Problem;
+        _busy = false;
+    }
+}

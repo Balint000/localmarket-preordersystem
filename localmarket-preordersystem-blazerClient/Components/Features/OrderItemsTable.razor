@@ -1,0 +1,28 @@
+﻿<table class="lm-table lm-stack">
+    <thead>
+        <tr><th>Termék</th><th class="num">Egységár</th><th class="num">Rendelt</th><th class="num">Teljesített</th><th class="num">Összeg</th></tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Order.Items)
+        {
+            <tr>
+                <td data-label="Termék">@item.ProductName</td>
+                <td data-label="Egységár" class="num">@Labels.Money(item.UnitPrice) / @Labels.Unit(item.Unit)</td>
+                <td data-label="Rendelt" class="num">@Labels.Qty(item.Quantity) @Labels.Unit(item.Unit)</td>
+                <td data-label="Teljesített" class="num">
+                    @Labels.Qty(item.FulfilledQuantity) @Labels.Unit(item.Unit)
+                    @if (item.FulfilledQuantity < item.Quantity)
+                    {
+                        <span class="lm-chip lm-chip-warn">hiányos</span>
+                    }
+                </td>
+                <td data-label="Összeg" class="num">@Labels.Money(item.Total)</td>
+            </tr>
+        }
+    </tbody>
+</table>
+<div class="lm-summary"><span>Végösszeg</span><span>@Labels.Money(Order.TotalAmount)</span></div>
+
+@code {
+    [Parameter, EditorRequired] public OrderInfo Order { get; set; } = default!;
+}

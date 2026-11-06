@@ -1,6 +1,25 @@
 ﻿<Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
     <Found Context="routeData">
-        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)"/>
+        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+            <Authorizing>
+                <LoadingIndicator Text="Betöltés..." />
+            </Authorizing>
+            <NotAuthorized>
+                @if (context.User.Identity?.IsAuthenticated == true)
+                {
+                    <PageContainer Title="Nincs jogosultságod">
+                        <EmptyState Title="Ehhez az oldalhoz nincs hozzáférésed"
+                                           Text="A fiókod szerepköre nem teszi lehetővé az oldal megnyitását.">
+                            <a class="btn btn-primary" href="dashboard">Vissza a kezdőlapra</a>
+                        </EmptyState>
+                    </PageContainer>
+                }
+                else
+                {
+                    <RedirectToLogin />
+                }
+            </NotAuthorized>
+        </AuthorizeRouteView>
         <FocusOnNavigate RouteData="routeData" Selector="h1"/>
     </Found>
 </Router>

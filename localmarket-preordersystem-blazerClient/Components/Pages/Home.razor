@@ -1,7 +1,29 @@
 ﻿@page "/"
+@inject AuthStateService Auth
+@inject NavigationManager Navigation
 
-<PageTitle>Home</PageTitle>
+<PageTitle>LocalMarket – helyi termelői piac</PageTitle>
 
-<h1>Hello, world!</h1>
+<section class="lm-hero">
+    <h1 tabindex="-1">Friss helyi termékek, előrendelve</h1>
+    <p class="lead">Rendelj a környékbeli termelőktől, válaszd ki az átvételi időpontot, és vedd át a piacon.</p>
+    <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-primary btn-lg" href="products">Termékek böngészése</a>
+        <a class="btn btn-outline-primary btn-lg" href="register">Regisztráció</a>
+    </div>
+</section>
 
-Welcome to your new app.
+<section class="lm-steps" aria-label="Hogyan működik">
+    <div><span class="lm-step-no">1</span><h2 class="h6">Válogass</h2><p>Böngészd a termelők heti kínálatát, szűrj kategória és allergén szerint.</p></div>
+    <div><span class="lm-step-no">2</span><h2 class="h6">Rendelj elő</h2><p>Tedd kosárba, és válassz átvételi időpontot minden termelőnél.</p></div>
+    <div><span class="lm-step-no">3</span><h2 class="h6">Vedd át</h2><p>A termelő visszaigazolja, jelzi ha kész, te pedig átveszed a piacon.</p></div>
+</section>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        // bejelentkezett felhasználót az irányítópultra irányítjuk
+        await Auth.GetAuthenticationStateAsync();
+        if (Auth.IsAuthenticated) Navigation.NavigateTo("dashboard", replace: true);
+    }
+}

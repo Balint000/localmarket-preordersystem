@@ -1,0 +1,48 @@
+﻿@if (Visible)
+{
+    <div class="lm-modal-backdrop" @onkeydown="OnKeyDown" @onkeydown:stopPropagation="true">
+        <div class="lm-modal" role="dialog" aria-modal="true" aria-labelledby="@_titleId" tabindex="-1" @ref="_dialog">
+            <h2 id="@_titleId" class="h5">@Title</h2>
+            @if (!string.IsNullOrWhiteSpace(Message))
+            {
+                <p>@Message</p>
+            }
+            @ChildContent
+            <div class="d-flex justify-content-end gap-2 mt-3">
+                <button type="button" class="btn btn-outline-secondary" @onclick="OnCancel" disabled="@Busy">@CancelText</button>
+                <SubmitButton Busy="Busy" Disabled="ConfirmDisabled" CssClass="@(Danger ? "btn-danger" : "btn-primary")" OnClick="OnConfirm">@ConfirmText</SubmitButton>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private readonly string _titleId = "dlg-" + Guid.NewGuid().ToString("N")[..8];
+    private ElementReference _dialog;
+    private bool _wasVisible;
+
+    [Parameter] public bool Visible { get; set; }
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public string? Message { get; set; }
+    [Parameter] public string ConfirmText { get; set; } = "Megerősítem";
+    [Parameter] public string CancelText { get; set; } = "Mégse";
+    [Parameter] public bool Danger { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public bool ConfirmDisabled { get; set; }
+    [Parameter] public EventCallback OnConfirm { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // megnyitáskor a fókusz a dialógusra kerül (billentyűzetes használat)
+        if (Visible && !_wasVisible)
+            await _dialog.FocusAsync();
+        _wasVisible = Visible;
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape" && !Busy) await OnCancel.InvokeAsync();
+    }
+}
