@@ -30,20 +30,21 @@ internal sealed class OrderRepository(MarketDbContext context) : IOrderRepositor
     {
         var query = ForRead().Where(o => o.UserId == userId);
         if (status.HasValue) query = query.Where(o => o.Status == status.Value);
-        return await query.OrderByDescending(o => o.CreatedAt).ToListAsync(cancellationToken);
+        return await query.OrderByDescending(o => o.CreatedAt).ThenByDescending(o => o.Id).ToListAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<Order>> ListByProducerAsync(int producerId, OrderStatus? status = null, CancellationToken cancellationToken = default)
     {
         var query = ForRead().Where(o => o.ProducerId == producerId);
         if (status.HasValue) query = query.Where(o => o.Status == status.Value);
-        return await query.OrderByDescending(o => o.CreatedAt).ToListAsync(cancellationToken);
+        return await query.OrderByDescending(o => o.CreatedAt).ThenByDescending(o => o.Id).ToListAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<Order>> ListByStatusAsync(OrderStatus status, CancellationToken cancellationToken = default)
         => await ForRead()
             .Where(o => o.Status == status)
             .OrderByDescending(o => o.CreatedAt)
+            .ThenByDescending(o => o.Id)
             .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<Order>> ListForPickingAsync(int producerId, DateTime pickupDate, CancellationToken cancellationToken = default)
