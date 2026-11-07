@@ -31,6 +31,8 @@ public sealed class GlobalExceptionHandler(
             ConcurrencyConflictException or DbUpdateConcurrencyException => (409, "Párhuzamos módosítás"),
             DbUpdateException { InnerException: PostgresException { SqlState: "23505" } } => (409, "Már létező adat"),
             DbUpdateException { InnerException: PostgresException { SqlState: "23514" or "23503" } } => (400, "Érvénytelen adat"),
+            BadHttpRequestException => (400, "Hibás kérés"),
+            HttpRequestException => (502, "Külső szolgáltatás hiba"),
             _ => (500, "Váratlan hiba")
         };
 

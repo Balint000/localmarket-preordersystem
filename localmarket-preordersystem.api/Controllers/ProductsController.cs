@@ -1,5 +1,6 @@
 using localmarket_preordersystem.api.Contracts.Products;
 using localmarket_preordersystem.api.Extensions;
+using localmarket_preordersystem.api.Contracts.Common;
 using localmarket_preordersystem.Application.Products.CreateProduct;
 using localmarket_preordersystem.Application.Products.GetProduct;
 using localmarket_preordersystem.Application.Products.SearchProducts;
@@ -22,9 +23,10 @@ public class ProductsController : ControllerBase
         [FromQuery] int? categoryId,
         [FromQuery] int? producerId,
         [FromQuery] Allergy[]? excludeAllergies,
+        [FromQuery] PageRequest paging,
         SearchProductsHandler handler,
         CancellationToken ct)
-        => Ok(await handler.HandleAsync(new SearchProductsQuery(text, categoryId, producerId, excludeAllergies), ct));
+        => Ok((await handler.HandleAsync(new SearchProductsQuery(text, categoryId, producerId, excludeAllergies), ct)).ToPaged(paging));
 
     [HttpGet("{id:int}")]
     [AllowAnonymous]

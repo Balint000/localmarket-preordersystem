@@ -1,5 +1,6 @@
 using localmarket_preordersystem.api.Contracts.Orders;
 using localmarket_preordersystem.api.Extensions;
+using localmarket_preordersystem.api.Contracts.Common;
 using localmarket_preordersystem.Application.Orders.AcceptOrder;
 using localmarket_preordersystem.Application.Orders.AcceptOrderPartially;
 using localmarket_preordersystem.Application.Orders.CancelOrder;
@@ -33,18 +34,18 @@ public class OrdersController : ControllerBase
 
     [HttpGet("my")]
     [Authorize(Policy = Policies.Customer)]
-    public async Task<IActionResult> ListMy([FromQuery] OrderStatus? status, ListMyOrdersHandler handler, CancellationToken ct)
-        => Ok(await handler.HandleAsync(new ListMyOrdersQuery(status), ct));
+    public async Task<IActionResult> ListMy([FromQuery] OrderStatus? status, [FromQuery] PageRequest paging, ListMyOrdersHandler handler, CancellationToken ct)
+        => Ok((await handler.HandleAsync(new ListMyOrdersQuery(status), ct)).ToPaged(paging));
 
     [HttpGet("producer")]
     [Authorize(Policy = Policies.Producer)]
-    public async Task<IActionResult> ListProducer([FromQuery] OrderStatus? status, ListProducerOrdersHandler handler, CancellationToken ct)
-        => Ok(await handler.HandleAsync(new ListProducerOrdersQuery(status), ct));
+    public async Task<IActionResult> ListProducer([FromQuery] OrderStatus? status, [FromQuery] PageRequest paging, ListProducerOrdersHandler handler, CancellationToken ct)
+        => Ok((await handler.HandleAsync(new ListProducerOrdersQuery(status), ct)).ToPaged(paging));
 
     [HttpGet("disputed")]
     [Authorize(Policy = Policies.Manager)]
-    public async Task<IActionResult> ListDisputed(ListDisputedOrdersHandler handler, CancellationToken ct)
-        => Ok(await handler.HandleAsync(ct));
+    public async Task<IActionResult> ListDisputed([FromQuery] PageRequest paging, ListDisputedOrdersHandler handler, CancellationToken ct)
+        => Ok((await handler.HandleAsync(ct)).ToPaged(paging));
 
     [HttpGet("{id:int}")]
     public async Task<IActionResult> Get(int id, GetOrderHandler handler, CancellationToken ct)
