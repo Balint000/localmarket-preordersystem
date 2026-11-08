@@ -6,7 +6,7 @@
 <PageTitle>Irányítópult – LocalMarket</PageTitle>
 
 <PageContainer Title="Irányítópult" Subtitle="@Labels.Role(Auth.Role ?? "")">
-    @if (Auth.Role == "MarketManager")
+    @if (Auth.Role == "Admin")
     {
         <EmptyState Title="Piacvezetői felület" Text="A vitatott rendeléseket a Viták menüpontban találod.">
             <a class="btn btn-primary" href="manager/disputes">Viták megtekintése</a>
@@ -50,7 +50,7 @@
     protected override async Task OnInitializedAsync()
     {
         await Auth.GetAuthenticationStateAsync();
-        if (Auth.Role != "MarketManager") await LoadAsync(); else _loading = false;
+        if (Auth.Role != "Admin") await LoadAsync(); else _loading = false;
     }
 
     private async Task LoadAsync()
