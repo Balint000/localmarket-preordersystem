@@ -10,6 +10,11 @@ internal sealed class PickupSlotRepository(MarketDbContext context) : IPickupSlo
     public Task<PickupSlot?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
         => context.PickupSlots.FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
 
+    public Task<PickupSlot?> GetForUpdateAsync(int id, CancellationToken cancellationToken = default)
+        => context.PickupSlots
+            .Include(s => s.Producer).ThenInclude(p => p.Market)
+            .FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
+
     public async Task<IReadOnlyList<PickupSlot>> ListByProducerAsync(int producerId, DateTime? fromDate = null, CancellationToken cancellationToken = default)
     {
         var query = context.PickupSlots.AsNoTracking().Where(s => s.ProducerId == producerId);
@@ -23,4 +28,6 @@ internal sealed class PickupSlotRepository(MarketDbContext context) : IPickupSlo
 
     public async Task AddAsync(PickupSlot slot, CancellationToken cancellationToken = default)
         => await context.PickupSlots.AddAsync(slot, cancellationToken);
+
+    public void Remove(PickupSlot slot) => context.PickupSlots.Remove(slot);
 }

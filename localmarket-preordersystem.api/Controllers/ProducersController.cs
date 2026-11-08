@@ -1,6 +1,7 @@
 using localmarket_preordersystem.api.Contracts.Orders;
 using localmarket_preordersystem.api.Extensions;
 using localmarket_preordersystem.Application.Producers.ApproveProducer;
+using localmarket_preordersystem.Application.Producers.GetMyProducer;
 using localmarket_preordersystem.Application.Producers.ListProducers;
 using localmarket_preordersystem.Application.Producers.RejectProducer;
 using localmarket_preordersystem.Application.Producers.UpdateMyProducer;
@@ -19,6 +20,12 @@ public class ProducersController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> List([FromQuery] ProducerStatus? status, [FromQuery] int? marketId, ListProducersHandler handler, CancellationToken ct)
         => Ok(await handler.HandleAsync(new ListProducersQuery(status, marketId), ct));
+
+    // Works for Pending/Rejected producers too (own profile incl. rejection reason).
+    [HttpGet("me")]
+    [Authorize(Policy = Policies.Producer)]
+    public async Task<IActionResult> GetMine(GetMyProducerHandler handler, CancellationToken ct)
+        => Ok(await handler.HandleAsync(ct));
 
     [HttpPut("me")]
     [Authorize(Policy = Policies.Producer)]

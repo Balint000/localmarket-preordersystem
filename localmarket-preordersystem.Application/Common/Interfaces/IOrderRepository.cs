@@ -12,5 +12,7 @@ public interface IOrderRepository
     Task<IReadOnlyList<Order>> ListByStatusAsync(OrderStatus status, CancellationToken cancellationToken = default);
     /// <summary>Az árus aktív (nem lemondott/elutasított) rendelései egy átvételi napra — csomagolólista.</summary>
     Task<IReadOnlyList<Order>> ListForPickingAsync(int producerId, DateTime pickupDate, CancellationToken cancellationToken = default);
+    /// <summary>Hivatkozik-e az idősávra bármelyik (akár lemondott) rendelés.</summary>
+    Task<bool> AnyForPickupSlotAsync(int pickupSlotId, CancellationToken cancellationToken = default);
     Task AddAsync(Order order, CancellationToken cancellationToken = default);
 }
