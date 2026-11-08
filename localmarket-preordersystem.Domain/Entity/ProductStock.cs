@@ -15,7 +15,8 @@ namespace localmarket_preordersystem.Domain.Entity
         /// <summary>A hét hétfői napja. Mindig normalizált (ld. GetWeekStart).</summary>
         public DateTime WeekStartDate { get; private set; }
 
-        [Range(0.01, 1000000)]
+        // 0 = "erre a hétre elfogyott / nem kínálom" (az adatbázis CK_ProductStocks_Quantity is >= 0-t enged).
+        [Range(0, 1000000)]
         [Column(TypeName = "decimal(18,2)")]
         public decimal Quantity { get; private set; }
 
@@ -51,8 +52,8 @@ namespace localmarket_preordersystem.Domain.Entity
         public static ProductStock Create(Product product, DateTime weekStartDate, decimal quantity, Units unit, decimal unitPrice)
         {
             ArgumentNullException.ThrowIfNull(product);
-            if (quantity <= 0)
-                throw new DomainException("A heti mennyiségnek pozitívnak kell lennie.");
+            if (quantity < 0)
+                throw new DomainException("A heti mennyiség nem lehet negatív.");
             if (unitPrice <= 0)
                 throw new DomainException("Az egységárnak pozitívnak kell lennie.");
             if (!Enum.IsDefined(unit))
@@ -73,8 +74,8 @@ namespace localmarket_preordersystem.Domain.Entity
 
         public void Update(DateTime weekStartDate, decimal quantity, Units unit, decimal unitPrice)
         {
-            if (quantity <= 0)
-                throw new DomainException("A heti mennyiségnek pozitívnak kell lennie.");
+            if (quantity < 0)
+                throw new DomainException("A heti mennyiség nem lehet negatív.");
             if (unitPrice <= 0)
                 throw new DomainException("Az egységárnak pozitívnak kell lennie.");
             if (!Enum.IsDefined(unit))

@@ -52,7 +52,12 @@ internal sealed class ProductRepository(MarketDbContext context) : IProductRepos
         return result;
     }
 
+    public Task<bool> HasOrdersAsync(int productId, CancellationToken cancellationToken = default)
+        => context.OrderItems.AnyAsync(i => i.ProductId == productId, cancellationToken);
+
     public async Task AddAsync(Product product, CancellationToken cancellationToken = default) => await context.Products.AddAsync(product, cancellationToken);
+
+    public void Remove(Product product) => context.Products.Remove(product);
 
     private static string EscapeLike(string value) => value.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
 }

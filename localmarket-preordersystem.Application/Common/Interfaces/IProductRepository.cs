@@ -9,5 +9,8 @@ public interface IProductRepository
     Task<Product?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Product>> GetByIdsAsync(IEnumerable<int> ids, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Product>> SearchAsync(ProductSearchCriteria criteria, CancellationToken cancellationToken = default);
+    /// <summary>Szerepel-e a termék bármelyik (akár lemondott) rendelés tételei között.</summary>
+    Task<bool> HasOrdersAsync(int productId, CancellationToken cancellationToken = default);
     Task AddAsync(Product product, CancellationToken cancellationToken = default);
+    void Remove(Product product);
 }

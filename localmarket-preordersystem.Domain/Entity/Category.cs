@@ -27,5 +27,14 @@ namespace localmarket_preordersystem.Domain.Entity
                 Description = description?.Trim() ?? string.Empty
             };
         }
+
+        public void Update(string name, string description)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                throw new DomainException("A kategória nevének megadása kötelező.");
+
+            Name = name.Trim();
+            Description = description?.Trim() ?? string.Empty;
+        }
     }
 }

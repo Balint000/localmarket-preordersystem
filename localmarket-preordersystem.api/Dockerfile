@@ -30,4 +30,8 @@ RUN dotnet publish "./localmarket-preordersystem.api.csproj" -c $BUILD_CONFIGURA
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
+# a feltöltött képek mappája (volume-ként csatolva); a nem-root felhasználónak írhatónak kell lennie
+USER root
+RUN mkdir -p /app/uploads/products && chown -R $APP_UID /app/uploads
+USER $APP_UID
 ENTRYPOINT ["dotnet", "localmarket-preordersystem.api.dll"]
