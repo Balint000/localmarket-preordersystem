@@ -1,64 +1,83 @@
-﻿@page "/dashboard"
+@page "/dashboard"
 @attribute [Authorize]
 @inject AuthStateService Auth
-@inject OrdersApi Api
+@inject OrdersApi Orders
+@inject CatalogApi Catalog
 
 <PageTitle>Irányítópult – LocalMarket</PageTitle>
 
 <PageContainer Title="Irányítópult" Subtitle="@Labels.Role(Auth.Role ?? "")">
-    @if (Auth.Role == "Admin")
-    {
-        <EmptyState Title="Piacvezetői felület" Text="A vitatott rendeléseket a Viták menüpontban találod.">
-            <a class="btn btn-primary" href="manager/disputes">Viták megtekintése</a>
-        </EmptyState>
-    }
-    else if (_loading)
-    {
-        <LoadingIndicator />
-    }
-    else if (_problem is not null)
-    {
-        <ErrorMessage Problem="_problem" OnRetry="LoadAsync" />
-    }
-    else
-    {
-        <div class="lm-stats">
-            <StatCard Label="Összes rendelés" Value="@_orders.Count.ToString()" />
-            <StatCard Label="Függőben" Value="@Count("Pending").ToString()" />
-            <StatCard Label="Átvehető" Value="@Count("Ready").ToString()" />
-            <StatCard Label="Átvéve" Value="@Count("PickedUp").ToString()" />
-        </div>
-        <div class="mt-3 d-flex gap-2">
-            @if (Auth.Role == "Producer")
-            {
-                <a class="btn btn-primary" href="vendor/orders">Beérkező rendelések</a>
-            }
-            else
-            {
-                <a class="btn btn-primary" href="orders">Rendeléseim</a>
-                <a class="btn btn-outline-primary" href="products">Termékek</a>
-            }
-        </div>
-    }
+    <ChildContent>
+        @if (_loading) { <LoadingIndicator /> }
+        else if (_problem is not null) { <ErrorMessage Problem="_problem" OnRetry="LoadAsync" /> }
+        else if (Auth.Role == "Admin")
+        {
+            <div class="lm-stats">
+                <StatCard Label="Jóváhagyásra váró árus" Value="@_pendingProducers.ToString()" CssClass="@(_pendingProducers > 0 ? "attention" : null)" />
+                <StatCard Label="Vitatott rendelés" Value="@_orders.Count.ToString()" CssClass="@(_orders.Count > 0 ? "attention" : null)" />
+            </div>
+            <div class="lm-tiles mt-4">
+                <a class="lm-tile" href="admin/producers"><strong>Árusok</strong><span>Regisztrációk jóváhagyása, elutasítása</span></a>
+                <a class="lm-tile" href="admin/markets"><strong>Piacok</strong><span>Nyitvatartás, cím, koordináta szerkesztése</span></a>
+                <a class="lm-tile" href="admin/categories"><strong>Kategóriák</strong><span>Termékkategóriák felvétele</span></a>
+                <a class="lm-tile" href="admin/disputes"><strong>Viták</strong><span>Vitatott rendelések lezárása</span></a>
+                <a class="lm-tile" href="admin/reports"><strong>Riportok</strong><span>Népszerű termékek, bevétel, lemondások</span></a>
+            </div>
+        }
+        else
+        {
+            <div class="lm-stats">
+                <StatCard Label="Összes rendelés" Value="@_orders.Count.ToString()" />
+                <StatCard Label="Függőben" Value="@Count("Pending").ToString()" />
+                <StatCard Label="Átvehető" Value="@Count("Ready").ToString()" />
+                <StatCard Label="Átvéve" Value="@Count("PickedUp").ToString()" />
+            </div>
+            <div class="lm-tiles mt-4">
+                @if (Auth.Role == "Producer")
+                {
+                    <a class="lm-tile" href="vendor/orders"><strong>Beérkező rendelések</strong><span>Elfogadás, teljesítés, átvétel</span></a>
+                    <a class="lm-tile" href="vendor/products"><strong>Termékeim</strong><span>Meghirdetés, heti készlet és ár</span></a>
+                    <a class="lm-tile" href="vendor/slots"><strong>Átvételi időpontok</strong><span>Mikor vehetik át a vásárlók</span></a>
+                    <a class="lm-tile" href="vendor/picking-list"><strong>Átvételi lista</strong><span>Napi összesítő exportja</span></a>
+                }
+                else
+                {
+                    <a class="lm-tile" href="products"><strong>Termékek</strong><span>Böngészés és kosárba tétel</span></a>
+                    <a class="lm-tile" href="cart"><strong>Kosár</strong><span>Rendelés leadása</span></a>
+                    <a class="lm-tile" href="orders"><strong>Rendeléseim</strong><span>Állapot, lemondás, export</span></a>
+                }
+            </div>
+        }
+    </ChildContent>
 </PageContainer>
 
 @code {
     private IReadOnlyList<OrderInfo> _orders = [];
+    private int _pendingProducers;
     private ApiProblem? _problem;
     private bool _loading = true;
 
     protected override async Task OnInitializedAsync()
     {
         await Auth.GetAuthenticationStateAsync();
-        if (Auth.Role != "Admin") await LoadAsync(); else _loading = false;
+        await LoadAsync();
     }
 
     private async Task LoadAsync()
     {
-        _loading = true;
-        _problem = null;
-        var r = Auth.Role == "Producer" ? await Api.ForProducerAsync(null) : await Api.MineAsync(null);
-        if (r.IsSuccess) _orders = r.Value!; else _problem = r.Problem;
+        _loading = true; _problem = null;
+        if (Auth.Role == "Admin")
+        {
+            var disputed = await Orders.DisputedAsync();
+            var pending = await Catalog.ProducersAsync("Pending");
+            _problem = disputed.Problem ?? pending.Problem;
+            if (_problem is null) { _orders = disputed.Value!; _pendingProducers = pending.Value!.Count; }
+        }
+        else
+        {
+            var r = Auth.Role == "Producer" ? await Orders.ForProducerAsync(null) : await Orders.MineAsync(null);
+            if (r.IsSuccess) _orders = r.Value!; else _problem = r.Problem;
+        }
         _loading = false;
     }
 

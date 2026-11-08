@@ -1,6 +1,7 @@
-﻿@page "/"
+@page "/"
 @inject AuthStateService Auth
 @inject NavigationManager Navigation
+@inject CatalogApi Catalog
 
 <PageTitle>LocalMarket – helyi termelői piac</PageTitle>
 
@@ -19,11 +20,46 @@
     <div><span class="lm-step-no">3</span><h2 class="h6">Vedd át</h2><p>A termelő visszaigazolja, jelzi ha kész, te pedig átveszed a piacon.</p></div>
 </section>
 
+@if (_featured.Count > 0)
+{
+    <div class="lm-section-title"><h2>Kiemelt termékek</h2><a href="products">Összes termék →</a></div>
+    <div class="lm-grid">
+        @foreach (var p in _featured)
+        {
+            <ProductCard Product="p" />
+        }
+    </div>
+}
+
+@if (_markets.Count > 0)
+{
+    <div class="lm-section-title"><h2>Piacaink</h2></div>
+    <div class="lm-grid">
+        @foreach (var m in _markets)
+        {
+            <article class="lm-card">
+                <h3 class="h6 mb-1">@m.Name</h3>
+                <div class="text-muted small">@m.Address</div>
+                <div class="small mt-2">Nyitva: @string.Join(", ", m.OpeningDays.Select(Labels.Day))</div>
+            </article>
+        }
+    </div>
+}
+
 @code {
+    private IReadOnlyList<ProductInfo> _featured = [];
+    private IReadOnlyList<MarketInfo> _markets = [];
+
     protected override async Task OnInitializedAsync()
     {
         // bejelentkezett felhasználót az irányítópultra irányítjuk
         await Auth.GetAuthenticationStateAsync();
-        if (Auth.IsAuthenticated) Navigation.NavigateTo("dashboard", replace: true);
+        if (Auth.IsAuthenticated) { Navigation.NavigateTo("dashboard", replace: true); return; }
+
+        // a kiemelt tartalom hiba esetén egyszerűen elmarad
+        var products = await Catalog.SearchProductsAsync(null, null, []);
+        _featured = products.Value?.Where(p => p.NextStock is { AvailableQuantity: > 0 }).Take(4).ToList() ?? [];
+        var markets = await Catalog.MarketsAsync();
+        _markets = markets.Value?.Where(m => m.IsActive).ToList() ?? [];
     }
 }

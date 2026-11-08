@@ -1,0 +1,74 @@
+@page "/vendor/products"
+@attribute [Authorize(Roles = "Producer")]
+@inject CatalogApi Catalog
+@inject AuthStateService Auth
+
+<PageTitle>Termékeim – LocalMarket</PageTitle>
+
+<PageContainer Title="Termékeim" Subtitle="Hirdesd meg termékeidet, és add meg a heti készletet">
+    <Actions><a class="btn btn-primary" href="vendor/products/new">Új termék meghirdetése</a></Actions>
+    <ChildContent>
+        @if (_loading) { <LoadingIndicator /> }
+        else if (_problem is not null) { <ErrorMessage Problem="_problem" OnRetry="LoadAsync" /> }
+        else if (_products.Count == 0)
+        {
+            <EmptyState Title="Még nincs meghirdetett terméked" Text="Vegyél fel egy terméket, majd add meg a heti készletét, hogy a vásárlók rendelhessenek.">
+                <a class="btn btn-primary" href="vendor/products/new">Első termék felvétele</a>
+            </EmptyState>
+        }
+        else
+        {
+            <div class="lm-table-wrap">
+                <table class="table lm-table align-middle">
+                    <thead><tr><th>Termék</th><th>Kategória</th><th>Aktuális kínálat</th><th class="text-end">Ár</th><th class="text-end">Művelet</th></tr></thead>
+                    <tbody>
+                    @foreach (var p in _products)
+                    {
+                        <tr>
+                            <td><strong>@p.Name</strong></td>
+                            <td>@foreach (var c in p.Categories) { <span class="lm-chip">@c.Name</span> }</td>
+                            <td>
+                                @if (p.NextStock is { } s)
+                                {
+                                    <span class="lm-badge @(s.AvailableQuantity > 0 ? "badge-ok" : "badge-bad")">@(s.AvailableQuantity > 0 ? "Elérhető" : "Elfogyott")</span>
+                                    <span class="small text-muted ms-1">@Labels.Qty(s.AvailableQuantity) / @Labels.Qty(s.Quantity) @Labels.Unit(s.Unit) (@Labels.Date(s.WeekStartDate) hete)</span>
+                                }
+                                else { <span class="lm-badge badge-muted">Nincs meghirdetve</span> }
+                            </td>
+                            <td class="text-end">@(p.NextStock is { } n ? Labels.Money(n.UnitPrice) + " / " + Labels.Unit(n.Unit) : "–")</td>
+                            <td class="text-end"><a class="btn btn-outline-primary btn-sm" href="vendor/products/@p.Id">Szerkesztés és készlet</a></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </ChildContent>
+</PageContainer>
+
+@code {
+    private IReadOnlyList<ProductInfo> _products = [];
+    private ApiProblem? _problem;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Auth.GetAuthenticationStateAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true; _problem = null;
+        if (Auth.ProducerId is not int pid)
+        {
+            _problem = new ApiProblem(ApiFailure.Forbidden, "Nincs árus-profil", "A fiókhoz nem tartozik árus-profil.", new Dictionary<string, string[]>());
+        }
+        else
+        {
+            var r = await Catalog.ProductsOfProducerAsync(pid);
+            if (r.IsSuccess) _products = r.Value!; else _problem = r.Problem;
+        }
+        _loading = false;
+    }
+}

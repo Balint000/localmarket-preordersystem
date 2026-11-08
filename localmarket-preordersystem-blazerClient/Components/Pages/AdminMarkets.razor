@@ -1,0 +1,126 @@
+@page "/admin/markets"
+@attribute [Authorize(Roles = "Admin")]
+@inject CatalogApi Catalog
+@inject AdminApi Admin
+@inject ToastService Toasts
+
+<PageTitle>Piacok – LocalMarket</PageTitle>
+
+<PageContainer Title="Piacok" Subtitle="Piacok felvétele, nyitvatartás és elhelyezkedés szerkesztése">
+    <Actions><button class="btn btn-primary" @onclick="OpenNew">Új piac</button></Actions>
+    <ChildContent>
+        @if (_loading) { <LoadingIndicator /> }
+        else if (_problem is not null) { <ErrorMessage Problem="_problem" OnRetry="LoadAsync" /> }
+        else if (_markets.Count == 0) { <EmptyState Title="Még nincs piac" Text="Vegyél fel egy piacot, hogy az árusok regisztrálhassanak." /> }
+        else
+        {
+            <div class="lm-grid">
+                @foreach (var m in _markets)
+                {
+                    <article class="lm-card">
+                        <div class="d-flex justify-content-between align-items-start gap-2">
+                            <h2 class="h6 mb-1">@m.Name</h2>
+                            <span class="lm-badge @(m.IsActive ? "badge-ok" : "badge-muted")">@(m.IsActive ? "Aktív" : "Inaktív")</span>
+                        </div>
+                        <div class="text-muted small">@m.Address</div>
+                        <div class="mt-2 small">Nyitva: @(m.OpeningDays.Count == 0 ? "–" : string.Join(", ", m.OpeningDays.Select(Labels.Day)))</div>
+                        <div class="small text-muted">@(m.Latitude is null ? "Nincs koordináta (időjárás nem kérdezhető le)" : $"Koordináta: {m.Latitude:0.0000}, {m.Longitude:0.0000}")</div>
+                        <button class="btn btn-outline-primary btn-sm mt-3" @onclick="() => OpenEdit(m)">Szerkesztés</button>
+                    </article>
+                }
+            </div>
+        }
+
+        <ConfirmDialog Visible="_editing" Title="@(_editId is null ? "Új piac" : "Piac szerkesztése")" Busy="_busy"
+                       ConfirmText="Mentés" ConfirmDisabled="string.IsNullOrWhiteSpace(_name) || string.IsNullOrWhiteSpace(_address)"
+                       OnConfirm="SaveAsync" OnCancel="Close">
+            <div class="mb-2">
+                <label class="form-label" for="m-name">Név</label>
+                <input id="m-name" class="form-control" maxlength="100" @bind="_name" @bind:event="oninput" />
+            </div>
+            <div class="mb-2">
+                <label class="form-label" for="m-addr">Cím</label>
+                <input id="m-addr" class="form-control" @bind="_address" @bind:event="oninput" />
+            </div>
+            <fieldset class="mb-2">
+                <legend class="form-label fs-6">Nyitvatartási napok</legend>
+                @foreach (var d in Labels.DayKeys)
+                {
+                    var day = d;
+                    <label class="form-check form-check-inline">
+                        <input type="checkbox" class="form-check-input" checked="@_days.Contains(day)" @onchange="e => ToggleDay(day, (bool)(e.Value ?? false))" />
+                        <span class="form-check-label">@Labels.Day(day)</span>
+                    </label>
+                }
+            </fieldset>
+            <div class="row g-2 mb-2">
+                <div class="col"><label class="form-label" for="m-lat">Szélesség</label><input id="m-lat" class="form-control" inputmode="decimal" placeholder="pl. 46.8417" @bind="_lat" /></div>
+                <div class="col"><label class="form-label" for="m-lon">Hosszúság</label><input id="m-lon" class="form-control" inputmode="decimal" placeholder="pl. 16.8416" @bind="_lon" /></div>
+            </div>
+            @if (_editId is not null)
+            {
+                <label class="form-check"><input type="checkbox" class="form-check-input" @bind="_active" /><span class="form-check-label">Aktív piac</span></label>
+            }
+            <FormProblem Problem="_saveProblem" />
+        </ConfirmDialog>
+    </ChildContent>
+</PageContainer>
+
+@code {
+    private IReadOnlyList<MarketInfo> _markets = [];
+    private ApiProblem? _problem, _saveProblem;
+    private bool _loading = true, _busy, _editing, _active = true;
+    private int? _editId;
+    private string _name = "", _address = "", _lat = "", _lon = "";
+    private readonly HashSet<string> _days = new();
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true; _problem = null;
+        var r = await Catalog.MarketsAsync();
+        if (r.IsSuccess) _markets = r.Value!; else _problem = r.Problem;
+        _loading = false;
+    }
+
+    private void OpenNew()
+    {
+        _editId = null; _name = _address = _lat = _lon = ""; _active = true; _days.Clear(); _saveProblem = null; _editing = true;
+    }
+
+    private void OpenEdit(MarketInfo m)
+    {
+        _editId = m.Id; _name = m.Name; _address = m.Address; _active = m.IsActive;
+        _lat = m.Latitude?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "";
+        _lon = m.Longitude?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "";
+        _days.Clear(); foreach (var d in m.OpeningDays) _days.Add(d);
+        _saveProblem = null; _editing = true;
+    }
+
+    private void Close() => _editing = false;
+
+    private void ToggleDay(string day, bool on) { if (on) _days.Add(day); else _days.Remove(day); }
+
+    private static double? ParseCoord(string s) =>
+        double.TryParse(s.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : null;
+
+    private async Task SaveAsync()
+    {
+        if (_busy) return;
+        var lat = ParseCoord(_lat); var lon = ParseCoord(_lon);
+        if ((lat is null) != (lon is null) || (!string.IsNullOrWhiteSpace(_lat) && lat is null) || (!string.IsNullOrWhiteSpace(_lon) && lon is null))
+        {
+            _saveProblem = new ApiProblem(ApiFailure.Validation, "Hibás koordináta", "Add meg mindkét koordinátát számként (pl. 46.8417), vagy hagyd üresen mindkettőt.", new Dictionary<string, string[]>());
+            return;
+        }
+        _busy = true; _saveProblem = null;
+        var days = Labels.DayKeys.Where(_days.Contains).ToList();
+        var r = _editId is int id
+            ? await Admin.UpdateMarketAsync(id, new UpdateMarketRequest(_name.Trim(), _address.Trim(), days, lat, lon, _active))
+            : await Admin.CreateMarketAsync(new CreateMarketRequest(_name.Trim(), _address.Trim(), days, lat, lon));
+        if (r.IsSuccess) { Toasts.Success("Piac elmentve."); _editing = false; await LoadAsync(); }
+        else _saveProblem = r.Problem;
+        _busy = false;
+    }
+}

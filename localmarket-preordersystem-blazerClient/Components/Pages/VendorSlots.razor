@@ -1,0 +1,86 @@
+@page "/vendor/slots"
+@attribute [Authorize(Roles = "Producer")]
+@inject CatalogApi Catalog
+@inject VendorApi Vendor
+@inject AuthStateService Auth
+@inject ToastService Toasts
+
+<PageTitle>Átvételi időpontok – LocalMarket</PageTitle>
+
+<PageContainer Title="Átvételi időpontok" Subtitle="Ezek közül választanak a vásárlók rendeléskor">
+    <ChildContent>
+        <div class="row g-4">
+            <div class="col-lg-4">
+                <div class="lm-card">
+                    <h2 class="h6">Új időpont</h2>
+                    <div class="mb-2"><label class="form-label" for="sl-date">Nap</label><input id="sl-date" type="date" class="form-control" @bind="_date" /></div>
+                    <div class="row g-2 mb-2">
+                        <div class="col"><label class="form-label" for="sl-from">Kezdés</label><input id="sl-from" type="time" class="form-control" @bind="_from" /></div>
+                        <div class="col"><label class="form-label" for="sl-to">Vége</label><input id="sl-to" type="time" class="form-control" @bind="_to" /></div>
+                    </div>
+                    <div class="mb-3"><label class="form-label" for="sl-cap">Kapacitás (rendelések száma)</label><input id="sl-cap" type="number" min="1" class="form-control" @bind="_capacity" /></div>
+                    <FormProblem Problem="_createProblem" />
+                    <SubmitButton Busy="_busy" CssClass="btn-primary" OnClick="CreateAsync">Időpont meghirdetése</SubmitButton>
+                </div>
+            </div>
+            <div class="col-lg-8">
+                @if (_loading) { <LoadingIndicator /> }
+                else if (_problem is not null) { <ErrorMessage Problem="_problem" OnRetry="LoadAsync" /> }
+                else if (_slots.Count == 0) { <EmptyState Title="Még nincs időpont" Text="Hirdess meg legalább egy átvételi időpontot, különben a vásárlók nem tudnak tőled rendelni." /> }
+                else
+                {
+                    <div class="lm-table-wrap">
+                        <table class="table lm-table">
+                            <thead><tr><th>Nap</th><th>Időszak</th><th class="text-end">Foglalt</th><th class="text-end">Szabad</th></tr></thead>
+                            <tbody>
+                            @foreach (var s in _slots.OrderBy(s => s.Date).ThenBy(s => s.StartTime))
+                            {
+                                <tr><td>@Labels.Date(s.Date)</td><td>@Labels.Time(s.StartTime) – @Labels.Time(s.EndTime)</td><td class="text-end">@s.BookedCount / @s.Capacity</td><td class="text-end">@s.FreeCapacity</td></tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </ChildContent>
+</PageContainer>
+
+@code {
+    private IReadOnlyList<PickupSlotInfo> _slots = [];
+    private ApiProblem? _problem, _createProblem;
+    private bool _loading = true, _busy;
+    private DateTime _date = DateTime.Today.AddDays(1);
+    private TimeOnly _from = new(8, 0), _to = new(12, 0);
+    private int _capacity = 10;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Auth.GetAuthenticationStateAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true; _problem = null;
+        if (Auth.ProducerId is not int pid)
+        {
+            _problem = new ApiProblem(ApiFailure.Forbidden, "Nincs árus-profil", "A fiókhoz nem tartozik árus-profil.", new Dictionary<string, string[]>());
+        }
+        else
+        {
+            var r = await Catalog.PickupSlotsAsync(pid);
+            if (r.IsSuccess) _slots = r.Value!; else _problem = r.Problem;
+        }
+        _loading = false;
+    }
+
+    private async Task CreateAsync()
+    {
+        if (_busy) return;
+        _busy = true; _createProblem = null;
+        var r = await Vendor.CreatePickupSlotAsync(new CreatePickupSlotRequest(_date, _from, _to, _capacity));
+        if (r.IsSuccess) { Toasts.Success("Időpont meghirdetve."); await LoadAsync(); } else _createProblem = r.Problem;
+        _busy = false;
+    }
+}

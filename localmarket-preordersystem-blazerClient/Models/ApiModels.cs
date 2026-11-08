@@ -1,4 +1,4 @@
-﻿namespace localmarket_preordersystem.Models;
+namespace localmarket_preordersystem.Models;
 
 // Az API DTO-inak kliensoldali tükre (JSON, camelCase). Az enumok névvel utaznak (a szerver JsonStringEnumConverter-t használ).
 
@@ -44,3 +44,21 @@ public sealed record NoteRequest(string Note);
 public sealed record ResolveRequest(string Decision, string? Note);
 public sealed record FulfilledLineRequest(int ProductId, decimal Quantity);
 public sealed record PartialRequest(IReadOnlyList<FulfilledLineRequest> Lines);
+
+// árus / admin / időjárás / riport DTO-k
+public sealed record ProducerInfo(int Id, string Name, int MarketId, int StallNumber, string Status, string? RejectionReason, DateTime RegisteredAt);
+public sealed record MarketWeatherInfo(int MarketId, string MarketName, DateTime Date, bool IsMarketOpen, bool ForecastAvailable, double? TemperatureMinC, double? TemperatureMaxC, double? PrecipitationMm, string? Description);
+public sealed record CancellationRateInfo(int TotalOrders, int CancelledOrders, int RejectedOrders, decimal Rate);
+public sealed record TopProductInfo(int ProductId, string ProductName, decimal TotalQuantity, decimal TotalRevenue, int OrderCount);
+public sealed record VendorRevenueInfo(int ProducerId, string ProducerName, int OrderCount, decimal Revenue);
+public sealed record UnclaimedOrderInfo(int OrderId, int ProducerId, string ProducerName, int CustomerId, string CustomerName, DateTime PickupDate, decimal TotalAmount, string Status);
+
+// további kérések
+public sealed record CreateProductRequest(string Name, string? Description, IReadOnlyList<int> CategoryIds, IReadOnlyList<string> Allergies);
+public sealed record UpdateProductRequest(string Name, string? Description, IReadOnlyList<int> CategoryIds, IReadOnlyList<string> Allergies);
+public sealed record StockRequest(DateTime WeekDate, decimal Quantity, string Unit, decimal UnitPrice);
+public sealed record CreatePickupSlotRequest(DateTime Date, TimeOnly StartTime, TimeOnly EndTime, int Capacity);
+public sealed record UpdateMyProducerRequest(string Name, int StallNumber);
+public sealed record CreateMarketRequest(string Name, string Address, IReadOnlyList<string> OpeningDays, double? Latitude, double? Longitude);
+public sealed record UpdateMarketRequest(string Name, string Address, IReadOnlyList<string> OpeningDays, double? Latitude, double? Longitude, bool IsActive);
+public sealed record CreateCategoryRequest(string Name, string? Description);
