@@ -7,12 +7,6 @@
         <RootNamespace>localmarket_preordersystem</RootNamespace>
         <AssemblyName>$(AssemblyName.Replace(' ', '_'))</AssemblyName>
         <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
-        <UserSecretsId>301a8efc-5fdd-4ec8-acb0-4a1b69e0e584</UserSecretsId>
-        <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
     </PropertyGroup>
-
-    <ItemGroup>
-      <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.24.2-preview.1" />
-    </ItemGroup>
 
 </Project>
