@@ -33,6 +33,9 @@ services:
       Database__MigrateOnStartup: "${MIGRATE_ON_STARTUP:-true}"
       Jwt__Secret: "${JWT_SECRET:?Állítsd be a JWT_SECRET-et a .env fájlban (min. 32 karakter)}"
       Cors__Origins__0: "http://localhost:5219"
+      ImageStorage__RootPath: /app/uploads/products
+    volumes:
+      - uploads:/app/uploads/products
     ports:
       - "5205:8080"
 
@@ -66,3 +69,4 @@ services:
 volumes:
   pgdata:
   pgadmin_data:
+  uploads:

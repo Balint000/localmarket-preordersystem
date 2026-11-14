@@ -2,7 +2,9 @@ using localmarket_preordersystem.Application.Common.Interfaces;
 using localmarket_preordersystem.Infrastructure.Persistence.Context;
 using localmarket_preordersystem.Infrastructure.Persistence.Repositories;
 using localmarket_preordersystem.Infrastructure.Auth;
+using localmarket_preordersystem.Infrastructure.ExternalAPIs.Geocoding;
 using localmarket_preordersystem.Infrastructure.ExternalAPIs.Weather;
+using localmarket_preordersystem.Infrastructure.Storage;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -59,6 +61,15 @@ public static class DependencyInjection
             client.BaseAddress = new Uri("https://api.open-meteo.com/");
             client.Timeout = TimeSpan.FromSeconds(10);
         });
+
+        services.AddHttpClient<IGeocodingService, OpenMeteoGeocodingService>(client =>
+        {
+            client.BaseAddress = new Uri("https://geocoding-api.open-meteo.com/");
+            client.Timeout = TimeSpan.FromSeconds(10);
+        });
+
+        services.Configure<ImageStorageOptions>(configuration.GetSection(ImageStorageOptions.SectionName));
+        services.AddSingleton<IImageStorage, LocalImageStorage>();
 
         return services;
     }

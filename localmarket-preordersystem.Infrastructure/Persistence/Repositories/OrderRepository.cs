@@ -59,6 +59,9 @@ internal sealed class OrderRepository(MarketDbContext context) : IOrderRepositor
             .ToListAsync(cancellationToken);
     }
 
+    public Task<bool> AnyForPickupSlotAsync(int pickupSlotId, CancellationToken cancellationToken = default)
+        => context.Orders.AnyAsync(o => o.PickupSlotId == pickupSlotId, cancellationToken);
+
     public async Task AddAsync(Order order, CancellationToken cancellationToken = default)
         => await context.Orders.AddAsync(order, cancellationToken);
 }

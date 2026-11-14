@@ -14,21 +14,28 @@ namespace localmarket_preordersystem.Application.Weather.GetMarketWeather
         int MarketId, string MarketName, DateTime Date, bool IsMarketOpen, bool ForecastAvailable,
         double? TemperatureMinC, double? TemperatureMaxC, double? PrecipitationMm, string? Description);
 
-    /// <summary>Időjárás a piac napjára. Ha a külső szolgáltatás nem elérhető, a válasz ForecastAvailable=false (a rendelés nem függ tőle).</summary>
-    public sealed class GetMarketWeatherHandler(IMarketRepository markets, IWeatherService weather)
+    /// <summary>
+    /// Időjárás a piac napjára. Ha a piachoz nincs koordináta, a cím alapján keresünk helyet (geokódolás);
+    /// ha az sem sikerül, vagy a külső szolgáltatás nem elérhető, a válasz ForecastAvailable=false
+    /// (a rendelés nem függ tőle, ezért nem hiba).
+    /// </summary>
+    public sealed class GetMarketWeatherHandler(IMarketRepository markets, IWeatherService weather, IGeocodingService geocoding)
     {
         public async Task<MarketWeatherDto> HandleAsync(GetMarketWeatherQuery query, CancellationToken ct = default)
         {
             var market = await markets.GetByIdAsync(query.MarketId, ct)
                 ?? throw new NotFoundException($"Nem található piac: {query.MarketId}.");
-            if (market.Latitude is not double lat || market.Longitude is not double lon)
-                throw new ConflictException("A piachoz nincs koordináta megadva, az időjárás nem kérdezhető le.");
 
             var open = market.OpeningDays.Contains(query.Date.DayOfWeek);
             DailyForecast? forecast = null;
             try
             {
-                forecast = await weather.GetDailyForecastAsync(lat, lon, query.Date.Date, ct);
+                var location = market is { Latitude: double lat, Longitude: double lon }
+                    ? new GeoPoint(lat, lon)
+                    : await geocoding.GeocodeAsync(market.Address, ct);
+
+                if (location is not null)
+                    forecast = await weather.GetDailyForecastAsync(location.Latitude, location.Longitude, query.Date.Date, ct);
             }
             catch (HttpRequestException)
             {

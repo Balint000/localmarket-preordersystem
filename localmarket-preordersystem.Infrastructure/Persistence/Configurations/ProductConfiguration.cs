@@ -16,6 +16,7 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.Property(product => product.Name).HasMaxLength(100).IsRequired();
         builder.Property(product => product.Description).HasMaxLength(500).IsRequired();
         builder.Property(product => product.CreatedAt).HasColumnType("timestamp with time zone");
+        builder.Property(product => product.ImageFileName).HasMaxLength(100);
         builder.Property<List<Allergy>>("_allergies")
             .HasColumnName("Allergies")
             .HasColumnType("integer[]")
