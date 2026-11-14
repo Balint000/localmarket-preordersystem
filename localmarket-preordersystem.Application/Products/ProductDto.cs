@@ -14,18 +14,20 @@ namespace localmarket_preordersystem.Application.Products
         string? ProducerName,
         string Name,
         string Description,
+        string? ImageUrl,
         IReadOnlyList<CategoryDto> Categories,
         IReadOnlyList<string> Allergies,
         ProductStockDto? NextStock,
         IReadOnlyList<ProductStockDto> WeeklyStocks)
     {
-        /// <summary>A NextStock az aktuális (vagy legközelebbi jövőbeli) hét kínálata.</summary>
+        /// <summary>A NextStock az aktuális (vagy legközelebbi jövőbeli) hét kínálata. Az ImageUrl az API-hoz képest relatív útvonal.</summary>
         public static ProductDto From(Product p, DateTime today) => new(
             p.Id,
             p.ProducerId,
             p.Producer?.Name,
             p.Name,
             p.Description,
+            ProductImages.UrlFor(p.ImageFileName),
             p.Categories.Select(CategoryDto.From).ToList(),
             p.Allergies.Select(a => a.ToString()).ToList(),
             p.GetNextAvailableStock(today) is { } s ? ProductStockDto.From(s) : null,

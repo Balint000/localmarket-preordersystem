@@ -23,6 +23,9 @@ namespace localmarket_preordersystem.Domain.Entity
 
         public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
 
+        /// <summary>A feltöltött termékkép fájlneve (a tárolóban); null, ha nincs kép.</summary>
+        public string? ImageFileName { get; private set; }
+
         private readonly List<Allergy> _allergies = new();
         public IReadOnlyCollection<Allergy> Allergies => _allergies.AsReadOnly();
 
@@ -78,6 +81,16 @@ namespace localmarket_preordersystem.Domain.Entity
             _allergies.Clear();
             _allergies.AddRange(allergies.Distinct());
         }
+
+        public void SetImage(string fileName)
+        {
+            if (string.IsNullOrWhiteSpace(fileName))
+                throw new DomainException("A kép fájlneve nem lehet üres.");
+
+            ImageFileName = fileName;
+        }
+
+        public void ClearImage() => ImageFileName = null;
 
         // Invariáns: legalább egy kategória kell (különben a termék a kategória-szűrésekben
         // sehol nem jelenne meg).

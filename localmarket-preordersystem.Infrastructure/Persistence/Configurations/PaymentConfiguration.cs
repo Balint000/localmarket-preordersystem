@@ -9,7 +9,7 @@ internal sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
     public void Configure(EntityTypeBuilder<Payment> builder)
     {
         builder.ToTable("Payments", table =>
-            table.HasCheckConstraint("CK_Payments_Amount", "\"Amount\" > 0"));
+            table.HasCheckConstraint("CK_Payments_Amount", "\"Amount\" >= 0"));
         builder.HasKey(payment => payment.Id);
 
         builder.Property(payment => payment.Amount).HasPrecision(12, 2);

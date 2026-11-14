@@ -74,7 +74,9 @@ namespace localmarket_preordersystem.Domain.Entity
                 ProducerId = slot.ProducerId,
                 PickupSlotId = slot.Id,
                 PickupSlot = slot,
-                CreatedAt = now,
+                // A `now` helyi idő (az idősáv helyi dátumához/időpontjához hasonlítjuk); az adatbázisba
+                // (timestamptz) csak UTC kerülhet, ahogy a többi entitásnál is.
+                CreatedAt = DateTime.UtcNow,
                 Status = OrderStatus.Pending
             };
 

@@ -10,6 +10,10 @@ namespace localmarket_preordersystem.api.Controllers;
 public class WeatherController : ControllerBase
 {
     [HttpGet("markets/{marketId:int}")]
-    public async Task<IActionResult> Get(int marketId, [FromQuery] DateTime date, GetMarketWeatherHandler handler, CancellationToken ct)
-        => Ok(await handler.HandleAsync(new GetMarketWeatherQuery(marketId, date), ct));
+    public async Task<IActionResult> Get(int marketId, [FromQuery] DateTime? date, GetMarketWeatherHandler handler, CancellationToken ct)
+    {
+        if (date is null) return Problem(statusCode: 400, title: "Hiányzó dátum", detail: "A 'date' paraméter kötelező (yyyy-MM-dd).");
+
+        return Ok(await handler.HandleAsync(new GetMarketWeatherQuery(marketId, date.Value), ct));
+    }
 }

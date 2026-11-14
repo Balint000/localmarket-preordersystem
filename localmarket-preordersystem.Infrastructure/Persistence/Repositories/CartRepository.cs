@@ -14,4 +14,10 @@ internal sealed class CartRepository(MarketDbContext context) : ICartRepository
 
     public async Task AddAsync(Cart cart, CancellationToken cancellationToken = default)
         => await context.Carts.AddAsync(cart, cancellationToken);
+
+    public async Task RemoveItemsForProductAsync(int productId, CancellationToken cancellationToken = default)
+    {
+        var items = await context.CartItems.Where(i => i.ProductId == productId).ToListAsync(cancellationToken);
+        context.CartItems.RemoveRange(items);
+    }
 }

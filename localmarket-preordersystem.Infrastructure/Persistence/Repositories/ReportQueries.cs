@@ -13,11 +13,23 @@ internal sealed class ReportQueries(MarketDbContext context, TimeProvider time) 
 {
     private static DateTime Utc(DateTime d) => DateTime.SpecifyKind(d, DateTimeKind.Utc);
 
+    private DateTime ToUtc(DateTime d)
+    {
+        if (d.Kind == DateTimeKind.Utc)
+            return d;
+
+        var zone = time.LocalTimeZone;
+        var local = DateTime.SpecifyKind(d, DateTimeKind.Unspecified);
+        if (zone.IsInvalidTime(local)) // nyári időszámításra váltáskor kimaradó óra
+            local = local.AddHours(1);
+        return TimeZoneInfo.ConvertTimeToUtc(local, zone);
+    }
+
     public async Task<IReadOnlyList<TopProductDto>> GetTopProductsAsync(
         DateTime from, DateTime to, int top, CancellationToken ct = default)
     {
-        var f = Utc(from);
-        var t = Utc(to);
+        var f = ToUtc(from);
+        var t = ToUtc(to);
 
         var rows = await context.Orders.AsNoTracking()
             .Where(o => o.CreatedAt >= f && o.CreatedAt <= t
