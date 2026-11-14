@@ -1,6 +1,7 @@
 using localmarket_preordersystem.Application.Common.Interfaces;
 using localmarket_preordersystem.Application.Common.Models;
 using localmarket_preordersystem.Domain.Entity;
+using localmarket_preordersystem.Domain.ValueObject;
 using localmarket_preordersystem.Infrastructure.Persistence.Context;
 using Microsoft.EntityFrameworkCore;
 
@@ -27,7 +28,9 @@ internal sealed class ProductRepository(MarketDbContext context) : IProductRepos
 
     public async Task<IReadOnlyList<Product>> SearchAsync(ProductSearchCriteria criteria, CancellationToken cancellationToken = default)
     {
-        var query = WithDetails().AsNoTracking();
+        // Only products of approved producers are publicly searchable.
+        var query = WithDetails().AsNoTracking()
+            .Where(p => p.Producer.Status == ProducerStatus.Approved);
 
         if (!string.IsNullOrWhiteSpace(criteria.Text))
         {
@@ -41,7 +44,7 @@ internal sealed class ProductRepository(MarketDbContext context) : IProductRepos
         if (criteria.ProducerId.HasValue)
             query = query.Where(p => p.ProducerId == criteria.ProducerId.Value);
 
-        var result = await query.OrderBy(p => p.Name).ToListAsync(cancellationToken);
+        var result = await query.OrderBy(p => p.Name).ThenBy(p => p.Id).ToListAsync(cancellationToken);
 
         if (criteria.ExcludeAllergies is { Count: > 0 })
             result = result.Where(p => !p.Allergies.Any(a => criteria.ExcludeAllergies.Contains(a))).ToList();
@@ -49,9 +52,7 @@ internal sealed class ProductRepository(MarketDbContext context) : IProductRepos
         return result;
     }
 
-    public async Task AddAsync(Product product, CancellationToken cancellationToken = default)
-        => await context.Products.AddAsync(product, cancellationToken);
+    public async Task AddAsync(Product product, CancellationToken cancellationToken = default) => await context.Products.AddAsync(product, cancellationToken);
 
-    private static string EscapeLike(string value)
-        => value.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+    private static string EscapeLike(string value) => value.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
 }

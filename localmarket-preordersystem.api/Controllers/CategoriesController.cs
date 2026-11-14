@@ -1,3 +1,4 @@
+using localmarket_preordersystem.api.Extensions;
 using localmarket_preordersystem.Application.Categories.CreateCategory;
 using localmarket_preordersystem.Application.Categories.ListCategories;
 using Microsoft.AspNetCore.Authorization;
@@ -15,7 +16,7 @@ public class CategoriesController : ControllerBase
         => Ok(await handler.HandleAsync(ct));
 
     [HttpPost]
-    [Authorize]
+    [Authorize(Policy = Policies.Manager)]
     public async Task<IActionResult> Create(CreateCategoryCommand command, CreateCategoryHandler handler, CancellationToken ct)
         => Ok(await handler.HandleAsync(command, ct));
 }

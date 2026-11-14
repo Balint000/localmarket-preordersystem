@@ -106,7 +106,7 @@ internal sealed class ReportQueries(MarketDbContext context, TimeProvider time) 
     {
         var f = Utc(from);
         var t = Utc(to);
-        var now = time.GetUtcNow().UtcDateTime;
+        var now = time.GetLocalNow().UtcDateTime;
         var today = now.Date;
         var nowTime = TimeOnly.FromDateTime(now);
 

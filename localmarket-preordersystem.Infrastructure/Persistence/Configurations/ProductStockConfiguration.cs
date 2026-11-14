@@ -10,13 +10,16 @@ internal sealed class ProductStockConfiguration : IEntityTypeConfiguration<Produ
     {
         builder.ToTable("ProductStocks", table =>
         {
-            table.HasCheckConstraint("CK_ProductStocks_Quantity", "\"Quantity\" > 0");
+            table.HasCheckConstraint("CK_ProductStocks_Quantity", "\"Quantity\" >= 0");
             table.HasCheckConstraint("CK_ProductStocks_Reserved", "\"ReservedQuantity\" >= 0 AND \"ReservedQuantity\" <= \"Quantity\"");
         });
         builder.HasKey(stock => stock.Id);
 
         builder.Property(stock => stock.WeekStartDate).HasColumnType("date");
         builder.Property(stock => stock.Unit).HasConversion<string>().HasMaxLength(30).IsRequired();
+        builder.Property(stock => stock.Quantity).HasPrecision(12, 3);
+        builder.Property(stock => stock.ReservedQuantity).HasPrecision(12, 3);
+        builder.Property(stock => stock.UnitPrice).HasPrecision(12, 2);
         builder.Property(stock => stock.LastUpdated).HasColumnType("timestamp with time zone");
         builder.Ignore(stock => stock.AvailableQuantity);
 

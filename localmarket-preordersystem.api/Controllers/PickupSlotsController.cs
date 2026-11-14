@@ -1,3 +1,4 @@
+using localmarket_preordersystem.api.Extensions;
 using localmarket_preordersystem.Application.PickupSlots.CreatePickupSlot;
 using localmarket_preordersystem.Application.PickupSlots.ListPickupSlots;
 using Microsoft.AspNetCore.Authorization;
@@ -15,7 +16,7 @@ public class PickupSlotsController : ControllerBase
         => Ok(await handler.HandleAsync(producerId, ct));
 
     [HttpPost]
-    [Authorize]
+    [Authorize(Policy = Policies.Producer)]
     public async Task<IActionResult> Create(CreatePickupSlotCommand command, CreatePickupSlotHandler handler, CancellationToken ct)
         => Ok(await handler.HandleAsync(command, ct));
 }
