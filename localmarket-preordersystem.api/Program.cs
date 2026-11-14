@@ -3,8 +3,6 @@ using localmarket_preordersystem.api.Extensions;
 using localmarket_preordersystem.api.Middleware;
 using localmarket_preordersystem.Application;
 using localmarket_preordersystem.Infrastructure;
-using localmarket_preordersystem.Infrastructure.Persistence.Context;
-using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,10 +24,7 @@ app.UseExceptionHandler();
 app.UseStatusCodePages();
 
 if (builder.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
-{
-    using var scope = app.Services.CreateScope();
-    await scope.ServiceProvider.GetRequiredService<MarketDbContext>().Database.MigrateAsync();
-}
+    await app.InitializeAsync();
 
 if (app.Environment.IsDevelopment())
     app.MapOpenApi();

@@ -9,7 +9,7 @@ namespace localmarket_preordersystem.Domain.Entity
     public class User
     {
         public int Id { get; private set; }
-        public int ProducerId { get; private set; }
+        public int? ProducerId { get; private set; }
         public string FirstName { get; set; } = string.Empty;
         public string LastName { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
