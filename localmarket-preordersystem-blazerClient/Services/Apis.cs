@@ -1,4 +1,4 @@
-﻿using localmarket_preordersystem.Models;
+using localmarket_preordersystem.Models;
 
 namespace localmarket_preordersystem.Services;
 
@@ -27,6 +27,15 @@ public sealed class CatalogApi(ApiClient api)
     }
 
     public Task<ApiResult<ProductInfo>> ProductAsync(int id, CancellationToken ct = default) => api.GetAsync<ProductInfo>($"api/products/{id}", ct);
+    public Task<ApiResult<IReadOnlyList<ProductInfo>>> ProductsOfProducerAsync(int producerId, CancellationToken ct = default) => api.GetAsync<IReadOnlyList<ProductInfo>>($"api/products?producerId={producerId}", ct);
+    public Task<ApiResult<IReadOnlyList<ProducerInfo>>> ProducersAsync(string? status = null, int? marketId = null, CancellationToken ct = default)
+    {
+        var q = new List<string>();
+        if (!string.IsNullOrEmpty(status)) q.Add("status=" + Uri.EscapeDataString(status));
+        if (marketId is int m) q.Add("marketId=" + m);
+        return api.GetAsync<IReadOnlyList<ProducerInfo>>("api/producers" + (q.Count > 0 ? "?" + string.Join('&', q) : ""), ct);
+    }
+    public Task<ApiResult<MarketWeatherInfo>> WeatherAsync(int marketId, DateTime date, CancellationToken ct = default) => api.GetAsync<MarketWeatherInfo>($"api/weather/markets/{marketId}?date={date:yyyy-MM-dd}", ct);
     public Task<ApiResult<IReadOnlyList<PickupSlotInfo>>> PickupSlotsAsync(int producerId, CancellationToken ct = default) => api.GetAsync<IReadOnlyList<PickupSlotInfo>>($"api/pickup-slots?producerId={producerId}", ct);
 }
 
@@ -78,4 +87,38 @@ public sealed class OrdersApi(ApiClient api, CartService cart)
     public Task<ApiResult<DownloadedFile>> ExportPickingListAsync(DateTime date, string format) => api.GetFileAsync($"api/export/picking-list?date={date:yyyy-MM-dd}&format={format}");
 
     private static string StatusQuery(string? status) => string.IsNullOrEmpty(status) ? "" : "?status=" + Uri.EscapeDataString(status);
+}
+
+/// <summary>Árus-oldali műveletek: termék, készlet, átvételi időpont, saját adatok.</summary>
+public sealed class VendorApi(ApiClient api)
+{
+    public Task<ApiResult<ProductInfo>> CreateProductAsync(CreateProductRequest r) => api.PostAsync<ProductInfo>("api/products", r);
+    public Task<ApiResult<ProductInfo>> UpdateProductAsync(int id, UpdateProductRequest r) => api.PutAsync<ProductInfo>($"api/products/{id}", r, default);
+    public Task<ApiResult<ProductInfo>> SetStockAsync(int id, StockRequest r) => api.PutAsync<ProductInfo>($"api/products/{id}/stock", r, default);
+    public Task<ApiResult<PickupSlotInfo>> CreatePickupSlotAsync(CreatePickupSlotRequest r) => api.PostAsync<PickupSlotInfo>("api/pickup-slots", r);
+    public Task<ApiResult<ProducerInfo>> UpdateMineAsync(UpdateMyProducerRequest r) => api.PutAsync<ProducerInfo>("api/producers/me", r, default);
+}
+
+/// <summary>Admin-műveletek: árusok jóváhagyása, piacok, kategóriák, riportok.</summary>
+public sealed class AdminApi(ApiClient api)
+{
+    public Task<ApiResult<ProducerInfo>> ApproveProducerAsync(int id) => api.PostAsync<ProducerInfo>($"api/producers/{id}/approve");
+    public Task<ApiResult<ProducerInfo>> RejectProducerAsync(int id, string reason) => api.PostAsync<ProducerInfo>($"api/producers/{id}/reject", new ReasonRequest(reason));
+    public Task<ApiResult<MarketInfo>> CreateMarketAsync(CreateMarketRequest r) => api.PostAsync<MarketInfo>("api/markets", r);
+    public Task<ApiResult<MarketInfo>> UpdateMarketAsync(int id, UpdateMarketRequest r) => api.PutAsync<MarketInfo>($"api/markets/{id}", r, default);
+    public Task<ApiResult<CategoryInfo>> CreateCategoryAsync(CreateCategoryRequest r) => api.PostAsync<CategoryInfo>("api/categories", r);
+
+    public Task<ApiResult<IReadOnlyList<TopProductInfo>>> TopProductsAsync(DateTime? from, DateTime? to, int top = 10) => api.GetAsync<IReadOnlyList<TopProductInfo>>("api/reports/top-products" + Range(from, to, "top=" + top), default);
+    public Task<ApiResult<CancellationRateInfo>> CancellationRateAsync(DateTime? from, DateTime? to) => api.GetAsync<CancellationRateInfo>("api/reports/cancellation-rate" + Range(from, to), default);
+    public Task<ApiResult<IReadOnlyList<VendorRevenueInfo>>> VendorRevenueAsync(DateTime? from, DateTime? to) => api.GetAsync<IReadOnlyList<VendorRevenueInfo>>("api/reports/vendor-revenue" + Range(from, to), default);
+    public Task<ApiResult<IReadOnlyList<UnclaimedOrderInfo>>> UnclaimedAsync(DateTime? from, DateTime? to) => api.GetAsync<IReadOnlyList<UnclaimedOrderInfo>>("api/reports/unclaimed-orders" + Range(from, to), default);
+
+    private static string Range(DateTime? from, DateTime? to, string? extra = null)
+    {
+        var q = new List<string>();
+        if (from is { } f) q.Add($"from={f:yyyy-MM-dd}");
+        if (to is { } t) q.Add($"to={t:yyyy-MM-dd}");
+        if (extra is not null) q.Add(extra);
+        return q.Count > 0 ? "?" + string.Join('&', q) : "";
+    }
 }

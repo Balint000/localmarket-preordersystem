@@ -11,11 +11,8 @@ namespace localmarket_preordersystem.Infrastructure.Persistence.Repositories;
 
 internal sealed class ReportQueries(MarketDbContext context, TimeProvider time) : IReportQueries
 {
-    /// <summary>
-    /// A riport-intervallum határai helyi (piaci) időben értendők ("a nap vége" a helyi nap vége), a
-    /// rendelések CreatedAt-ja viszont UTC — ezért a határokat helyi időből UTC-re kell váltani
-    /// (a korábbi SpecifyKind(Utc) a helyi időt egyszerűen UTC-nek címkézte, az időzóna-eltolást elvesztve).
-    /// </summary>
+    private static DateTime Utc(DateTime d) => DateTime.SpecifyKind(d, DateTimeKind.Utc);
+
     private DateTime ToUtc(DateTime d)
     {
         if (d.Kind == DateTimeKind.Utc)
@@ -61,8 +58,8 @@ internal sealed class ReportQueries(MarketDbContext context, TimeProvider time) 
     public async Task<CancellationRateDto> GetCancellationRateAsync(
         DateTime from, DateTime to, CancellationToken ct = default)
     {
-        var f = ToUtc(from);
-        var t = ToUtc(to);
+        var f = Utc(from);
+        var t = Utc(to);
 
         var counts = await context.Orders.AsNoTracking()
             .Where(o => o.CreatedAt >= f && o.CreatedAt <= t)
@@ -85,8 +82,8 @@ internal sealed class ReportQueries(MarketDbContext context, TimeProvider time) 
     public async Task<IReadOnlyList<VendorRevenueDto>> GetVendorRevenueAsync(
         DateTime from, DateTime to, CancellationToken ct = default)
     {
-        var f = ToUtc(from);
-        var t = ToUtc(to);
+        var f = Utc(from);
+        var t = Utc(to);
 
         var orders = await context.Orders.AsNoTracking()
             .Where(o => o.CreatedAt >= f && o.CreatedAt <= t && o.Status == OrderStatus.PickedUp)
@@ -119,11 +116,9 @@ internal sealed class ReportQueries(MarketDbContext context, TimeProvider time) 
     public async Task<IReadOnlyList<UnclaimedOrderDto>> GetUnclaimedOrdersAsync(
         DateTime from, DateTime to, CancellationToken ct = default)
     {
-        var f = ToUtc(from);
-        var t = ToUtc(to);
-        // Az idősávok dátuma/ideje helyi (piaci) időben van tárolva, ezért a "most"-ot is helyi időben kell venni
-        // (korábban UtcDateTime volt: az időzóna-eltolásnyi ablakban rossz rendeléseket jelzett át nem vettnek).
-        var now = time.GetLocalNow().DateTime;
+        var f = Utc(from);
+        var t = Utc(to);
+        var now = time.GetUtcNow().UtcDateTime;
         var today = now.Date;
         var nowTime = TimeOnly.FromDateTime(now);
 

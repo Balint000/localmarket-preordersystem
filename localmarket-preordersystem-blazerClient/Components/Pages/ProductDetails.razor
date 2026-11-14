@@ -1,4 +1,4 @@
-﻿@page "/products/{Id:int}"
+@page "/products/{Id:int}"
 @inject CatalogApi Catalog
 @inject CartService Cart
 @inject AuthStateService Auth
@@ -23,7 +23,7 @@
     {
         <div class="row g-4">
             <div class="col-md-5">
-                <div class="lm-product-img rounded" style="height:260px" aria-hidden="true">🥕</div>
+                <div class="lm-product-img rounded @Look.Css" style="height:260px;font-size:5rem" aria-hidden="true">@Look.Emoji</div>
             </div>
             <div class="col-md-7">
                 <div class="lm-card">
@@ -83,6 +83,62 @@
                 </div>
             </div>
         </div>
+
+        <div class="row g-4 mt-1">
+            <div class="col-lg-4">
+                <div class="lm-card h-100">
+                    <h2 class="h6">Az árusról</h2>
+                    <dl class="lm-facts">
+                        <dt>Árus</dt><dd>@_product.ProducerName</dd>
+                        @if (_producer is not null) { <dt>Stand</dt><dd>@_producer.StallNumber. számú stand</dd> }
+                        @if (_market is not null)
+                        {
+                            <dt>Piac</dt><dd>@_market.Name<div class="small text-muted">@_market.Address</div></dd>
+                            <dt>Nyitva</dt><dd>@(_market.OpeningDays.Count == 0 ? "–" : string.Join(", ", _market.OpeningDays.Select(Labels.Day)))</dd>
+                        }
+                    </dl>
+                    @if (_weather is { ForecastAvailable: true } w)
+                    {
+                        <div class="lm-weather mt-3">
+                            <span class="lm-weather-icon" aria-hidden="true">🌤️</span>
+                            <div>
+                                <div class="fw-semibold">Következő piacnap: @Labels.Date(w.Date)</div>
+                                <div class="small">@w.Description · @Labels.Qty((decimal)(w.TemperatureMinC ?? 0)) – @Labels.Qty((decimal)(w.TemperatureMaxC ?? 0)) °C · csapadék: @Labels.Qty((decimal)(w.PrecipitationMm ?? 0)) mm</div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+            <div class="col-lg-8">
+                <div class="lm-card mb-3">
+                    <h2 class="h6">Heti kínálat</h2>
+                    @if (_product.WeeklyStocks.Count == 0) { <p class="text-muted mb-0">Még nincs meghirdetett készlet.</p> }
+                    else
+                    {
+                        <table class="table lm-table mb-0">
+                            <thead><tr><th>Hét kezdete</th><th class="text-end">Elérhető</th><th class="text-end">Ár</th></tr></thead>
+                            <tbody>
+                            @foreach (var ws in _product.WeeklyStocks)
+                            {
+                                <tr><td>@Labels.Date(ws.WeekStartDate)</td><td class="text-end">@Labels.Qty(ws.AvailableQuantity) / @Labels.Qty(ws.Quantity) @Labels.Unit(ws.Unit)</td><td class="text-end">@Labels.Money(ws.UnitPrice) / @Labels.Unit(ws.Unit)</td></tr>
+                            }
+                            </tbody>
+                        </table>
+                    }
+                </div>
+                <div class="lm-card">
+                    <h2 class="h6">Szabad átvételi időpontok</h2>
+                    @if (_slots.Count == 0) { <p class="text-muted mb-0">Az árus még nem hirdetett meg átvételi időpontot.</p> }
+                    else
+                    {
+                        @foreach (var sl in _slots)
+                        {
+                            <span class="lm-slot-chip">@Labels.Date(sl.Date) · @Labels.Time(sl.StartTime)–@Labels.Time(sl.EndTime) · @sl.FreeCapacity szabad hely</span>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
     }
 </ChildContent>
 </PageContainer>
@@ -95,6 +151,13 @@
     private bool _loading = true, _adding;
     private decimal _quantity = 1;
 
+    private ProducerInfo? _producer;
+    private MarketInfo? _market;
+    private MarketWeatherInfo? _weather;
+    private IReadOnlyList<PickupSlotInfo> _slots = [];
+
+    private (string Emoji, string Css) Look => Labels.CategoryLook(_product?.Categories.FirstOrDefault()?.Name);
+
     private bool Available => _product?.NextStock is { AvailableQuantity: > 0 };
 
     protected override async Task OnParametersSetAsync() => await LoadAsync();
@@ -106,6 +169,37 @@
         var result = await Catalog.ProductAsync(Id);
         if (result.IsSuccess) _product = result.Value; else { _product = null; _problem = result.Problem; }
         _loading = false;
+        if (_product is not null) await LoadExtrasAsync(_product);
+    }
+
+    // kiegészítő információk: hiba esetén egyszerűen kimaradnak, a termék megrendelhetőségét nem érintik
+    private async Task LoadExtrasAsync(ProductInfo product)
+    {
+        _producer = null; _market = null; _weather = null; _slots = [];
+        var producers = await Catalog.ProducersAsync();
+        _producer = producers.Value?.FirstOrDefault(p => p.Id == product.ProducerId);
+        var slots = await Catalog.PickupSlotsAsync(product.ProducerId);
+        _slots = slots.Value?.Where(s => s.Date.Date >= DateTime.Today && s.FreeCapacity > 0).OrderBy(s => s.Date).ThenBy(s => s.StartTime).Take(8).ToList() ?? [];
+        if (_producer is not null)
+        {
+            var markets = await Catalog.MarketsAsync();
+            _market = markets.Value?.FirstOrDefault(m => m.Id == _producer.MarketId);
+            if (_market is { Latitude: not null } && NextOpening(_market) is { } day)
+            {
+                var w = await Catalog.WeatherAsync(_market.Id, day);
+                if (w.IsSuccess) _weather = w.Value;
+            }
+        }
+    }
+
+    private static DateTime? NextOpening(MarketInfo market)
+    {
+        for (var i = 0; i < 7; i++)
+        {
+            var d = DateTime.Today.AddDays(i);
+            if (market.OpeningDays.Contains(d.DayOfWeek.ToString())) return d;
+        }
+        return null;
     }
 
     // csak beviteli segítség: darab-egységnél egész lépés; a szabályt a backend kényszeríti

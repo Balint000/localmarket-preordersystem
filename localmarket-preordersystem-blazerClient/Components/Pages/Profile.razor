@@ -1,16 +1,83 @@
-﻿@page "/profile"
+@page "/profile"
 @attribute [Authorize]
 @inject AuthStateService Auth
+@inject CatalogApi Catalog
+@inject VendorApi Vendor
+@inject ToastService Toasts
 
 <PageTitle>Profil – LocalMarket</PageTitle>
 
 <PageContainer Title="Profilom">
-    @* A backend nem ad profil-lekérdező/módosító végpontot, ezért csak a tokenben lévő adatokat mutatjuk. *@
-    <div class="lm-card" style="max-width:32rem">
-        <dl class="mb-0">
-            <dt>E-mail</dt><dd>@Auth.Email</dd>
-            <dt>Szerepkör</dt><dd>@Labels.Role(Auth.Role ?? "")</dd>
-            @if (Auth.ProducerId is { } pid) { <dt>Termelő azonosító</dt><dd>@pid</dd> }
-        </dl>
-    </div>
+    <ChildContent>
+        <div class="row g-4">
+            <div class="col-lg-5">
+                <div class="lm-card">
+                    @* A backend nem ad általános profil-lekérdező végpontot, ezért a bejelentkezési token adatait mutatjuk. *@
+                    <dl class="mb-0">
+                        <dt>E-mail</dt><dd>@Auth.Email</dd>
+                        <dt>Szerepkör</dt><dd>@Labels.Role(Auth.Role ?? "")</dd>
+                        @if (Auth.ProducerId is { } pid) { <dt>Árus azonosító</dt><dd>@pid</dd> }
+                    </dl>
+                </div>
+            </div>
+
+            @if (Auth.Role == "Producer")
+            {
+                <div class="col-lg-7">
+                    <div class="lm-card">
+                        <h2 class="h6">Gazdaság adatai</h2>
+                        @if (_loading) { <LoadingIndicator /> }
+                        else
+                        {
+                            @if (_market is not null)
+                            {
+                                <p class="small text-muted">Piac: <strong>@_market.Name</strong> (@_market.Address)</p>
+                            }
+                            else if (!_found)
+                            {
+                                <p class="small text-muted">A jóváhagyásra váró árusok adatai még nem kérdezhetők le, ezért a mezők üresek. Mentés előtt add meg a gazdaság nevét és a standszámot.</p>
+                            }
+                            <div class="mb-2"><label class="form-label" for="pr-name">Gazdaság neve</label><input id="pr-name" class="form-control" maxlength="100" @bind="_name" @bind:event="oninput" /></div>
+                            <div class="mb-3"><label class="form-label" for="pr-stall">Standszám</label><input id="pr-stall" type="number" min="0" class="form-control" @bind="_stall" /></div>
+                            <FormProblem Problem="_problem" />
+                            <SubmitButton Busy="_busy" Disabled="string.IsNullOrWhiteSpace(_name)" CssClass="btn-primary" OnClick="SaveAsync">Mentés</SubmitButton>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </ChildContent>
 </PageContainer>
+
+@code {
+    private string _name = "";
+    private int _stall;
+    private bool _loading, _busy, _found;
+    private MarketInfo? _market;
+    private ApiProblem? _problem;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Auth.GetAuthenticationStateAsync();
+        if (Auth.Role != "Producer" || Auth.ProducerId is not int pid) return;
+        _loading = true;
+        var list = await Catalog.ProducersAsync();
+        var mine = list.Value?.FirstOrDefault(p => p.Id == pid);
+        if (mine is not null)
+        {
+            _found = true; _name = mine.Name; _stall = mine.StallNumber;
+            var markets = await Catalog.MarketsAsync();
+            _market = markets.Value?.FirstOrDefault(m => m.Id == mine.MarketId);
+        }
+        _loading = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_busy) return;
+        _busy = true; _problem = null;
+        var r = await Vendor.UpdateMineAsync(new UpdateMyProducerRequest(_name.Trim(), _stall));
+        if (r.IsSuccess) { _found = true; Toasts.Success("Adatok elmentve."); } else _problem = r.Problem;
+        _busy = false;
+    }
+}

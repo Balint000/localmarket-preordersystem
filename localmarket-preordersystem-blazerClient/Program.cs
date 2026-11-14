@@ -32,6 +32,8 @@ builder.Services.AddScoped<AuthApi>();
 builder.Services.AddScoped<CatalogApi>();
 builder.Services.AddScoped<CartService>();
 builder.Services.AddScoped<OrdersApi>();
+builder.Services.AddScoped<VendorApi>();
+builder.Services.AddScoped<AdminApi>();
 
 var app = builder.Build();
 

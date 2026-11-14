@@ -1,0 +1,83 @@
+@page "/admin/categories"
+@attribute [Authorize(Roles = "Admin")]
+@inject CatalogApi Catalog
+@inject AdminApi Admin
+@inject ToastService Toasts
+
+<PageTitle>Kategóriák – LocalMarket</PageTitle>
+
+<PageContainer Title="Termékkategóriák" Subtitle="A termékek ezekbe a kategóriákba sorolhatók">
+    <ChildContent>
+        <div class="row g-4">
+            <div class="col-lg-5">
+                <div class="lm-card">
+                    <h2 class="h6">Új kategória</h2>
+                    <EditForm Model="_form" OnValidSubmit="CreateAsync" FormName="category-form">
+                        <DataAnnotationsValidator />
+                        <div class="mb-2">
+                            <label class="form-label" for="cat-name">Név</label>
+                            <InputText id="cat-name" class="form-control" @bind-Value="_form.Name" maxlength="100" />
+                            <ValidationMessage For="() => _form.Name" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="cat-desc">Leírás</label>
+                            <InputTextArea id="cat-desc" class="form-control" rows="2" @bind-Value="_form.Description" maxlength="500" />
+                        </div>
+                        <FormProblem Problem="_formProblem" />
+                        <SubmitButton Busy="_busy" CssClass="btn-primary">Létrehozás</SubmitButton>
+                    </EditForm>
+                    <p class="small text-muted mt-3 mb-0">A backend jelenleg csak létrehozást támogat, a kategóriák nem szerkeszthetők és nem törölhetők.</p>
+                </div>
+            </div>
+            <div class="col-lg-7">
+                @if (_loading) { <LoadingIndicator /> }
+                else if (_problem is not null) { <ErrorMessage Problem="_problem" OnRetry="LoadAsync" /> }
+                else if (_items.Count == 0) { <EmptyState Title="Még nincs kategória" /> }
+                else
+                {
+                    <ul class="lm-list">
+                        @foreach (var c in _items)
+                        {
+                            <li><strong>@c.Name</strong>@if (!string.IsNullOrWhiteSpace(c.Description)) { <div class="small text-muted">@c.Description</div> }</li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    </ChildContent>
+</PageContainer>
+
+@code {
+    private sealed class CategoryForm
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "A név megadása kötelező.")]
+        [System.ComponentModel.DataAnnotations.MaxLength(100, ErrorMessage = "Legfeljebb 100 karakter.")]
+        public string Name { get; set; } = "";
+        public string? Description { get; set; }
+    }
+
+    private readonly CategoryForm _form = new();
+    private IReadOnlyList<CategoryInfo> _items = [];
+    private ApiProblem? _problem, _formProblem;
+    private bool _loading = true, _busy;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true; _problem = null;
+        var r = await Catalog.CategoriesAsync();
+        if (r.IsSuccess) _items = r.Value!; else _problem = r.Problem;
+        _loading = false;
+    }
+
+    private async Task CreateAsync()
+    {
+        if (_busy) return;
+        _busy = true; _formProblem = null;
+        var r = await Admin.CreateCategoryAsync(new CreateCategoryRequest(_form.Name.Trim(), _form.Description?.Trim()));
+        if (r.IsSuccess) { Toasts.Success("Kategória létrehozva."); _form.Name = ""; _form.Description = null; await LoadAsync(); }
+        else _formProblem = r.Problem;
+        _busy = false;
+    }
+}

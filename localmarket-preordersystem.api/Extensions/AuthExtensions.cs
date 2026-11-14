@@ -33,6 +33,7 @@ public static class AuthExtensions
                 };
             });
 
+        services.AddAuthorization();
         services.AddApiAuthorization();
         return services;
     }

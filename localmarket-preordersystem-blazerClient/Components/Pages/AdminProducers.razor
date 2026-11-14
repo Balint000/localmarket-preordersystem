@@ -1,0 +1,115 @@
+@page "/admin/producers"
+@attribute [Authorize(Roles = "Admin")]
+@inject CatalogApi Catalog
+@inject AdminApi Admin
+@inject ToastService Toasts
+
+<PageTitle>Árusok – LocalMarket</PageTitle>
+
+<PageContainer Title="Árusok kezelése" Subtitle="Új regisztrációk jóváhagyása vagy elutasítása">
+    <ChildContent>
+        <div class="lm-toolbar" role="group" aria-label="Szűrés állapot szerint">
+            @foreach (var (key, label) in Filters)
+            {
+                var k = key;
+                <button type="button" class="btn btn-sm @(_status == k ? "btn-primary" : "btn-outline-secondary")" @onclick="() => SetStatusAsync(k)">@label</button>
+            }
+        </div>
+
+        @if (_loading) { <LoadingIndicator /> }
+        else if (_problem is not null) { <ErrorMessage Problem="_problem" OnRetry="LoadAsync" /> }
+        else if (_producers.Count == 0) { <EmptyState Title="Nincs találat" Text="Ebben az állapotban jelenleg nincs árus." /> }
+        else
+        {
+            <div class="lm-table-wrap">
+                <table class="table lm-table align-middle">
+                    <thead><tr><th>Árus</th><th>Piac</th><th>Stand</th><th>Regisztrált</th><th>Állapot</th><th class="text-end">Művelet</th></tr></thead>
+                    <tbody>
+                    @foreach (var p in _producers)
+                    {
+                        <tr>
+                            <td><strong>@p.Name</strong>@if (!string.IsNullOrWhiteSpace(p.RejectionReason)) { <div class="small text-muted">Indoklás: @p.RejectionReason</div> }</td>
+                            <td>@MarketName(p.MarketId)</td>
+                            <td>@p.StallNumber</td>
+                            <td>@Labels.Date(p.RegisteredAt)</td>
+                            <td><span class="lm-badge @Labels.ProducerStatusClass(p.Status)">@Labels.ProducerStatus(p.Status)</span></td>
+                            <td class="text-end text-nowrap">
+                                @if (p.Status != "Approved")
+                                {
+                                    <button class="btn btn-primary btn-sm" disabled="@_busy" @onclick="() => ApproveAsync(p)">Jóváhagyás</button>
+                                }
+                                @if (p.Status != "Rejected")
+                                {
+                                    <button class="btn btn-outline-danger btn-sm" disabled="@_busy" @onclick="() => OpenReject(p)">Elutasítás</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        <ConfirmDialog Visible="_rejecting is not null" Title="@($"Árus elutasítása: {_rejecting?.Name}")" Danger="true" Busy="_busy"
+                       ConfirmText="Elutasítom" ConfirmDisabled="string.IsNullOrWhiteSpace(_reason)"
+                       OnConfirm="RejectAsync" OnCancel="CloseReject">
+            <label class="form-label" for="rej">Indoklás (kötelező, max. 500 karakter)</label>
+            <textarea id="rej" class="form-control" rows="3" maxlength="500" @bind="_reason" @bind:event="oninput"></textarea>
+        </ConfirmDialog>
+    </ChildContent>
+</PageContainer>
+
+@code {
+    private static readonly (string Key, string Label)[] Filters =
+        [("Pending", "Jóváhagyásra várók"), ("Approved", "Jóváhagyottak"), ("Rejected", "Elutasítottak"), ("", "Mind")];
+
+    private IReadOnlyList<ProducerInfo> _producers = [];
+    private IReadOnlyList<MarketInfo> _markets = [];
+    private ApiProblem? _problem;
+    private bool _loading = true, _busy;
+    private string _status = "Pending";
+    private ProducerInfo? _rejecting;
+    private string _reason = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var m = await Catalog.MarketsAsync();
+        if (m.IsSuccess) _markets = m.Value!;
+        await LoadAsync();
+    }
+
+    private string MarketName(int id) => _markets.FirstOrDefault(m => m.Id == id)?.Name ?? $"#{id}";
+
+    private async Task SetStatusAsync(string s) { _status = s; await LoadAsync(); }
+
+    private async Task LoadAsync()
+    {
+        _loading = true; _problem = null;
+        var r = await Catalog.ProducersAsync(string.IsNullOrEmpty(_status) ? null : _status);
+        if (r.IsSuccess) _producers = r.Value!; else _problem = r.Problem;
+        _loading = false;
+    }
+
+    private async Task ApproveAsync(ProducerInfo p)
+    {
+        if (_busy) return;
+        _busy = true;
+        var r = await Admin.ApproveProducerAsync(p.Id);
+        if (r.IsSuccess) { Toasts.Success($"{p.Name} jóváhagyva."); await LoadAsync(); }
+        else Toasts.Error(r.Problem!.Message);
+        _busy = false;
+    }
+
+    private void OpenReject(ProducerInfo p) { _rejecting = p; _reason = ""; }
+    private void CloseReject() { _rejecting = null; _reason = ""; }
+
+    private async Task RejectAsync()
+    {
+        if (_busy || _rejecting is null) return;
+        _busy = true;
+        var r = await Admin.RejectProducerAsync(_rejecting.Id, _reason.Trim());
+        if (r.IsSuccess) { Toasts.Success($"{_rejecting.Name} elutasítva."); CloseReject(); await LoadAsync(); }
+        else Toasts.Error(r.Problem!.Message);
+        _busy = false;
+    }
+}

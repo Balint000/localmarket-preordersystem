@@ -18,6 +18,7 @@ public static class DatabaseInitializer
 
         if (db.Database.GetMigrations().Any())
             await db.Database.MigrateAsync();
+      
         else if (app.Environment.IsDevelopment())
         {
             log.LogWarning("Nincs EF migráció, EnsureCreated fut (csak Development).");
@@ -37,9 +38,8 @@ public static class DatabaseInitializer
 
         if (!await db.Users.AnyAsync(u => u.Role == Role.Admin))
         {
-            var adminPw = ResolvePassword(cfg, "Seed:AdminPassword", "Admin123!", app.Environment);
             db.Users.Add(User.Register("Piac", "Vezető", "admin@localmarket.test",
-                hasher.Hash(adminPw), Role.Admin, "+3612345678"));
+                hasher.Hash(cfg["Seed:AdminPassword"] ?? "Admin123!"), Role.Admin, "+3612345678"));
         }
 
         if (app.Environment.IsDevelopment() && !await db.Users.AnyAsync(u => u.Email == "vevo@localmarket.test"))

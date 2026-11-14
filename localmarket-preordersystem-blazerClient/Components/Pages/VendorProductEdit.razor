@@ -1,0 +1,184 @@
+@page "/vendor/products/new"
+@page "/vendor/products/{Id:int}"
+@attribute [Authorize(Roles = "Producer")]
+@inject CatalogApi Catalog
+@inject VendorApi Vendor
+@inject ToastService Toasts
+@inject NavigationManager Navigation
+
+<PageTitle>@(Id is null ? "Új termék" : "Termék szerkesztése") – LocalMarket</PageTitle>
+
+<PageContainer Title="@(Id is null ? "Új termék meghirdetése" : _name)" Subtitle="@(Id is null ? "A mentés után add meg a heti készletet." : "Termékadatok és heti készlet")">
+    <Actions><a class="btn btn-outline-secondary" href="vendor/products">← Termékeim</a></Actions>
+    <ChildContent>
+        @if (_loading) { <LoadingIndicator /> }
+        else if (_problem is not null) { <ErrorMessage Problem="_problem" OnRetry="LoadAsync" /> }
+        else
+        {
+            <div class="row g-4">
+                <div class="col-lg-6">
+                    <div class="lm-card">
+                        <h2 class="h6">Termékadatok</h2>
+                        <div class="mb-2">
+                            <label class="form-label" for="p-name">Név</label>
+                            <input id="p-name" class="form-control" maxlength="100" @bind="_name" @bind:event="oninput" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="p-desc">Leírás</label>
+                            <textarea id="p-desc" class="form-control" rows="3" maxlength="500" @bind="_description" @bind:event="oninput"></textarea>
+                        </div>
+                        <fieldset class="mb-3">
+                            <legend class="form-label fs-6">Kategóriák (legalább egy)</legend>
+                            @foreach (var c in _categories)
+                            {
+                                var id = c.Id;
+                                <label class="form-check form-check-inline">
+                                    <input type="checkbox" class="form-check-input" checked="@_selectedCategories.Contains(id)" @onchange="e => Toggle(_selectedCategories, id, (bool)(e.Value ?? false))" />
+                                    <span class="form-check-label">@c.Name</span>
+                                </label>
+                            }
+                            @if (_categories.Count == 0) { <div class="small text-muted">Még nincs kategória, az admin tud felvenni.</div> }
+                        </fieldset>
+                        <fieldset class="mb-3">
+                            <legend class="form-label fs-6">Allergének</legend>
+                            @foreach (var a in Labels.Allergies)
+                            {
+                                var allergy = a;
+                                <label class="form-check form-check-inline">
+                                    <input type="checkbox" class="form-check-input" checked="@_selectedAllergies.Contains(allergy)" @onchange="e => Toggle(_selectedAllergies, allergy, (bool)(e.Value ?? false))" />
+                                    <span class="form-check-label">@Labels.Allergy(allergy)</span>
+                                </label>
+                            }
+                        </fieldset>
+                        <FormProblem Problem="_saveProblem" />
+                        <SubmitButton Busy="_busy" Disabled="string.IsNullOrWhiteSpace(_name) || _selectedCategories.Count == 0" CssClass="btn-primary" OnClick="SaveAsync">@(Id is null ? "Meghirdetés" : "Mentés")</SubmitButton>
+                    </div>
+                </div>
+
+                @if (Id is not null)
+                {
+                    <div class="col-lg-6">
+                        <div class="lm-card">
+                            <h2 class="h6">Heti készlet és elérhetőség</h2>
+                            <p class="small text-muted">Add meg, mennyi áll rendelkezésre az adott héten és milyen áron. A vásárlók csak a meghirdetett, elérhető készletből rendelhetnek.</p>
+                            <div class="row g-2 mb-2">
+                                <div class="col-sm-6"><label class="form-label" for="s-week">Hét (bármely napja)</label><input id="s-week" type="date" class="form-control" @bind="_week" /></div>
+                                <div class="col-sm-6"><label class="form-label" for="s-unit">Mértékegység</label>
+                                    <select id="s-unit" class="form-select" @bind="_unit">
+                                        @foreach (var u in Labels.UnitKeys) { <option value="@u">@Labels.Unit(u)</option> }
+                                    </select></div>
+                                <div class="col-sm-6"><label class="form-label" for="s-qty">Mennyiség összesen</label><input id="s-qty" class="form-control" inputmode="decimal" @bind="_qty" /></div>
+                                <div class="col-sm-6"><label class="form-label" for="s-price">Egységár (Ft)</label><input id="s-price" class="form-control" inputmode="decimal" @bind="_price" /></div>
+                            </div>
+                            <FormProblem Problem="_stockProblem" />
+                            <SubmitButton Busy="_stockBusy" CssClass="btn-primary" OnClick="SaveStockAsync">Készlet mentése</SubmitButton>
+                        </div>
+
+                        <div class="lm-card mt-3">
+                            <h2 class="h6">Meghirdetett hetek</h2>
+                            @if (_stocks.Count == 0) { <p class="text-muted mb-0">Még nincs meghirdetett készlet.</p> }
+                            else
+                            {
+                                <table class="table lm-table mb-0">
+                                    <thead><tr><th>Hét</th><th class="text-end">Összes</th><th class="text-end">Foglalt</th><th class="text-end">Elérhető</th><th class="text-end">Ár</th></tr></thead>
+                                    <tbody>
+                                    @foreach (var s in _stocks)
+                                    {
+                                        <tr>
+                                            <td>@Labels.Date(s.WeekStartDate)</td>
+                                            <td class="text-end">@Labels.Qty(s.Quantity) @Labels.Unit(s.Unit)</td>
+                                            <td class="text-end">@Labels.Qty(s.ReservedQuantity)</td>
+                                            <td class="text-end">@Labels.Qty(s.AvailableQuantity)</td>
+                                            <td class="text-end">@Labels.Money(s.UnitPrice)</td>
+                                        </tr>
+                                    }
+                                    </tbody>
+                                </table>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </ChildContent>
+</PageContainer>
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private IReadOnlyList<CategoryInfo> _categories = [];
+    private IReadOnlyList<ProductStockInfo> _stocks = [];
+    private readonly HashSet<int> _selectedCategories = new();
+    private readonly HashSet<string> _selectedAllergies = new();
+    private string _name = "", _description = "", _unit = "Kilogram", _qty = "", _price = "";
+    private DateTime _week = DateTime.Today;
+    private ApiProblem? _problem, _saveProblem, _stockProblem;
+    private bool _loading = true, _busy, _stockBusy;
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true; _problem = null;
+        var cats = await Catalog.CategoriesAsync();
+        if (!cats.IsSuccess) { _problem = cats.Problem; _loading = false; return; }
+        _categories = cats.Value!;
+
+        _name = _description = ""; _selectedCategories.Clear(); _selectedAllergies.Clear(); _stocks = [];
+        if (Id is int id)
+        {
+            var r = await Catalog.ProductAsync(id);
+            if (!r.IsSuccess) { _problem = r.Problem; _loading = false; return; }
+            Apply(r.Value!);
+        }
+        _loading = false;
+    }
+
+    private void Apply(ProductInfo p)
+    {
+        _name = p.Name; _description = p.Description;
+        _selectedCategories.Clear(); foreach (var c in p.Categories) _selectedCategories.Add(c.Id);
+        _selectedAllergies.Clear(); foreach (var a in p.Allergies) _selectedAllergies.Add(a);
+        _stocks = p.WeeklyStocks;
+        if (p.NextStock is { } s) _unit = s.Unit;
+    }
+
+    private static void Toggle<T>(HashSet<T> set, T item, bool on) { if (on) set.Add(item); else set.Remove(item); }
+
+    private async Task SaveAsync()
+    {
+        if (_busy) return;
+        _busy = true; _saveProblem = null;
+        var cats = _selectedCategories.ToList();
+        var allergies = _selectedAllergies.ToList();
+        if (Id is int id)
+        {
+            var r = await Vendor.UpdateProductAsync(id, new UpdateProductRequest(_name.Trim(), _description.Trim(), cats, allergies));
+            if (r.IsSuccess) { Apply(r.Value!); Toasts.Success("Termék elmentve."); } else _saveProblem = r.Problem;
+        }
+        else
+        {
+            var r = await Vendor.CreateProductAsync(new CreateProductRequest(_name.Trim(), _description.Trim(), cats, allergies));
+            if (r.IsSuccess) { Toasts.Success("Termék meghirdetve. Add meg a heti készletet!"); Navigation.NavigateTo($"vendor/products/{r.Value!.Id}"); }
+            else _saveProblem = r.Problem;
+        }
+        _busy = false;
+    }
+
+    private static bool TryNumber(string s, out decimal v) =>
+        decimal.TryParse(s.Trim().Replace(',', '.'), System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out v);
+
+    private async Task SaveStockAsync()
+    {
+        if (_stockBusy || Id is not int id) return;
+        if (!TryNumber(_qty, out var qty) || !TryNumber(_price, out var price))
+        {
+            _stockProblem = new ApiProblem(ApiFailure.Validation, "Hibás szám", "A mennyiséget és az egységárat számként add meg.", new Dictionary<string, string[]>());
+            return;
+        }
+        _stockBusy = true; _stockProblem = null;
+        var r = await Vendor.SetStockAsync(id, new StockRequest(_week, qty, _unit, price));
+        if (r.IsSuccess) { Apply(r.Value!); Toasts.Success("Készlet elmentve."); _qty = ""; } else _stockProblem = r.Problem;
+        _stockBusy = false;
+    }
+}

@@ -1,4 +1,4 @@
-﻿@implements IDisposable
+@implements IDisposable
 @inject AuthStateService Auth
 @inject CartService Cart
 @inject NavigationManager Navigation
@@ -30,11 +30,17 @@
             </AuthorizeView>
             <AuthorizeView Roles="Producer">
                 <NavLink class="lm-nav-link" href="dashboard">Irányítópult</NavLink>
-                <NavLink class="lm-nav-link" href="vendor/orders">Beérkező rendelések</NavLink>
+                <NavLink class="lm-nav-link" href="vendor/orders">Rendelések</NavLink>
+                <NavLink class="lm-nav-link" href="vendor/products">Termékeim</NavLink>
+                <NavLink class="lm-nav-link" href="vendor/slots">Átvételi időpontok</NavLink>
             </AuthorizeView>
-            <AuthorizeView Roles="MarketManager">
+            <AuthorizeView Roles="Admin">
                 <NavLink class="lm-nav-link" href="dashboard">Irányítópult</NavLink>
-                <NavLink class="lm-nav-link" href="manager/disputes">Viták</NavLink>
+                <NavLink class="lm-nav-link" href="admin/producers">Árusok</NavLink>
+                <NavLink class="lm-nav-link" href="admin/markets">Piacok</NavLink>
+                <NavLink class="lm-nav-link" href="admin/categories">Kategóriák</NavLink>
+                <NavLink class="lm-nav-link" href="admin/disputes">Viták</NavLink>
+                <NavLink class="lm-nav-link" href="admin/reports">Riportok</NavLink>
             </AuthorizeView>
 
             <span class="lm-nav-spacer"></span>

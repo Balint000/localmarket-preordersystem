@@ -1,5 +1,15 @@
-﻿<article class="lm-product">
-    <div class="lm-product-img" aria-hidden="true">🥕</div>
+<article class="lm-product">
+    <div class="lm-product-img @_look.Css" aria-hidden="true">
+        @_look.Emoji
+        @if (Product.NextStock is { } st)
+        {
+            <span class="lm-product-flag @(st.AvailableQuantity > 0 ? "ok" : "out")">@(st.AvailableQuantity > 0 ? "Elérhető" : "Elfogyott")</span>
+        }
+        else
+        {
+            <span class="lm-product-flag none">Nincs kínálat</span>
+        }
+    </div>
     <div class="lm-product-body">
         <a class="lm-product-name" href="products/@Product.Id">@Product.Name</a>
         <div class="text-muted small">@(Product.ProducerName ?? "Termelő")</div>
@@ -28,4 +38,6 @@
 
 @code {
     [Parameter, EditorRequired] public ProductInfo Product { get; set; } = default!;
+
+    private (string Emoji, string Css) _look => Labels.CategoryLook(Product.Categories.FirstOrDefault()?.Name);
 }

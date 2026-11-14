@@ -1,0 +1,90 @@
+@page "/admin/reports"
+@attribute [Authorize(Roles = "Admin")]
+@inject AdminApi Admin
+
+<PageTitle>Riportok – LocalMarket</PageTitle>
+
+<PageContainer Title="Riportok" Subtitle="Összesítések a kiválasztott időszakra">
+    <ChildContent>
+        <div class="lm-toolbar">
+            <div><label class="form-label small mb-0" for="r-from">Ettől</label><input id="r-from" type="date" class="form-control form-control-sm" @bind="_from" /></div>
+            <div><label class="form-label small mb-0" for="r-to">Eddig</label><input id="r-to" type="date" class="form-control form-control-sm" @bind="_to" /></div>
+            <button class="btn btn-primary btn-sm align-self-end" disabled="@_loading" @onclick="LoadAsync">Frissítés</button>
+        </div>
+
+        @if (_loading) { <LoadingIndicator /> }
+        else if (_problem is not null) { <ErrorMessage Problem="_problem" OnRetry="LoadAsync" /> }
+        else
+        {
+            @if (_rate is not null)
+            {
+                <div class="lm-stats mb-4">
+                    <StatCard Label="Összes rendelés" Value="@_rate.TotalOrders.ToString()" />
+                    <StatCard Label="Lemondott" Value="@_rate.CancelledOrders.ToString()" />
+                    <StatCard Label="Elutasított" Value="@_rate.RejectedOrders.ToString()" />
+                    <StatCard Label="Lemondási arány" Value="@($"{Labels.Qty(_rate.Rate * (_rate.Rate <= 1 ? 100 : 1))}%")" />
+                </div>
+            }
+            <div class="row g-4">
+                <div class="col-lg-6">
+                    <div class="lm-card">
+                        <h2 class="h6">Legnépszerűbb termékek</h2>
+                        @if (_top.Count == 0) { <p class="text-muted mb-0">Nincs adat.</p> }
+                        else
+                        {
+                            <table class="table lm-table"><thead><tr><th>Termék</th><th class="text-end">Mennyiség</th><th class="text-end">Bevétel</th></tr></thead>
+                            <tbody>@foreach (var t in _top) { <tr><td>@t.ProductName</td><td class="text-end">@Labels.Qty(t.TotalQuantity)</td><td class="text-end">@Labels.Money(t.TotalRevenue)</td></tr> }</tbody></table>
+                        }
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="lm-card">
+                        <h2 class="h6">Árusok bevétele</h2>
+                        @if (_revenue.Count == 0) { <p class="text-muted mb-0">Nincs adat.</p> }
+                        else
+                        {
+                            <table class="table lm-table"><thead><tr><th>Árus</th><th class="text-end">Rendelés</th><th class="text-end">Bevétel</th></tr></thead>
+                            <tbody>@foreach (var v in _revenue) { <tr><td>@v.ProducerName</td><td class="text-end">@v.OrderCount</td><td class="text-end">@Labels.Money(v.Revenue)</td></tr> }</tbody></table>
+                        }
+                    </div>
+                </div>
+                <div class="col-12">
+                    <div class="lm-card">
+                        <h2 class="h6">Át nem vett rendelések</h2>
+                        @if (_unclaimed.Count == 0) { <p class="text-muted mb-0">Nincs át nem vett rendelés.</p> }
+                        else
+                        {
+                            <div class="lm-table-wrap"><table class="table lm-table"><thead><tr><th>Rendelés</th><th>Árus</th><th>Vevő</th><th>Átvétel</th><th class="text-end">Összeg</th><th>Állapot</th></tr></thead>
+                            <tbody>@foreach (var u in _unclaimed) { <tr><td>#@u.OrderId</td><td>@u.ProducerName</td><td>@u.CustomerName</td><td>@Labels.Date(u.PickupDate)</td><td class="text-end">@Labels.Money(u.TotalAmount)</td><td><StatusBadge Status="@u.Status" /></td></tr> }</tbody></table></div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </ChildContent>
+</PageContainer>
+
+@code {
+    private DateTime? _from = DateTime.Today.AddDays(-30), _to = DateTime.Today;
+    private CancellationRateInfo? _rate;
+    private IReadOnlyList<TopProductInfo> _top = [];
+    private IReadOnlyList<VendorRevenueInfo> _revenue = [];
+    private IReadOnlyList<UnclaimedOrderInfo> _unclaimed = [];
+    private ApiProblem? _problem;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true; _problem = null;
+        var rate = Admin.CancellationRateAsync(_from, _to);
+        var top = Admin.TopProductsAsync(_from, _to);
+        var rev = Admin.VendorRevenueAsync(_from, _to);
+        var unc = Admin.UnclaimedAsync(_from, _to);
+        await Task.WhenAll(rate, top, rev, unc);
+        _problem = rate.Result.Problem ?? top.Result.Problem ?? rev.Result.Problem ?? unc.Result.Problem;
+        if (_problem is null) { _rate = rate.Result.Value; _top = top.Result.Value!; _revenue = rev.Result.Value!; _unclaimed = unc.Result.Value!; }
+        _loading = false;
+    }
+}
