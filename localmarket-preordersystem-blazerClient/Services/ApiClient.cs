@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using localmarket_preordersystem.Models;
 
 namespace localmarket_preordersystem.Services;
 
@@ -21,6 +22,27 @@ public sealed class ApiClient(HttpClient http, AuthStateService auth)
     public Task<ApiResult<T>> PostAsync<T>(string url, object? body = null, CancellationToken ct = default) => SendAsync<T>(HttpMethod.Post, url, body, ct);
     public Task<ApiResult<T>> PutAsync<T>(string url, object? body, CancellationToken ct = default) => SendAsync<T>(HttpMethod.Put, url, body, ct);
     public Task<ApiResult<T>> DeleteAsync<T>(string url, CancellationToken ct = default) => SendAsync<T>(HttpMethod.Delete, url, null, ct);
+
+    /// <summary>A szerver által megengedett legnagyobb oldalméret (PageRequest.PageSize: 1..100).</summary>
+    private const int MaxPageSize = 100;
+
+    /// <summary>
+    /// Lapozott végpont (<c>{ items, total, page, pageSize, totalPages }</c>) összes oldalának lekérése,
+    /// egyetlen listává összefűzve: a felület a teljes listát jeleníti meg.
+    /// </summary>
+    public async Task<ApiResult<IReadOnlyList<T>>> GetAllPagesAsync<T>(string url, CancellationToken ct = default)
+    {
+        var separator = url.Contains('?') ? '&' : '?';
+        var items = new List<T>();
+        for (var page = 1; ; page++)
+        {
+            var result = await GetAsync<PagedResponse<T>>($"{url}{separator}page={page}&pageSize={MaxPageSize}", ct);
+            if (!result.IsSuccess) return ApiResult<IReadOnlyList<T>>.Fail(result.Problem!);
+
+            items.AddRange(result.Value!.Items);
+            if (page >= result.Value.TotalPages) return ApiResult<IReadOnlyList<T>>.Ok(items);
+        }
+    }
 
     /// <summary>Fájl (export) letöltése bájtokként.</summary>
     public async Task<ApiResult<DownloadedFile>> GetFileAsync(string url, CancellationToken ct = default)
@@ -65,6 +87,10 @@ public sealed class ApiClient(HttpClient http, AuthStateService auth)
             return value is null
                 ? ApiResult<T>.Fail(new ApiProblem(ApiFailure.Server, "Üres válasz érkezett a szervertől.", null, Empty))
                 : ApiResult<T>.Ok(value);
+        }
+        catch (JsonException)
+        {
+            return ApiResult<T>.Fail(new ApiProblem(ApiFailure.Server, "Érvénytelen válasz érkezett a szervertől.", null, Empty));
         }
         catch (Exception ex) when (IsNetworkError(ex, ct))
         {

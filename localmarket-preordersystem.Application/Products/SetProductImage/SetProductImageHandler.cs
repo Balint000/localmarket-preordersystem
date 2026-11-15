@@ -29,7 +29,8 @@ namespace localmarket_preordersystem.Application.Products.SetProductImage
                     $"A kép legfeljebb {ProductImages.MaxBytes / (1024 * 1024)} MB lehet.")
                 .ThrowIfInvalid();
 
-            var extension = ProductImages.DetectExtension(command.Content)
+            var content = command.Content ?? Array.Empty<byte>(); // a validáció után sosem üres
+            var extension = ProductImages.DetectExtension(content)
                 ?? throw new ValidationException(new Dictionary<string, string[]>
                 {
                     [nameof(command.Content)] = new[] { "Csak JPEG, PNG vagy WebP kép tölthető fel." }
@@ -41,7 +42,7 @@ namespace localmarket_preordersystem.Application.Products.SetProductImage
                 throw new ForbiddenAccessException("Csak a saját terméked képét módosíthatod.");
 
             var previous = product.ImageFileName;
-            var fileName = await images.SaveAsync(command.Content, extension, ct);
+            var fileName = await images.SaveAsync(content, extension, ct);
             product.SetImage(fileName);
 
             try

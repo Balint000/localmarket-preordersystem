@@ -10,7 +10,7 @@ namespace localmarket_preordersystem.Application.Products.SetWeeklyStock
     {
         public static void Validate(SetWeeklyStockCommand c) => new ValidationBuilder()
             .Positive(nameof(c.ProductId), c.ProductId, "Érvénytelen termék azonosító.")
-            .Positive(nameof(c.Quantity), c.Quantity, "A mennyiségnek pozitívnak kell lennie.")
+            .Must(nameof(c.Quantity), c.Quantity >= 0, "A mennyiség nem lehet negatív.")
             .Positive(nameof(c.UnitPrice), c.UnitPrice, "Az egységárnak pozitívnak kell lennie.")
             .Must(nameof(c.Unit), Enum.IsDefined(c.Unit), "Érvénytelen mértékegység.")
             .ThrowIfInvalid();

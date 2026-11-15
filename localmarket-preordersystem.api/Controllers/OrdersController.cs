@@ -87,7 +87,7 @@ public class OrdersController : ControllerBase
         => Ok(await handler.HandleAsync(new MarkOrderNotPickedUpCommand(id), ct));
 
     [HttpPost("{id:int}/dispute")]
-    [Authorize(Policy = Policies.Customer)]
+    [Authorize(Policy = Policies.CustomerOrProducer)]
     public async Task<IActionResult> Dispute(int id, NoteRequest body, DisputeOrderHandler handler, CancellationToken ct)
         => Ok(await handler.HandleAsync(new DisputeOrderCommand(id, body.Note), ct));
 
