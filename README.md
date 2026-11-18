@@ -120,15 +120,16 @@ Minden végpont `/api` alatt van; a védettek `Authorization: Bearer <token>` fe
 dotnet test localmarket-preordersystem.Tests
 ```
 
-A tesztek a rendelés-állapotgépet (a vitás rendelés védelmét is), a készlet- és idősáv-foglalást, a validációt és az időzóna-kezelést fedik le. A GitHub Actions workflow (`.github/workflows/ci.yml`) minden push-nál és pull requestnél felépíti az API-t és a klienst, majd lefuttatja a teszteket.
+A tesztek a rendelés-állapotgépet (a vitás rendelés védelmét is), a készlet- és idősáv-foglalást, a validációt és az időzóna-kezelést fedik le. Az `integration-smoke` CI-feladat valódi PostgreSQL-lel elindítja az API-t (migrációk, seed), és a `scripts/smoke-test.sh` végigviszi a teljes folyamatot (regisztráció, jóváhagyás, termék/készlet/idősáv/kép, kosár, rendelés, teljesítés, vita, döntés, szerkesztés/törlés, jogosultságok). Helyben: `docker compose up -d --build`, majd `scripts/smoke-test.sh http://localhost:5205`.
+
+A GitHub Actions workflow (`.github/workflows/ci.yml`) minden push-nál és pull requestnél felépíti az API-t és a klienst, lefuttatja a teszteket és a füsttesztet.
 
 ## Ismert korlátok
 
 * A Blazor Server kliens szerver oldalról hívja az API-t, ezért az API számára minden kérés ugyanarról az IP-ről érkezik: az IP-alapú rate limit gyakorlatilag globális, ezért a limitek bőkezűek és konfigurálhatók.
-* Ha egy elfogadott vagy kész rendelés vitatottá válik, majd a piacvezető a lemondás mellett dönt, a rendelés már nem tart foglalást, ezért a készlet és az idősáv-hely nem szabadul fel automatikusan. A `NotPickedUp` állapotba kerülő rendelés foglalása sem szabadul fel magától. Ezek a szabályok a jelenlegi állapotgép továbbfejlesztési pontjai.
+* A vitatott vagy át nem vett (`NotPickedUp`) rendelés már nem tart foglalást, ezért a készlet és az idősáv-hely ilyenkor nem szabadul fel külön. Mivel ezek az állapotok az átvételi nap után jellemzőek, ennek gyakorlati hatása kicsi; az állapotgép továbbfejlesztési pontja.
 * A termékképek helyi lemezen tárolódnak (Dockerben volume-on); felhős tárhely nincs bekötve.
 * Fizetés csak nyilvántartás (készpénz/kártya/átutalás jelölése), tényleges fizetési szolgáltató nincs integrálva.
-* Az Infrastructure/API réteg a fejlesztői környezetben csak statikusan ellenőrizhető volt (NuGet nélkül); a `dotnet test` és a `docker compose up --build` az első futtatásnál visszaigazolja.
 
 ## Hibák és javítások
 

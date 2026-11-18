@@ -29,6 +29,11 @@ expect() { # expect STATUS LEIRAS
   echo "ok  $2"
 }
 
+expect_4xx() { # expect_4xx LEIRAS
+  if [[ ! "$STATUS" =~ ^4 ]]; then echo "HIBA: $1 (várt: 4xx, kapott: $STATUS)"; echo "$BODY"; exit 1; fi
+  echo "ok  $1 ($STATUS)"
+}
+
 login() { req POST /api/auth/login "" "{\"email\":\"$1\",\"password\":\"$2\"}"; expect 200 "bejelentkezés: $1" >&2; echo "$BODY" | jq -r .token; }
 order_status() { req GET "/api/orders/$2" "$1"; expect 200 "rendelés lekérése #$2" >&2; echo "$BODY" | jq -r .status; }
 assert_eq() { if [[ "$1" != "$2" ]]; then echo "HIBA: $3 (várt: $2, kapott: $1)"; exit 1; fi; echo "ok  $3"; }
@@ -119,6 +124,25 @@ req POST "/api/orders/$ORDER2_ID/accept-partially" "$PRODUCER" "{\"lines\":[{\"p
 expect 200 "részleges teljesítés"
 assert_eq "$(order_status "$CUSTOMER" "$ORDER2_ID")" PartiallyFulfilled "a rendelés részben teljesített"
 req POST "/api/orders/$ORDER2_ID/cancel" "$CUSTOMER"; expect 200 "vevő lemondja"
+
+echo "== Szerkesztés és törlés"
+req POST /api/categories "$ADMIN" "{\"name\":\"Teszt kategória $SUFFIX\",\"description\":\"x\"}"; expect 200 "kategória létrehozása"
+CAT2_ID="$(echo "$BODY" | jq -r .id)"
+req PUT "/api/categories/$CAT2_ID" "$ADMIN" "{\"name\":\"Átnevezett $SUFFIX\",\"description\":\"y\"}"; expect 200 "kategória módosítása"
+req DELETE "/api/categories/$CAT2_ID" "$ADMIN"; expect 204 "üres kategória törlése"
+req DELETE "/api/categories/$CATEGORY_ID" "$ADMIN"; expect_4xx "használatban lévő kategória nem törölhető"
+req POST /api/categories "$CUSTOMER" '{"name":"Tiltott","description":""}'; expect 403 "kategóriát vevő nem hozhat létre"
+
+req POST /api/pickup-slots "$PRODUCER" "{\"date\":\"$SAT\",\"startTime\":\"13:00:00\",\"endTime\":\"14:00:00\",\"capacity\":2}"; expect 200 "második idősáv"
+SLOT2_ID="$(echo "$BODY" | jq -r .id)"
+req PUT "/api/pickup-slots/$SLOT2_ID" "$PRODUCER" "{\"date\":\"$SAT\",\"startTime\":\"13:00:00\",\"endTime\":\"15:00:00\",\"capacity\":3}"; expect 200 "idősáv módosítása"
+req DELETE "/api/pickup-slots/$SLOT2_ID" "$PRODUCER"; expect 204 "foglalatlan idősáv törlése"
+req DELETE "/api/pickup-slots/$SLOT_ID" "$PRODUCER"; expect_4xx "foglalt idősáv nem törölhető"
+
+req POST /api/products "$PRODUCER" "{\"name\":\"Törlendő termék\",\"description\":\"\",\"categoryIds\":[$CATEGORY_ID],\"allergies\":[]}"; expect 200 "második termék"
+PRODUCT2_ID="$(echo "$BODY" | jq -r .id)"
+req DELETE "/api/products/$PRODUCT2_ID" "$PRODUCER"; expect 204 "rendelés nélküli termék törlése"
+req DELETE "/api/products/$PRODUCT_ID" "$PRODUCER"; expect_4xx "rendeléssel rendelkező termék nem törölhető"
 
 echo "== Admin"
 req GET /api/audit "$ADMIN"; expect 200 "auditnapló"

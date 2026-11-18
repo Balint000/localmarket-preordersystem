@@ -99,6 +99,9 @@ public sealed class VendorApi(ApiClient api)
     public Task<ApiResult<ProducerInfo>> GetMineAsync(CancellationToken ct = default) => api.GetAsync<ProducerInfo>("api/producers/me", ct);
     public Task<ApiResult<ProducerInfo>> UpdateMineAsync(UpdateMyProducerRequest r) => api.PutAsync<ProducerInfo>("api/producers/me", r, default);
     public Task<ApiResult<ProductInfo>> SetImageAsync(int id, string fileName, string contentType, byte[] content) => api.PutFileAsync<ProductInfo>($"api/products/{id}/image", fileName, contentType, content);
+    public Task<ApiResult<Unit>> DeleteProductAsync(int id) => api.DeleteAsync<Unit>($"api/products/{id}");
+    public Task<ApiResult<PickupSlotInfo>> UpdatePickupSlotAsync(int id, CreatePickupSlotRequest r) => api.PutAsync<PickupSlotInfo>($"api/pickup-slots/{id}", r, default);
+    public Task<ApiResult<Unit>> DeletePickupSlotAsync(int id) => api.DeleteAsync<Unit>($"api/pickup-slots/{id}");
     public Task<ApiResult<ProductInfo>> DeleteImageAsync(int id) => api.DeleteAsync<ProductInfo>($"api/products/{id}/image");
 }
 
@@ -110,6 +113,8 @@ public sealed class AdminApi(ApiClient api)
     public Task<ApiResult<MarketInfo>> CreateMarketAsync(CreateMarketRequest r) => api.PostAsync<MarketInfo>("api/markets", r);
     public Task<ApiResult<MarketInfo>> UpdateMarketAsync(int id, UpdateMarketRequest r) => api.PutAsync<MarketInfo>($"api/markets/{id}", r, default);
     public Task<ApiResult<CategoryInfo>> CreateCategoryAsync(CreateCategoryRequest r) => api.PostAsync<CategoryInfo>("api/categories", r);
+    public Task<ApiResult<CategoryInfo>> UpdateCategoryAsync(int id, CreateCategoryRequest r) => api.PutAsync<CategoryInfo>($"api/categories/{id}", r, default);
+    public Task<ApiResult<Unit>> DeleteCategoryAsync(int id) => api.DeleteAsync<Unit>($"api/categories/{id}");
 
     public Task<ApiResult<IReadOnlyList<TopProductInfo>>> TopProductsAsync(DateTime? from, DateTime? to, int top = 10) => api.GetAsync<IReadOnlyList<TopProductInfo>>("api/reports/top-products" + Range(from, to, "top=" + top), default);
     public Task<ApiResult<CancellationRateInfo>> CancellationRateAsync(DateTime? from, DateTime? to) => api.GetAsync<CancellationRateInfo>("api/reports/cancellation-rate" + Range(from, to), default);

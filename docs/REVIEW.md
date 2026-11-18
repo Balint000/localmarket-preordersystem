@@ -64,7 +64,8 @@ Súlyosság: **Magas** = hibás működés vagy összeomlás, **Közepes** = ros
 | 31 | A `docker-compose.override.yml` Windows-specifikus (`APPDATA`) mountokat és HTTPS-portot adott a szolgáltatáshoz, és `docker compose up` automatikusan beolvasta, így Linuxon/macOS-en az API nem indult | Törölve (a `.dcproj`-ból is) |
 | 32 | A compose nem adta át a kezdő jelszavakat, az időzónát és az API nyilvános címét | Környezeti változók felvéve |
 | 33 | Nem volt `.env.example`, a README kevés információt adott | `.env.example`, teljes README |
-| 34 | Nem voltak tesztek és CI | `localmarket-preordersystem.Tests` (49 teszteset), GitHub Actions workflow |
+| 34 | Nem voltak tesztek és CI | `localmarket-preordersystem.Tests` (49 teszteset), GitHub Actions workflow, valódi PostgreSQL-lel futó integrációs füstteszt (`scripts/smoke-test.sh`) |
+| 35 | Az API-nak nem volt kezelőfelülete a kategória szerkesztéséhez/törléséhez, az idősáv szerkesztéséhez/törléséhez és a termék törléséhez | Új gombok és megerősítő párbeszédek a Blazor kliensben |
 
 ## Tudatosan nem javított pontok
 
@@ -74,7 +75,7 @@ Lásd a README „Ismert korlátok” szakaszát (foglalás-felszabadítás vita
 
 * A Domain, az Application és a Blazor kliens offline lefordult hibák és figyelmeztetések nélkül.
 * A teszteket egy xUnit-kompatibilis futtatóval ellenőriztem: 49 teszteset, mind sikeres.
-* Az Infrastructure és az API csak szintaktikailag ellenőrizhető volt (az EF Core / Npgsql / JwtBearer csomagok nem voltak letölthetők), ezeknél a `dotnet build` és a `docker compose up --build` az első futtatás próbája.
+* Az Infrastructure és az API a helyi környezetben nem volt fordítható (NuGet nem volt elérhető), de a GitHub Actions CI lefordítja őket, és az integrációs füstteszt valódi PostgreSQL-en végigfuttatja a teljes folyamatot (migrációk, seed, rendelés, vita).
 
 ## Kapcsolat a #75 pull requesttel
 
