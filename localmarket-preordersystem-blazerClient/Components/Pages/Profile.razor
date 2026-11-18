@@ -3,7 +3,7 @@
 @inject AuthStateService Auth
 @inject CatalogApi Catalog
 @inject VendorApi Vendor
-@inject ProfileApi Profile
+@inject ProfileApi ProfileClient
 @inject ToastService Toasts
 
 <PageTitle>Profil – LocalMarket</PageTitle>
@@ -20,6 +20,14 @@
                         <dl class="small text-muted mb-3">
                             <dt>E-mail</dt><dd>@Auth.Email</dd>
                             <dt>Szerepkör</dt><dd>@Labels.Role(Auth.Role ?? "")</dd>
+                            @if (_me is not null)
+                            {
+                                <dt>Regisztráció dátuma</dt><dd>@Labels.Date(_me.CreatedAt)</dd>
+                            }
+                            @if (_me?.ProducerStatus is { } status)
+                            {
+                                <dt>Árus státusz</dt><dd><span class="lm-badge @Labels.ProducerStatusClass(status)">@Labels.ProducerStatus(status)</span></dd>
+                            }
                         </dl>
                         <div class="mb-2"><label class="form-label" for="pf-last">Vezetéknév</label><input id="pf-last" class="form-control" maxlength="100" @bind="_lastName" @bind:event="oninput" /></div>
                         <div class="mb-2"><label class="form-label" for="pf-first">Keresztnév</label><input id="pf-first" class="form-control" maxlength="100" @bind="_firstName" @bind:event="oninput" /></div>
@@ -63,6 +71,7 @@
 </PageContainer>
 
 @code {
+    private UserInfo? _me;
     private string _firstName = "", _lastName = "", _phone = "";
     private string _currentPw = "", _newPw = "", _confirmPw = "";
     private string? _pwMessage;
@@ -76,8 +85,8 @@
     {
         await Auth.GetAuthenticationStateAsync();
 
-        var me = (await Profile.GetAsync()).Value;
-        if (me is not null) { _firstName = me.FirstName; _lastName = me.LastName; _phone = me.PhoneNumber; }
+        _me = (await ProfileClient.GetAsync()).Value;
+        if (_me is not null) { _firstName = _me.FirstName; _lastName = _me.LastName; _phone = _me.PhoneNumber; }
 
         if (Auth.Role == "Producer")
         {
@@ -96,7 +105,7 @@
     {
         if (_profileBusy) return;
         _profileBusy = true; _profileProblem = null;
-        var r = await Profile.UpdateAsync(new UpdateProfileRequest(_firstName.Trim(), _lastName.Trim(), _phone.Trim()));
+        var r = await ProfileClient.UpdateAsync(new UpdateProfileRequest(_firstName.Trim(), _lastName.Trim(), _phone.Trim()));
         if (r.IsSuccess) Toasts.Success("Személyes adatok elmentve."); else _profileProblem = r.Problem;
         _profileBusy = false;
     }
@@ -109,7 +118,7 @@
         if (_newPw != _confirmPw) { _pwMessage = "A két új jelszó nem egyezik."; return; }
 
         _pwBusy = true;
-        var r = await Profile.ChangePasswordAsync(new ChangePasswordRequest(_currentPw, _newPw));
+        var r = await ProfileClient.ChangePasswordAsync(new ChangePasswordRequest(_currentPw, _newPw));
         if (r.IsSuccess)
         {
             Toasts.Success("A jelszó megváltozott.");

@@ -3,6 +3,8 @@
 @inject AuthStateService Auth
 @inject OrdersApi Orders
 @inject CatalogApi Catalog
+@inject VendorApi Vendor
+@inject AdminApi Admin
 
 <PageTitle>Irányítópult – LocalMarket</PageTitle>
 
@@ -12,11 +14,37 @@
         else if (_problem is not null) { <ErrorMessage Problem="_problem" OnRetry="LoadAsync" /> }
         else
         {
+            @* Figyelmeztetések: ami azonnali teendőt jelent *@
+            @if (Auth.Role == "Customer" && Count("Ready") > 0)
+            {
+                <div class="alert alert-success" role="status">@Count("Ready") rendelésed átvehető. <a href="orders">Megtekintés →</a></div>
+            }
+            @if (Auth.Role == "Producer")
+            {
+                @if (_producer is { Status: not "Approved" })
+                {
+                    <div class="alert alert-warning" role="status">A gazdaságod státusza: <strong>@Labels.ProducerStatus(_producer.Status)</strong>. Terméket a jóváhagyás után hirdethetsz.</div>
+                }
+                @if (Count("Pending") > 0)
+                {
+                    <div class="alert alert-warning" role="status">@Count("Pending") rendelés vár elfogadásra. <a href="vendor/orders">Rendelések →</a></div>
+                }
+            }
+            @if (Auth.Role == "Admin" && _pendingProducers > 0)
+            {
+                <div class="alert alert-warning" role="status">@_pendingProducers árus vár jóváhagyásra. <a href="admin/producers">Árusok →</a></div>
+            }
+
             @if (Auth.Role == "Admin")
             {
                 <div class="lm-stats">
                     <StatCard Label="Jóváhagyásra váró árus" Value="@_pendingProducers.ToString()" CssClass="@(_pendingProducers > 0 ? "attention" : null)" />
                     <StatCard Label="Vitatott rendelés" Value="@_orders.Count.ToString()" CssClass="@(_orders.Count > 0 ? "attention" : null)" />
+                    <StatCard Label="Át nem vett rendelés" Value="@_unclaimed.ToString()" />
+                    @if (_rate is not null)
+                    {
+                        <StatCard Label="Lemondott / elutasított" Value="@((_rate.CancelledOrders + _rate.RejectedOrders) + " / " + _rate.TotalOrders)" />
+                    }
                 </div>
             }
             else
@@ -72,7 +100,7 @@
                                     }
                                     @if (_weather.PrecipitationMm is { } rain)
                                     {
-                                        <span> · csó. @Labels.Qty((decimal)rain) mm</span>
+                                        <span> · csap. @Labels.Qty((decimal)rain) mm</span>
                                     }
                                 </div>
                             }
@@ -85,6 +113,51 @@
                 </div>
             </div>
 
+            @* Szerepkör-specifikus szekció *@
+            @if (Auth.Role == "Customer" && _featured.Count > 0)
+            {
+                <div class="lm-section-title mt-4"><h2>Ajánlott termékek</h2><a href="products">Összes termék →</a></div>
+                <div class="lm-grid">
+                    @foreach (var p in _featured)
+                    {
+                        <ProductCard Product="p" />
+                    }
+                </div>
+            }
+
+            @if (Auth.Role == "Producer")
+            {
+                <div class="lm-card mt-3">
+                    <div class="lm-section-title"><h2 class="h6 mb-0">Fogyó készlet</h2><a href="vendor/products">Termékeim →</a></div>
+                    @if (_lowStock.Count == 0)
+                    {
+                        <p class="text-muted small mb-0">Nincs fogyó készlet a következő heti kínálatban.</p>
+                    }
+                    else
+                    {
+                        <ul class="mb-0">
+                            @foreach (var p in _lowStock)
+                            {
+                                <li>@p.Name – @Labels.Qty(p.NextStock!.AvailableQuantity) @Labels.Unit(p.NextStock.Unit) maradt</li>
+                            }
+                        </ul>
+                    }
+                </div>
+            }
+
+            @if (Auth.Role == "Admin" && _top.Count > 0)
+            {
+                <div class="lm-card mt-3">
+                    <div class="lm-section-title"><h2 class="h6 mb-0">Legkeresettebb termékek</h2><a href="admin/reports">Riportok →</a></div>
+                    <ol class="mb-0">
+                        @foreach (var t in _top)
+                        {
+                            <li>@t.ProductName – @Labels.Qty(t.TotalQuantity) egység, @Labels.Money(t.TotalRevenue)</li>
+                        }
+                    </ol>
+                </div>
+            }
+
             <div class="lm-tiles mt-4">
                 @if (Auth.Role == "Admin")
                 {
@@ -93,6 +166,7 @@
                     <a class="lm-tile" href="admin/categories"><strong>Kategóriák</strong><span>Termékkategóriák felvétele</span></a>
                     <a class="lm-tile" href="admin/disputes"><strong>Viták</strong><span>Vitatott rendelések lezárása</span></a>
                     <a class="lm-tile" href="admin/reports"><strong>Riportok</strong><span>Népszerű termékek, bevétel, lemondások</span></a>
+                    <a class="lm-tile" href="admin/audit"><strong>Napló</strong><span>Kritikus módosítások</span></a>
                 }
                 else if (Auth.Role == "Producer")
                 {
@@ -116,7 +190,12 @@
 @code {
     private IReadOnlyList<OrderInfo> _orders = [];
     private IReadOnlyList<OrderInfo> _recent = [];
-    private int _pendingProducers;
+    private IReadOnlyList<ProductInfo> _featured = [];
+    private IReadOnlyList<ProductInfo> _lowStock = [];
+    private IReadOnlyList<TopProductInfo> _top = [];
+    private CancellationRateInfo? _rate;
+    private ProducerInfo? _producer;
+    private int _pendingProducers, _unclaimed;
     private MarketInfo? _nextMarket;
     private DateTime _nextDay;
     private MarketWeatherInfo? _weather;
@@ -150,9 +229,37 @@
         }
         _recent = _orders.OrderByDescending(o => o.CreatedAt).Take(3).ToList();
 
-        // a következő piacnap és az időjárás kiegészítő információ: hiba esetén egyszerűen elmarad
-        if (_problem is null) await LoadNextMarketDayAsync();
+        // a kiegészítő kártyák hiba esetén egyszerűen elmaradnak
+        if (_problem is null)
+        {
+            await LoadNextMarketDayAsync();
+            await LoadRoleExtrasAsync();
+        }
         _loading = false;
+    }
+
+    private async Task LoadRoleExtrasAsync()
+    {
+        if (Auth.Role == "Customer")
+        {
+            var products = await Catalog.SearchProductsAsync(null, null, []);
+            _featured = products.Value?.Where(p => p.NextStock is { AvailableQuantity: > 0 }).Take(4).ToList() ?? [];
+        }
+        else if (Auth.Role == "Producer")
+        {
+            _producer = (await Vendor.GetMineAsync()).Value;
+            if (Auth.ProducerId is { } producerId)
+            {
+                var products = await Catalog.ProductsOfProducerAsync(producerId);
+                _lowStock = products.Value?.Where(p => p.NextStock is { AvailableQuantity: <= 5 }).Take(4).ToList() ?? [];
+            }
+        }
+        else if (Auth.Role == "Admin")
+        {
+            _rate = (await Admin.CancellationRateAsync(null, null)).Value;
+            _top = (await Admin.TopProductsAsync(null, null, 3)).Value ?? [];
+            _unclaimed = (await Admin.UnclaimedAsync(null, null)).Value?.Count ?? 0;
+        }
     }
 
     private async Task LoadNextMarketDayAsync()
