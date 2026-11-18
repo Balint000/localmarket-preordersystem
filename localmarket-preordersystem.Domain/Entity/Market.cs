@@ -12,10 +12,7 @@ namespace localmarket_preordersystem.Domain.Entity
         public string Address { get; set; } = string.Empty;
         public bool IsActive { get; set; } = true;
 
-        /// <summary>
-        /// Coordinates of the market.
-        /// Ai suggested that to use these when we connect to the weather API.
-        /// </summary>
+        /// <summary>A piac koordinátái (az időjárás-előrejelzéshez; opcionális, hiányában a címből geokódolunk).</summary>
         public double? Latitude { get; private set; }
         public double? Longitude { get; private set; }
 

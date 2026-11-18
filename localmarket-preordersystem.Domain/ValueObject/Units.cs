@@ -20,4 +20,11 @@ namespace localmarket_preordersystem.Domain.ValueObject
         Bunch = 12,
         Tray = 13
     }
+
+    public static class UnitsExtensions
+    {
+        /// <summary>Darabolható (tört mennyiség nem értelmes): darab, csomag, doboz, üveg stb. A tömeg- és űrmértékek törtek lehetnek.</summary>
+        public static bool IsCountable(this Units unit) => unit is not
+            (Units.Kilogram or Units.Gram or Units.Decagram or Units.Litre or Units.Millilitre);
+    }
 }

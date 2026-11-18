@@ -16,7 +16,7 @@ namespace localmarket_preordersystem.Domain.Entity
         public decimal Amount{ get; set; }
 
         public PaymentStatus Status { get; set; } = PaymentStatus.Pending;
-        public PaymentMethod Method { get; set; } = PaymentMethod.DishWashing;
+        public PaymentMethod Method { get; set; } = PaymentMethod.Cash;
         public DateTime Date { get; set; }
 
         private Payment()

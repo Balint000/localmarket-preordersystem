@@ -11,8 +11,8 @@
         <div class="row g-4">
             <div class="col-lg-5">
                 <div class="lm-card">
-                    <h2 class="h6">Új kategória</h2>
-                    <EditForm Model="_form" OnValidSubmit="CreateAsync" FormName="category-form">
+                    <h2 class="h6">@(_editId is null ? "Új kategória" : "Kategória szerkesztése")</h2>
+                    <EditForm Model="_form" OnValidSubmit="SaveAsync" FormName="category-form">
                         <DataAnnotationsValidator />
                         <div class="mb-2">
                             <label class="form-label" for="cat-name">Név</label>
@@ -24,9 +24,9 @@
                             <InputTextArea id="cat-desc" class="form-control" rows="2" @bind-Value="_form.Description" maxlength="500" />
                         </div>
                         <FormProblem Problem="_formProblem" />
-                        <SubmitButton Busy="_busy" CssClass="btn-primary">Létrehozás</SubmitButton>
+                        <SubmitButton Busy="_busy" CssClass="btn-primary">@(_editId is null ? "Létrehozás" : "Mentés")</SubmitButton>
+                        @if (_editId is not null) { <button type="button" class="btn btn-outline-secondary ms-2" @onclick="CancelEdit">Mégse</button> }
                     </EditForm>
-                    <p class="small text-muted mt-3 mb-0">A backend jelenleg csak létrehozást támogat, a kategóriák nem szerkeszthetők és nem törölhetők.</p>
                 </div>
             </div>
             <div class="col-lg-7">
@@ -38,12 +38,23 @@
                     <ul class="lm-list">
                         @foreach (var c in _items)
                         {
-                            <li><strong>@c.Name</strong>@if (!string.IsNullOrWhiteSpace(c.Description)) { <div class="small text-muted">@c.Description</div> }</li>
+                            <li class="d-flex justify-content-between align-items-start gap-2">
+                                <div><strong>@c.Name</strong>@if (!string.IsNullOrWhiteSpace(c.Description)) { <div class="small text-muted">@c.Description</div> }</div>
+                                <div class="text-nowrap">
+                                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => StartEdit(c)">Szerkesztés</button>
+                                    <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => _deleting = c">Törlés</button>
+                                </div>
+                            </li>
                         }
                     </ul>
                 }
             </div>
         </div>
+
+        <ConfirmDialog Visible="_deleting is not null" Title="@($"Törlöd a(z) {_deleting?.Name} kategóriát?")" Danger="true" Busy="_busy"
+                       Message="Ha még vannak termékek ebben a kategóriában, a törlés nem engedélyezett."
+                       ConfirmText="Igen, törlöm" CancelText="Mégsem"
+                       OnConfirm="DeleteAsync" OnCancel="() => _deleting = null" />
     </ChildContent>
 </PageContainer>
 
@@ -60,6 +71,8 @@
     private IReadOnlyList<CategoryInfo> _items = [];
     private ApiProblem? _problem, _formProblem;
     private bool _loading = true, _busy;
+    private int? _editId;
+    private CategoryInfo? _deleting;
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
@@ -71,13 +84,42 @@
         _loading = false;
     }
 
-    private async Task CreateAsync()
+    private void StartEdit(CategoryInfo c)
+    {
+        _editId = c.Id; _form.Name = c.Name; _form.Description = c.Description; _formProblem = null;
+    }
+
+    private void CancelEdit()
+    {
+        _editId = null; _form.Name = ""; _form.Description = null; _formProblem = null;
+    }
+
+    private async Task SaveAsync()
     {
         if (_busy) return;
         _busy = true; _formProblem = null;
-        var r = await Admin.CreateCategoryAsync(new CreateCategoryRequest(_form.Name.Trim(), _form.Description?.Trim()));
-        if (r.IsSuccess) { Toasts.Success("Kategória létrehozva."); _form.Name = ""; _form.Description = null; await LoadAsync(); }
+        var request = new CreateCategoryRequest(_form.Name.Trim(), _form.Description?.Trim());
+        var r = _editId is int id
+            ? await Admin.UpdateCategoryAsync(id, request)
+            : await Admin.CreateCategoryAsync(request);
+        if (r.IsSuccess)
+        {
+            Toasts.Success(_editId is null ? "Kategória létrehozva." : "Kategória módosítva.");
+            CancelEdit();
+            await LoadAsync();
+        }
         else _formProblem = r.Problem;
+        _busy = false;
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (_busy || _deleting is null) return;
+        _busy = true;
+        var r = await Admin.DeleteCategoryAsync(_deleting.Id);
+        if (r.IsSuccess) { Toasts.Success("Kategória törölve."); if (_editId == _deleting.Id) CancelEdit(); await LoadAsync(); }
+        else Toasts.Error(r.Problem!.Message);
+        _deleting = null;
         _busy = false;
     }
 }

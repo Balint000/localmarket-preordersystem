@@ -98,6 +98,11 @@ public sealed class VendorApi(ApiClient api)
     public Task<ApiResult<PickupSlotInfo>> CreatePickupSlotAsync(CreatePickupSlotRequest r) => api.PostAsync<PickupSlotInfo>("api/pickup-slots", r);
     public Task<ApiResult<ProducerInfo>> GetMineAsync(CancellationToken ct = default) => api.GetAsync<ProducerInfo>("api/producers/me", ct);
     public Task<ApiResult<ProducerInfo>> UpdateMineAsync(UpdateMyProducerRequest r) => api.PutAsync<ProducerInfo>("api/producers/me", r, default);
+    public Task<ApiResult<ProductInfo>> SetImageAsync(int id, string fileName, string contentType, byte[] content) => api.PutFileAsync<ProductInfo>($"api/products/{id}/image", fileName, contentType, content);
+    public Task<ApiResult<Unit>> DeleteProductAsync(int id) => api.DeleteAsync<Unit>($"api/products/{id}");
+    public Task<ApiResult<PickupSlotInfo>> UpdatePickupSlotAsync(int id, CreatePickupSlotRequest r) => api.PutAsync<PickupSlotInfo>($"api/pickup-slots/{id}", r, default);
+    public Task<ApiResult<Unit>> DeletePickupSlotAsync(int id) => api.DeleteAsync<Unit>($"api/pickup-slots/{id}");
+    public Task<ApiResult<ProductInfo>> DeleteImageAsync(int id) => api.DeleteAsync<ProductInfo>($"api/products/{id}/image");
 }
 
 /// <summary>Admin-műveletek: árusok jóváhagyása, piacok, kategóriák, riportok.</summary>
@@ -108,11 +113,20 @@ public sealed class AdminApi(ApiClient api)
     public Task<ApiResult<MarketInfo>> CreateMarketAsync(CreateMarketRequest r) => api.PostAsync<MarketInfo>("api/markets", r);
     public Task<ApiResult<MarketInfo>> UpdateMarketAsync(int id, UpdateMarketRequest r) => api.PutAsync<MarketInfo>($"api/markets/{id}", r, default);
     public Task<ApiResult<CategoryInfo>> CreateCategoryAsync(CreateCategoryRequest r) => api.PostAsync<CategoryInfo>("api/categories", r);
+    public Task<ApiResult<CategoryInfo>> UpdateCategoryAsync(int id, CreateCategoryRequest r) => api.PutAsync<CategoryInfo>($"api/categories/{id}", r, default);
+    public Task<ApiResult<Unit>> DeleteCategoryAsync(int id) => api.DeleteAsync<Unit>($"api/categories/{id}");
 
     public Task<ApiResult<IReadOnlyList<TopProductInfo>>> TopProductsAsync(DateTime? from, DateTime? to, int top = 10) => api.GetAsync<IReadOnlyList<TopProductInfo>>("api/reports/top-products" + Range(from, to, "top=" + top), default);
     public Task<ApiResult<CancellationRateInfo>> CancellationRateAsync(DateTime? from, DateTime? to) => api.GetAsync<CancellationRateInfo>("api/reports/cancellation-rate" + Range(from, to), default);
     public Task<ApiResult<IReadOnlyList<VendorRevenueInfo>>> VendorRevenueAsync(DateTime? from, DateTime? to) => api.GetAsync<IReadOnlyList<VendorRevenueInfo>>("api/reports/vendor-revenue" + Range(from, to), default);
     public Task<ApiResult<IReadOnlyList<UnclaimedOrderInfo>>> UnclaimedAsync(DateTime? from, DateTime? to) => api.GetAsync<IReadOnlyList<UnclaimedOrderInfo>>("api/reports/unclaimed-orders" + Range(from, to), default);
+
+    public Task<ApiResult<PagedResponse<AuditLogInfo>>> AuditAsync(string? entityName, int page, int pageSize = 25, CancellationToken ct = default)
+    {
+        var q = new List<string> { "page=" + page, "pageSize=" + pageSize };
+        if (!string.IsNullOrWhiteSpace(entityName)) q.Add("entityName=" + Uri.EscapeDataString(entityName.Trim()));
+        return api.GetAsync<PagedResponse<AuditLogInfo>>("api/audit?" + string.Join('&', q), ct);
+    }
 
     private static string Range(DateTime? from, DateTime? to, string? extra = null)
     {

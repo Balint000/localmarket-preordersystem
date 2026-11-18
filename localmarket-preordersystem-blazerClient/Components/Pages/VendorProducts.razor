@@ -2,6 +2,8 @@
 @attribute [Authorize(Roles = "Producer")]
 @inject CatalogApi Catalog
 @inject AuthStateService Auth
+@inject VendorApi Vendor
+@inject ToastService Toasts
 
 <PageTitle>Termékeim – LocalMarket</PageTitle>
 
@@ -36,20 +38,29 @@
                                 else { <span class="lm-badge badge-muted">Nincs meghirdetve</span> }
                             </td>
                             <td class="text-end">@(p.NextStock is { } n ? Labels.Money(n.UnitPrice) + " / " + Labels.Unit(n.Unit) : "–")</td>
-                            <td class="text-end"><a class="btn btn-outline-primary btn-sm" href="vendor/products/@p.Id">Szerkesztés és készlet</a></td>
+                            <td class="text-end text-nowrap">
+                                <a class="btn btn-outline-primary btn-sm" href="vendor/products/@p.Id">Szerkesztés és készlet</a>
+                                <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => _deleting = p">Törlés</button>
+                            </td>
                         </tr>
                     }
                     </tbody>
                 </table>
             </div>
         }
+
+        <ConfirmDialog Visible="_deleting is not null" Title="@($"Törlöd a(z) {_deleting?.Name} terméket?")" Danger="true" Busy="_busy"
+                       Message="A termék eltűnik a kínálatból. Ha már vannak hozzá rendelések, a törlés nem engedélyezett."
+                       ConfirmText="Igen, törlöm" CancelText="Mégsem"
+                       OnConfirm="DeleteAsync" OnCancel="() => _deleting = null" />
     </ChildContent>
 </PageContainer>
 
 @code {
     private IReadOnlyList<ProductInfo> _products = [];
     private ApiProblem? _problem;
-    private bool _loading = true;
+    private bool _loading = true, _busy;
+    private ProductInfo? _deleting;
 
     protected override async Task OnInitializedAsync()
     {
@@ -70,5 +81,15 @@
             if (r.IsSuccess) _products = r.Value!; else _problem = r.Problem;
         }
         _loading = false;
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (_busy || _deleting is null) return;
+        _busy = true;
+        var r = await Vendor.DeleteProductAsync(_deleting.Id);
+        if (r.IsSuccess) { Toasts.Success("Termék törölve."); _deleting = null; await LoadAsync(); }
+        else { Toasts.Error(r.Problem!.Message); _deleting = null; }
+        _busy = false;
     }
 }

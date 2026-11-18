@@ -13,10 +13,14 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "localmarket-preordersystem.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "localmarket-preordersystem.api", "localmarket-preordersystem.api\localmarket-preordersystem.api.csproj", "{45E26085-9E1A-495E-98BE-A5FB1AE77BAF}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "localmarket-preordersystem.Tests", "localmarket-preordersystem.Tests\localmarket-preordersystem.Tests.csproj", "{7B3C1F6E-52A4-4D8B-9E21-3C6A0D5F8A17}"
+EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{E4BA1EA0-7BDF-4AF4-9B9D-8F7118717058}"
 	ProjectSection(SolutionItems) = preProject
 		.editorconfig = .editorconfig
+		.env.example = .env.example
 		docker-compose.yml = docker-compose.yml
+		README.md = README.md
 	EndProjectSection
 EndProject
 Project("{E53339B2-1760-4266-BCC7-CA923CBCF16C}") = "docker-compose", "docker-compose.dcproj", "{81DDED9D-158B-E303-5F62-77A2896D2A5A}"
@@ -51,6 +55,10 @@ Global
 		{81DDED9D-158B-E303-5F62-77A2896D2A5A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{81DDED9D-158B-E303-5F62-77A2896D2A5A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{81DDED9D-158B-E303-5F62-77A2896D2A5A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7B3C1F6E-52A4-4D8B-9E21-3C6A0D5F8A17}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7B3C1F6E-52A4-4D8B-9E21-3C6A0D5F8A17}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7B3C1F6E-52A4-4D8B-9E21-3C6A0D5F8A17}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7B3C1F6E-52A4-4D8B-9E21-3C6A0D5F8A17}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

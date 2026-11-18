@@ -32,6 +32,13 @@ namespace localmarket_preordersystem.Application.Cart.AddToCart
             var stock = product.GetNextAvailableStock(time.GetLocalNow().Date)
                 ?? throw new ConflictException($"A(z) '{product.Name}' termékhez jelenleg nincs meghirdetett kínálat.");
 
+            new ValidationBuilder()
+                .Must(nameof(command.Quantity), !stock.Unit.IsCountable() || command.Quantity == decimal.Truncate(command.Quantity),
+                    "Ennél a terméknél csak egész mennyiség rendelhető.")
+                .Must(nameof(command.Quantity), decimal.Round(command.Quantity, 3) == command.Quantity,
+                    "A mennyiség legfeljebb három tizedesjegyet tartalmazhat.")
+                .ThrowIfInvalid();
+
             var cart = await CartSupport.GetOrCreateAsync(carts, users, userId, ct);
             cart.AddItem(product, command.Quantity, stock.UnitPrice);
 

@@ -20,7 +20,7 @@ namespace localmarket_preordersystem.Application.Orders.ResolveDispute
             currentUser.RequireRole(Role.Admin);
             new ValidationBuilder()
                 .Must(nameof(command.Decision), Enum.IsDefined(command.Decision), "Érvénytelen döntés.")
-                .MaxLength(nameof(command.Note), command.Note, 1000)
+                .MaxLength(nameof(command.Note), command.Note, 900)
                 .ThrowIfInvalid();
 
             var order = await OrderSupport.LoadAsync(orders, command.OrderId, ct);

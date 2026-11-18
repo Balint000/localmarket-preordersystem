@@ -20,6 +20,10 @@ if (string.IsNullOrWhiteSpace(apiBaseUrl) || !Uri.TryCreate(apiBaseUrl, UriKind.
     throw new InvalidOperationException("Az 'Api:BaseUrl' konfiguráció hiányzik vagy érvénytelen (pl. http://localhost:5205). Állítsd be az appsettings.Development.json-ban vagy az Api__BaseUrl környezeti változóval.");
 }
 
+// a böngésző által elérhető cím (képekhez); alapértelmezés: ugyanaz, mint az Api:BaseUrl
+var publicBaseUrl = builder.Configuration["Api:PublicBaseUrl"];
+builder.Services.AddSingleton(new ApiUrls(string.IsNullOrWhiteSpace(publicBaseUrl) ? apiBaseUri.ToString() : publicBaseUrl));
+
 builder.Services.AddHttpClient<ApiClient>(client =>
 {
     client.BaseAddress = new Uri(apiBaseUri.ToString().TrimEnd('/') + "/");
@@ -41,10 +45,10 @@ if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
     app.UseHsts();
+    app.UseHttpsRedirection();
 }
 
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
-app.UseHttpsRedirection();
 
 app.UseAntiforgery();
 

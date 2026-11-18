@@ -86,6 +86,7 @@ public class OrdersController : ControllerBase
     public async Task<IActionResult> NotPickedUp(int id, MarkOrderNotPickedUpHandler handler, CancellationToken ct)
         => Ok(await handler.HandleAsync(new MarkOrderNotPickedUpCommand(id), ct));
 
+    // a vevő és az érintett árus is vitathatja, a piacvezető dönt (resolve-dispute)
     [HttpPost("{id:int}/dispute")]
     [Authorize(Policy = Policies.CustomerOrProducer)]
     public async Task<IActionResult> Dispute(int id, NoteRequest body, DisputeOrderHandler handler, CancellationToken ct)

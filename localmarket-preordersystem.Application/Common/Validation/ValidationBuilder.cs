@@ -32,6 +32,9 @@ namespace localmarket_preordersystem.Application.Common.Validation
         public ValidationBuilder Positive(string field, int value, string message)
             => value <= 0 ? Add(field, message) : this;
 
+        public ValidationBuilder NonNegative(string field, decimal value, string message)
+            => value < 0 ? Add(field, message) : this;
+
         public ValidationBuilder Must(string field, bool condition, string message)
             => condition ? this : Add(field, message);
 

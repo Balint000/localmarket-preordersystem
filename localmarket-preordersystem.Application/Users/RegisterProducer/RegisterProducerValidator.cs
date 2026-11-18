@@ -11,6 +11,12 @@ namespace localmarket_preordersystem.Application.Users.RegisterProducer
             .Must(nameof(command.Password), HasValidLength(command.Password), "A jelszónak legalább 8 karakter hosszúnak kell lennie.")
             .Required(nameof(command.ProducerName), command.ProducerName, "Az árus/gazdaság nevének megadása kötelező.")
             .Must(nameof(command.StallNumber), command.StallNumber >= 0, "A standszám nem lehet negatív.")
+            .MaxLength(nameof(command.FirstName), command.FirstName, 100)
+            .MaxLength(nameof(command.LastName), command.LastName, 100)
+            .MaxLength(nameof(command.Email), command.Email, 320)
+            .MaxLength(nameof(command.PhoneNumber), command.PhoneNumber, 30)
+            .MaxLength(nameof(command.Password), command.Password, 128)
+            .MaxLength(nameof(command.ProducerName), command.ProducerName, 200)
             .ThrowIfInvalid();
 
         private static bool HasValidLength(string? password) => !string.IsNullOrWhiteSpace(password) && password.Length >= 8;

@@ -44,6 +44,44 @@ public sealed class ApiClient(HttpClient http, AuthStateService auth)
         }
     }
 
+    /// <summary>Fájl feltöltése multipart/form-data kérésben (pl. termékkép), "file" mezőnévvel.</summary>
+    public async Task<ApiResult<T>> PutFileAsync<T>(string url, string fileName, string contentType, byte[] content, CancellationToken ct = default)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Put, url);
+            if (auth.Token is { } token)
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            var file = new ByteArrayContent(content);
+            file.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+            var form = new MultipartFormDataContent { { file, "file", fileName } };
+            request.Content = form;
+
+            using var response = await http.SendAsync(request, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                var problem = await ToProblemAsync(response, ct);
+                if (problem.Kind == ApiFailure.Unauthorized && auth.IsAuthenticated)
+                    await auth.SignOutAsync(expired: true);
+                return ApiResult<T>.Fail(problem);
+            }
+
+            var value = await response.Content.ReadFromJsonAsync<T>(Json, ct);
+            return value is null
+                ? ApiResult<T>.Fail(new ApiProblem(ApiFailure.Server, "Üres válasz érkezett a szervertől.", null, Empty))
+                : ApiResult<T>.Ok(value);
+        }
+        catch (JsonException)
+        {
+            return ApiResult<T>.Fail(new ApiProblem(ApiFailure.Server, "A szerver válasza nem értelmezhető.", null, Empty));
+        }
+        catch (Exception ex) when (IsNetworkError(ex, ct))
+        {
+            return ApiResult<T>.Fail(NetworkProblem(ex));
+        }
+    }
+
     /// <summary>Fájl (export) letöltése bájtokként.</summary>
     public async Task<ApiResult<DownloadedFile>> GetFileAsync(string url, CancellationToken ct = default)
     {

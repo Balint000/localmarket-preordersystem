@@ -11,8 +11,6 @@ namespace localmarket_preordersystem.Infrastructure.Persistence.Repositories;
 
 internal sealed class ReportQueries(MarketDbContext context, TimeProvider time) : IReportQueries
 {
-    private static DateTime Utc(DateTime d) => DateTime.SpecifyKind(d, DateTimeKind.Utc);
-
     private DateTime ToUtc(DateTime d)
     {
         if (d.Kind == DateTimeKind.Utc)
@@ -58,8 +56,8 @@ internal sealed class ReportQueries(MarketDbContext context, TimeProvider time) 
     public async Task<CancellationRateDto> GetCancellationRateAsync(
         DateTime from, DateTime to, CancellationToken ct = default)
     {
-        var f = Utc(from);
-        var t = Utc(to);
+        var f = ToUtc(from);
+        var t = ToUtc(to);
 
         var counts = await context.Orders.AsNoTracking()
             .Where(o => o.CreatedAt >= f && o.CreatedAt <= t)
@@ -82,8 +80,8 @@ internal sealed class ReportQueries(MarketDbContext context, TimeProvider time) 
     public async Task<IReadOnlyList<VendorRevenueDto>> GetVendorRevenueAsync(
         DateTime from, DateTime to, CancellationToken ct = default)
     {
-        var f = Utc(from);
-        var t = Utc(to);
+        var f = ToUtc(from);
+        var t = ToUtc(to);
 
         var orders = await context.Orders.AsNoTracking()
             .Where(o => o.CreatedAt >= f && o.CreatedAt <= t && o.Status == OrderStatus.PickedUp)
@@ -116,9 +114,10 @@ internal sealed class ReportQueries(MarketDbContext context, TimeProvider time) 
     public async Task<IReadOnlyList<UnclaimedOrderDto>> GetUnclaimedOrdersAsync(
         DateTime from, DateTime to, CancellationToken ct = default)
     {
-        var f = Utc(from);
-        var t = Utc(to);
-        var now = time.GetUtcNow().UtcDateTime;
+        var f = ToUtc(from);
+        var t = ToUtc(to);
+        // az idősáv dátuma/ideje helyi (piaci) idő, ezért a "most" is helyi időben kell
+        var now = time.GetLocalNow().DateTime;
         var today = now.Date;
         var nowTime = TimeOnly.FromDateTime(now);
 

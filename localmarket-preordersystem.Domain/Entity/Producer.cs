@@ -34,6 +34,8 @@ namespace localmarket_preordersystem.Domain.Entity
         public static Producer Register(Market market, string name, int stallNumber)
         {
             ArgumentNullException.ThrowIfNull(market);
+            if (!market.IsActive)
+                throw new DomainException("Inaktív piacra nem lehet árusként regisztrálni.");
             if (string.IsNullOrWhiteSpace(name))
                 throw new DomainException("Az árus nevének megadása kötelező.");
             if (stallNumber < 0)
