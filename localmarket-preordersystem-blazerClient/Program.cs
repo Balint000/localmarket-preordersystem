@@ -33,6 +33,7 @@ builder.Services.AddHttpClient<ApiClient>(client =>
 builder.Services.AddScoped<ToastService>();
 builder.Services.AddScoped<FileDownloader>();
 builder.Services.AddScoped<AuthApi>();
+builder.Services.AddScoped<ProfileApi>();
 builder.Services.AddScoped<CatalogApi>();
 builder.Services.AddScoped<CartService>();
 builder.Services.AddScoped<OrdersApi>();

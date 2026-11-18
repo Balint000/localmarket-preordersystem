@@ -10,30 +10,91 @@
     <ChildContent>
         @if (_loading) { <LoadingIndicator /> }
         else if (_problem is not null) { <ErrorMessage Problem="_problem" OnRetry="LoadAsync" /> }
-        else if (Auth.Role == "Admin")
-        {
-            <div class="lm-stats">
-                <StatCard Label="Jóváhagyásra váró árus" Value="@_pendingProducers.ToString()" CssClass="@(_pendingProducers > 0 ? "attention" : null)" />
-                <StatCard Label="Vitatott rendelés" Value="@_orders.Count.ToString()" CssClass="@(_orders.Count > 0 ? "attention" : null)" />
-            </div>
-            <div class="lm-tiles mt-4">
-                <a class="lm-tile" href="admin/producers"><strong>Árusok</strong><span>Regisztrációk jóváhagyása, elutasítása</span></a>
-                <a class="lm-tile" href="admin/markets"><strong>Piacok</strong><span>Nyitvatartás, cím, koordináta szerkesztése</span></a>
-                <a class="lm-tile" href="admin/categories"><strong>Kategóriák</strong><span>Termékkategóriák felvétele</span></a>
-                <a class="lm-tile" href="admin/disputes"><strong>Viták</strong><span>Vitatott rendelések lezárása</span></a>
-                <a class="lm-tile" href="admin/reports"><strong>Riportok</strong><span>Népszerű termékek, bevétel, lemondások</span></a>
-            </div>
-        }
         else
         {
-            <div class="lm-stats">
-                <StatCard Label="Összes rendelés" Value="@_orders.Count.ToString()" />
-                <StatCard Label="Függőben" Value="@Count("Pending").ToString()" />
-                <StatCard Label="Átvehető" Value="@Count("Ready").ToString()" />
-                <StatCard Label="Átvéve" Value="@Count("PickedUp").ToString()" />
+            @if (Auth.Role == "Admin")
+            {
+                <div class="lm-stats">
+                    <StatCard Label="Jóváhagyásra váró árus" Value="@_pendingProducers.ToString()" CssClass="@(_pendingProducers > 0 ? "attention" : null)" />
+                    <StatCard Label="Vitatott rendelés" Value="@_orders.Count.ToString()" CssClass="@(_orders.Count > 0 ? "attention" : null)" />
+                </div>
+            }
+            else
+            {
+                <div class="lm-stats">
+                    <StatCard Label="Összes rendelés" Value="@_orders.Count.ToString()" />
+                    <StatCard Label="Függőben" Value="@Count("Pending").ToString()" />
+                    <StatCard Label="Átvehető" Value="@Count("Ready").ToString()" CssClass="@(Count("Ready") > 0 ? "attention" : null)" />
+                    <StatCard Label="Átvéve" Value="@Count("PickedUp").ToString()" />
+                </div>
+            }
+
+            <div class="row g-3 mt-1">
+                <div class="col-lg-7">
+                    <div class="lm-card">
+                        <div class="lm-section-title">
+                            <h2 class="h6 mb-0">@RecentTitle</h2>
+                            <a href="@AllOrdersHref">Összes →</a>
+                        </div>
+                        @if (_recent.Count == 0)
+                        {
+                            <p class="text-muted small mb-0">Nincs megjelenítendő rendelés.</p>
+                        }
+                        else
+                        {
+                            @foreach (var o in _recent)
+                            {
+                                <OrderListItem Order="o" Href="@OrderHref(o)" ShowCustomer="@(Auth.Role != "Customer")" />
+                            }
+                        }
+                    </div>
+                </div>
+
+                <div class="col-lg-5">
+                    <div class="lm-card">
+                        <h2 class="h6">Következő piacnap</h2>
+                        @if (_nextMarket is null)
+                        {
+                            <p class="text-muted small mb-0">Nincs aktív piac nyitvatartással.</p>
+                        }
+                        else
+                        {
+                            <div class="fw-semibold">@_nextMarket.Name</div>
+                            <div class="text-muted small">@_nextMarket.Address</div>
+                            <div class="mt-2">@Labels.Date(_nextDay) (@Labels.Day(_nextDay.DayOfWeek.ToString()))</div>
+                            @if (_weather is { ForecastAvailable: true })
+                            {
+                                <div class="small mt-1">
+                                    @_weather.Description
+                                    @if (_weather.TemperatureMinC is { } min && _weather.TemperatureMaxC is { } max)
+                                    {
+                                        <span> · @Math.Round(min)–@Math.Round(max) °C</span>
+                                    }
+                                    @if (_weather.PrecipitationMm is { } rain)
+                                    {
+                                        <span> · csó. @Labels.Qty((decimal)rain) mm</span>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="text-muted small mt-1">Az időjárás-előrejelzés még nem elérhető.</div>
+                            }
+                        }
+                    </div>
+                </div>
             </div>
+
             <div class="lm-tiles mt-4">
-                @if (Auth.Role == "Producer")
+                @if (Auth.Role == "Admin")
+                {
+                    <a class="lm-tile" href="admin/producers"><strong>Árusok</strong><span>Regisztrációk jóváhagyása, elutasítása</span></a>
+                    <a class="lm-tile" href="admin/markets"><strong>Piacok</strong><span>Nyitvatartás, cím, koordináta szerkesztése</span></a>
+                    <a class="lm-tile" href="admin/categories"><strong>Kategóriák</strong><span>Termékkategóriák felvétele</span></a>
+                    <a class="lm-tile" href="admin/disputes"><strong>Viták</strong><span>Vitatott rendelések lezárása</span></a>
+                    <a class="lm-tile" href="admin/reports"><strong>Riportok</strong><span>Népszerű termékek, bevétel, lemondások</span></a>
+                }
+                else if (Auth.Role == "Producer")
                 {
                     <a class="lm-tile" href="vendor/orders"><strong>Beérkező rendelések</strong><span>Elfogadás, teljesítés, átvétel</span></a>
                     <a class="lm-tile" href="vendor/products"><strong>Termékeim</strong><span>Meghirdetés, heti készlet és ár</span></a>
@@ -46,6 +107,7 @@
                     <a class="lm-tile" href="cart"><strong>Kosár</strong><span>Rendelés leadása</span></a>
                     <a class="lm-tile" href="orders"><strong>Rendeléseim</strong><span>Állapot, lemondás, export</span></a>
                 }
+                <a class="lm-tile" href="profile"><strong>Profilom</strong><span>Adatok és jelszó módosítása</span></a>
             </div>
         }
     </ChildContent>
@@ -53,9 +115,17 @@
 
 @code {
     private IReadOnlyList<OrderInfo> _orders = [];
+    private IReadOnlyList<OrderInfo> _recent = [];
     private int _pendingProducers;
+    private MarketInfo? _nextMarket;
+    private DateTime _nextDay;
+    private MarketWeatherInfo? _weather;
     private ApiProblem? _problem;
     private bool _loading = true;
+
+    private string RecentTitle => Auth.Role == "Admin" ? "Vitatott rendelések" : "Legutóbbi rendelések";
+    private string AllOrdersHref => Auth.Role switch { "Admin" => "admin/disputes", "Producer" => "vendor/orders", _ => "orders" };
+    private string OrderHref(OrderInfo o) => Auth.Role switch { "Admin" => "admin/disputes", "Producer" => $"vendor/orders/{o.Id}", _ => $"orders/{o.Id}" };
 
     protected override async Task OnInitializedAsync()
     {
@@ -78,7 +148,37 @@
             var r = Auth.Role == "Producer" ? await Orders.ForProducerAsync(null) : await Orders.MineAsync(null);
             if (r.IsSuccess) _orders = r.Value!; else _problem = r.Problem;
         }
+        _recent = _orders.OrderByDescending(o => o.CreatedAt).Take(3).ToList();
+
+        // a következő piacnap és az időjárás kiegészítő információ: hiba esetén egyszerűen elmarad
+        if (_problem is null) await LoadNextMarketDayAsync();
         _loading = false;
+    }
+
+    private async Task LoadNextMarketDayAsync()
+    {
+        var markets = (await Catalog.MarketsAsync()).Value?.Where(m => m.IsActive) ?? [];
+        var today = DateTime.Today;
+        var best = markets
+            .Select(m => (Market: m, Day: NextOpeningDay(m, today)))
+            .Where(x => x.Day is not null)
+            .OrderBy(x => x.Day)
+            .FirstOrDefault();
+        if (best.Market is null) return;
+
+        _nextMarket = best.Market;
+        _nextDay = best.Day!.Value;
+        _weather = (await Catalog.WeatherAsync(_nextMarket.Id, _nextDay)).Value;
+    }
+
+    private static DateTime? NextOpeningDay(MarketInfo market, DateTime today)
+    {
+        for (var i = 0; i < 7; i++)
+        {
+            var day = today.AddDays(i);
+            if (market.OpeningDays.Contains(day.DayOfWeek.ToString())) return day;
+        }
+        return null;
     }
 
     private int Count(string status) => _orders.Count(o => o.Status == status);

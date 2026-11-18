@@ -3,32 +3,49 @@
 @inject AuthStateService Auth
 @inject CatalogApi Catalog
 @inject VendorApi Vendor
+@inject ProfileApi Profile
 @inject ToastService Toasts
 
 <PageTitle>Profil – LocalMarket</PageTitle>
 
-<PageContainer Title="Profilom">
+<PageContainer Title="Profilom" Subtitle="Személyes adatok és biztonság">
     <ChildContent>
-        <div class="row g-4">
-            <div class="col-lg-5">
-                <div class="lm-card">
-                    @* Az e-mail és a szerepkör a bejelentkezési tokenből jön. *@
-                    <dl class="mb-0">
-                        <dt>E-mail</dt><dd>@Auth.Email</dd>
-                        <dt>Szerepkör</dt><dd>@Labels.Role(Auth.Role ?? "")</dd>
-                        @if (Auth.ProducerId is { } pid) { <dt>Árus azonosító</dt><dd>@pid</dd> }
-                    </dl>
-                </div>
-            </div>
-
-            @if (Auth.Role == "Producer")
-            {
-                <div class="col-lg-7">
+        @if (_loading) { <LoadingIndicator /> }
+        else
+        {
+            <div class="row g-4">
+                <div class="col-lg-6">
                     <div class="lm-card">
-                        <h2 class="h6">Gazdaság adatai</h2>
-                        @if (_loading) { <LoadingIndicator /> }
-                        else
-                        {
+                        <h2 class="h6">Személyes adatok</h2>
+                        <dl class="small text-muted mb-3">
+                            <dt>E-mail</dt><dd>@Auth.Email</dd>
+                            <dt>Szerepkör</dt><dd>@Labels.Role(Auth.Role ?? "")</dd>
+                        </dl>
+                        <div class="mb-2"><label class="form-label" for="pf-last">Vezetéknév</label><input id="pf-last" class="form-control" maxlength="100" @bind="_lastName" @bind:event="oninput" /></div>
+                        <div class="mb-2"><label class="form-label" for="pf-first">Keresztnév</label><input id="pf-first" class="form-control" maxlength="100" @bind="_firstName" @bind:event="oninput" /></div>
+                        <div class="mb-3"><label class="form-label" for="pf-phone">Telefonszám</label><input id="pf-phone" type="tel" class="form-control" maxlength="30" @bind="_phone" @bind:event="oninput" autocomplete="tel" /></div>
+                        <FormProblem Problem="_profileProblem" />
+                        <SubmitButton Busy="_profileBusy" Disabled="@(string.IsNullOrWhiteSpace(_firstName) || string.IsNullOrWhiteSpace(_lastName))" CssClass="btn-primary" OnClick="SaveProfileAsync">Mentés</SubmitButton>
+                    </div>
+                </div>
+
+                <div class="col-lg-6">
+                    <div class="lm-card">
+                        <h2 class="h6">Jelszó módosítása</h2>
+                        <div class="mb-2"><label class="form-label" for="pw-cur">Jelenlegi jelszó</label><input id="pw-cur" type="password" class="form-control" @bind="_currentPw" @bind:event="oninput" autocomplete="current-password" /></div>
+                        <div class="mb-2"><label class="form-label" for="pw-new">Új jelszó (legalább 8 karakter)</label><input id="pw-new" type="password" class="form-control" @bind="_newPw" @bind:event="oninput" autocomplete="new-password" /></div>
+                        <div class="mb-3"><label class="form-label" for="pw-conf">Új jelszó újra</label><input id="pw-conf" type="password" class="form-control" @bind="_confirmPw" @bind:event="oninput" autocomplete="new-password" /></div>
+                        @if (_pwMessage is not null) { <div class="text-danger small mb-2" role="alert">@_pwMessage</div> }
+                        <FormProblem Problem="_pwProblem" />
+                        <SubmitButton Busy="_pwBusy" Disabled="@(string.IsNullOrEmpty(_currentPw) || string.IsNullOrEmpty(_newPw))" CssClass="btn-primary" OnClick="ChangePasswordAsync">Jelszó módosítása</SubmitButton>
+                    </div>
+                </div>
+
+                @if (Auth.Role == "Producer")
+                {
+                    <div class="col-12">
+                        <div class="lm-card">
+                            <h2 class="h6">Gazdaság adatai</h2>
                             @if (_market is not null)
                             {
                                 <p class="small text-muted">Piac: <strong>@_market.Name</strong> (@_market.Address)</p>
@@ -37,34 +54,69 @@
                             <div class="mb-3"><label class="form-label" for="pr-stall">Standszám</label><input id="pr-stall" type="number" min="0" class="form-control" @bind="_stall" /></div>
                             <FormProblem Problem="_problem" />
                             <SubmitButton Busy="_busy" Disabled="string.IsNullOrWhiteSpace(_name)" CssClass="btn-primary" OnClick="SaveAsync">Mentés</SubmitButton>
-                        }
+                        </div>
                     </div>
-                </div>
-            }
-        </div>
+                }
+            </div>
+        }
     </ChildContent>
 </PageContainer>
 
 @code {
+    private string _firstName = "", _lastName = "", _phone = "";
+    private string _currentPw = "", _newPw = "", _confirmPw = "";
+    private string? _pwMessage;
     private string _name = "";
     private int _stall;
-    private bool _loading, _busy;
+    private bool _loading = true, _busy, _profileBusy, _pwBusy;
     private MarketInfo? _market;
-    private ApiProblem? _problem;
+    private ApiProblem? _problem, _profileProblem, _pwProblem;
 
     protected override async Task OnInitializedAsync()
     {
         await Auth.GetAuthenticationStateAsync();
-        if (Auth.Role != "Producer") return;
-        _loading = true;
-        var mine = (await Vendor.GetMineAsync()).Value;
-        if (mine is not null)
+
+        var me = (await Profile.GetAsync()).Value;
+        if (me is not null) { _firstName = me.FirstName; _lastName = me.LastName; _phone = me.PhoneNumber; }
+
+        if (Auth.Role == "Producer")
         {
-            _name = mine.Name; _stall = mine.StallNumber;
-            var markets = await Catalog.MarketsAsync();
-            _market = markets.Value?.FirstOrDefault(m => m.Id == mine.MarketId);
+            var mine = (await Vendor.GetMineAsync()).Value;
+            if (mine is not null)
+            {
+                _name = mine.Name; _stall = mine.StallNumber;
+                var markets = await Catalog.MarketsAsync();
+                _market = markets.Value?.FirstOrDefault(m => m.Id == mine.MarketId);
+            }
         }
         _loading = false;
+    }
+
+    private async Task SaveProfileAsync()
+    {
+        if (_profileBusy) return;
+        _profileBusy = true; _profileProblem = null;
+        var r = await Profile.UpdateAsync(new UpdateProfileRequest(_firstName.Trim(), _lastName.Trim(), _phone.Trim()));
+        if (r.IsSuccess) Toasts.Success("Személyes adatok elmentve."); else _profileProblem = r.Problem;
+        _profileBusy = false;
+    }
+
+    private async Task ChangePasswordAsync()
+    {
+        if (_pwBusy) return;
+        _pwMessage = null; _pwProblem = null;
+        if (_newPw.Length < 8) { _pwMessage = "Az új jelszónak legalább 8 karakter hosszúnak kell lennie."; return; }
+        if (_newPw != _confirmPw) { _pwMessage = "A két új jelszó nem egyezik."; return; }
+
+        _pwBusy = true;
+        var r = await Profile.ChangePasswordAsync(new ChangePasswordRequest(_currentPw, _newPw));
+        if (r.IsSuccess)
+        {
+            Toasts.Success("A jelszó megváltozott.");
+            _currentPw = _newPw = _confirmPw = "";
+        }
+        else _pwProblem = r.Problem;
+        _pwBusy = false;
     }
 
     private async Task SaveAsync()
