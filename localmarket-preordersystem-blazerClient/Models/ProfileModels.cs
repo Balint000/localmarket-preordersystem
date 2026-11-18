@@ -6,3 +6,4 @@ public sealed record UserInfo(
 
 public sealed record UpdateProfileRequest(string FirstName, string LastName, string? PhoneNumber);
 public sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword);
+public sealed record ChangeEmailRequest(string NewEmail, string CurrentPassword);

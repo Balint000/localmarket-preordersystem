@@ -1,3 +1,4 @@
+using localmarket_preordersystem.Application.Users.ChangeMyEmail;
 using localmarket_preordersystem.Application.Users.ChangeMyPassword;
 using localmarket_preordersystem.Application.Users.GetMyProfile;
 using localmarket_preordersystem.Application.Users.UpdateMyProfile;
@@ -26,4 +27,9 @@ public class ProfileController : ControllerBase
         await handler.HandleAsync(command, ct);
         return NoContent();
     }
+
+    // Demó mód: e-mailes megerősítés nélkül, jelszóval védve.
+    [HttpPut("email")]
+    public async Task<IActionResult> ChangeEmail(ChangeMyEmailCommand command, ChangeMyEmailHandler handler, CancellationToken ct)
+        => Ok(await handler.HandleAsync(command, ct));
 }

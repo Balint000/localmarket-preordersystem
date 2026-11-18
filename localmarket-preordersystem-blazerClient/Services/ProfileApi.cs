@@ -8,4 +8,5 @@ public sealed class ProfileApi(ApiClient api)
     public Task<ApiResult<UserInfo>> GetAsync(CancellationToken ct = default) => api.GetAsync<UserInfo>("api/me", ct);
     public Task<ApiResult<UserInfo>> UpdateAsync(UpdateProfileRequest r) => api.PutAsync<UserInfo>("api/me", r, default);
     public Task<ApiResult<Unit>> ChangePasswordAsync(ChangePasswordRequest r) => api.PostAsync<Unit>("api/me/password", r);
+    public Task<ApiResult<UserInfo>> ChangeEmailAsync(ChangeEmailRequest r) => api.PutAsync<UserInfo>("api/me/email", r, default);
 }
