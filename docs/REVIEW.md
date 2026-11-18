@@ -27,10 +27,10 @@ Súlyosság: **Magas** = hibás működés vagy összeomlás, **Közepes** = ros
 
 | # | Súly | Hiba | Javítás |
 |---|---|---|---|
-| 12 | Magas | A `Products.ImageFileName` oszlop hiányzott a migrációból és a snapshotból, így friss adatbázison minden terméklekérdezés elbukott | Új migráció: `20261117090000_ProductImageAndStockPrecision` + Designer + snapshot |
+| 12 | Magas | A `Products.ImageFileName` oszlop hiányzott a migrációból és a snapshotból, így friss adatbázison minden terméklekérdezés elbukott | A #75 `SyncModel` migrációja pótolja (az én változatom ezt nem duplázza) |
 | 13 | Közepes | A `ProductStocks` oszlopai `numeric(18,2)` típusúak maradtak, az EF konfiguráció `(12,3)`/`(12,2)`-t ír elő; a modell eltért a snapshottól (EF 10-ben a `Migrate()` ilyenkor kivételt dob) | A migráció átállítja a típusokat |
-| 14 | Közepes | `CK_ProductStocks_Quantity` `> 0` volt, `CK_Payments_Amount` konfigurációja `>= 0`, a migrációval és a domainnel ellentétes | Egységesítve: készlet `>= 0`, fizetés `> 0` |
-| 15 | Közepes | A kosár és a rendelés betöltésekor az árus (`Producer`) nem töltődött be (`ThenInclude` hiányzott) | `Include` kiegészítve |
+| 14 | Közepes | A `CK_ProductStocks_Quantity` `> 0` volt, ami ellentmondott a 0 = „elfogyott” szabálynak; a `CK_Payments_Amount` konfiguráció és migráció eltért | Készlet: `>= 0` (`StockPrecision` migráció); fizetés: a #75 `SyncModel` migrációjához igazítva `>= 0` (a domain továbbra is pozitív összeget követel) |
+| 15 | Közepes | (a #75 is javította) A kosár és a rendelés betöltésekor az árus (`Producer`) nem töltődött be (`ThenInclude` hiányzott) | `Include` kiegészítve |
 | 16 | Közepes | A riportok dátumhatárait csak a „top termékek” alakította át helyi időből UTC-re, a többi UTC-nek vette; a „le nem vett rendelések” a helyi idősávot UTC-vel hasonlította | Minden riport `ToUtc`-t használ, a „most” helyi idő |
 | 17 | Alacsony | Törölt osztályra hivatkozó `modelBuilder.Ignore<…>` | Eltávolítva |
 
@@ -75,3 +75,7 @@ Lásd a README „Ismert korlátok” szakaszát (foglalás-felszabadítás vita
 * A Domain, az Application és a Blazor kliens offline lefordult hibák és figyelmeztetések nélkül.
 * A teszteket egy xUnit-kompatibilis futtatóval ellenőriztem: 49 teszteset, mind sikeres.
 * Az Infrastructure és az API csak szintaktikailag ellenőrizhető volt (az EF Core / Npgsql / JwtBearer csomagok nem voltak letölthetők), ezeknél a `dotnet build` és a `docker compose up --build` az első futtatás próbája.
+
+## Kapcsolat a #75 pull requesttel
+
+Ez a PR a `align/frontend-backend` ágra épül (#75). A #75 javításait (claim név, lapozás `PagedResponse`, `JsonException`, `CustomerOrProducer` policy, `Include`-ok, validátorok `ValidationBuilder`-re, `SyncModel` migráció, neutrális `docker-compose.override.yml`) megtartottam; erre épül minden más. Az átfedő részeknél a #75 változata maradt, a validátorokhoz hozzáadtam a hosszkorlátokat.

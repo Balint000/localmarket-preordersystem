@@ -5,7 +5,7 @@
 namespace localmarket_preordersystem.Infrastructure.Persistence.Migrations
 {
     /// <inheritdoc />
-    public partial class ProductImageAndStockPrecision : Migration
+    public partial class StockPrecision : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -13,13 +13,6 @@ namespace localmarket_preordersystem.Infrastructure.Persistence.Migrations
             migrationBuilder.DropCheckConstraint(
                 name: "CK_ProductStocks_Quantity",
                 table: "ProductStocks");
-
-            migrationBuilder.AddColumn<string>(
-                name: "ImageFileName",
-                table: "Products",
-                type: "character varying(100)",
-                maxLength: 100,
-                nullable: true);
 
             migrationBuilder.AlterColumn<decimal>(
                 name: "UnitPrice",
@@ -63,10 +56,6 @@ namespace localmarket_preordersystem.Infrastructure.Persistence.Migrations
             migrationBuilder.DropCheckConstraint(
                 name: "CK_ProductStocks_Quantity",
                 table: "ProductStocks");
-
-            migrationBuilder.DropColumn(
-                name: "ImageFileName",
-                table: "Products");
 
             migrationBuilder.AlterColumn<decimal>(
                 name: "UnitPrice",

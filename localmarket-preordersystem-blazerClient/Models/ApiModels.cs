@@ -2,6 +2,9 @@ namespace localmarket_preordersystem.Models;
 
 // Az API DTO-inak kliensoldali tükre (JSON, camelCase). Az enumok névvel utaznak (a szerver JsonStringEnumConverter-t használ).
 
+/// <summary>A lapozott végpontok burkoló válasza (api: PagedResult).</summary>
+public sealed record PagedResponse<T>(IReadOnlyList<T> Items, int Total, int Page, int PageSize, int TotalPages);
+
 public sealed record AuthResult(string Token, DateTime ExpiresAtUtc, int UserId, string Role, int? ProducerId);
 public sealed record RegisteredResult(int Id);
 
@@ -16,8 +19,6 @@ public sealed record ProductInfo(
     ProductStockInfo? NextStock, IReadOnlyList<ProductStockInfo> WeeklyStocks,
     string? ImageUrl = null);
 
-/// <summary>Az API lapozott válasza (products, orders, audit).</summary>
-public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Total, int Page, int PageSize);
 
 public sealed record PickupSlotInfo(int Id, int ProducerId, DateTime Date, TimeOnly StartTime, TimeOnly EndTime, int Capacity, int BookedCount, int FreeCapacity);
 

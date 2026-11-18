@@ -12,15 +12,15 @@ using localmarket_preordersystem.Infrastructure.Persistence.Context;
 namespace localmarket_preordersystem.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(MarketDbContext))]
-    [Migration("20261117090000_ProductImageAndStockPrecision")]
-    partial class ProductImageAndStockPrecision
+    [Migration("20261117090000_StockPrecision")]
+    partial class StockPrecision
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.14")
+                .HasAnnotation("ProductVersion", "10.0.7")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -337,7 +337,7 @@ namespace localmarket_preordersystem.Infrastructure.Persistence.Migrations
 
                     b.ToTable("Payments", null, t =>
                         {
-                            t.HasCheckConstraint("CK_Payments_Amount", "\"Amount\" > 0");
+                            t.HasCheckConstraint("CK_Payments_Amount", "\"Amount\" >= 0");
                         });
                 });
 

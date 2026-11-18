@@ -17,7 +17,7 @@ namespace localmarket_preordersystem.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.14")
+                .HasAnnotation("ProductVersion", "10.0.7")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -334,7 +334,7 @@ namespace localmarket_preordersystem.Infrastructure.Persistence.Migrations
 
                     b.ToTable("Payments", null, t =>
                         {
-                            t.HasCheckConstraint("CK_Payments_Amount", "\"Amount\" > 0");
+                            t.HasCheckConstraint("CK_Payments_Amount", "\"Amount\" >= 0");
                         });
                 });
 

@@ -56,7 +56,7 @@
 @code {
     private static readonly string[] Entities = ["Order", "Product", "Producer", "Market", "Category", "PickupSlot"];
 
-    private PagedResult<AuditLogInfo>? _page;
+    private PagedResponse<AuditLogInfo>? _page;
     private ApiProblem? _problem;
     private bool _loading = true;
     private string _entity = "";

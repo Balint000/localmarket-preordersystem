@@ -29,7 +29,7 @@ namespace localmarket_preordersystem.Application.Products.SetProductImage
                     $"A kép legfeljebb {ProductImages.MaxBytes / (1024 * 1024)} MB lehet.")
                 .ThrowIfInvalid();
 
-            var content = command.Content!; // a fenti validáció garantálja, hogy nem null és nem üres
+            var content = command.Content ?? Array.Empty<byte>(); // a validáció után sosem üres
             var extension = ProductImages.DetectExtension(content)
                 ?? throw new ValidationException(new Dictionary<string, string[]>
                 {

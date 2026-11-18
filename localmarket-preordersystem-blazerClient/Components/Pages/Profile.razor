@@ -12,7 +12,7 @@
         <div class="row g-4">
             <div class="col-lg-5">
                 <div class="lm-card">
-                    @* A backend nem ad általános profil-lekérdező végpontot, ezért a bejelentkezési token adatait mutatjuk. *@
+                    @* Az e-mail és a szerepkör a bejelentkezési tokenből jön. *@
                     <dl class="mb-0">
                         <dt>E-mail</dt><dd>@Auth.Email</dd>
                         <dt>Szerepkör</dt><dd>@Labels.Role(Auth.Role ?? "")</dd>
@@ -33,10 +33,6 @@
                             {
                                 <p class="small text-muted">Piac: <strong>@_market.Name</strong> (@_market.Address)</p>
                             }
-                            else if (!_found)
-                            {
-                                <p class="small text-muted">A jóváhagyásra váró árusok adatai még nem kérdezhetők le, ezért a mezők üresek. Mentés előtt add meg a gazdaság nevét és a standszámot.</p>
-                            }
                             <div class="mb-2"><label class="form-label" for="pr-name">Gazdaság neve</label><input id="pr-name" class="form-control" maxlength="100" @bind="_name" @bind:event="oninput" /></div>
                             <div class="mb-3"><label class="form-label" for="pr-stall">Standszám</label><input id="pr-stall" type="number" min="0" class="form-control" @bind="_stall" /></div>
                             <FormProblem Problem="_problem" />
@@ -52,20 +48,19 @@
 @code {
     private string _name = "";
     private int _stall;
-    private bool _loading, _busy, _found;
+    private bool _loading, _busy;
     private MarketInfo? _market;
     private ApiProblem? _problem;
 
     protected override async Task OnInitializedAsync()
     {
         await Auth.GetAuthenticationStateAsync();
-        if (Auth.Role != "Producer" || Auth.ProducerId is not int pid) return;
+        if (Auth.Role != "Producer") return;
         _loading = true;
-        var list = await Catalog.ProducersAsync();
-        var mine = list.Value?.FirstOrDefault(p => p.Id == pid);
+        var mine = (await Vendor.GetMineAsync()).Value;
         if (mine is not null)
         {
-            _found = true; _name = mine.Name; _stall = mine.StallNumber;
+            _name = mine.Name; _stall = mine.StallNumber;
             var markets = await Catalog.MarketsAsync();
             _market = markets.Value?.FirstOrDefault(m => m.Id == mine.MarketId);
         }
@@ -77,7 +72,7 @@
         if (_busy) return;
         _busy = true; _problem = null;
         var r = await Vendor.UpdateMineAsync(new UpdateMyProducerRequest(_name.Trim(), _stall));
-        if (r.IsSuccess) { _found = true; Toasts.Success("Adatok elmentve."); } else _problem = r.Problem;
+        if (r.IsSuccess) { Toasts.Success("Adatok elmentve."); } else _problem = r.Problem;
         _busy = false;
     }
 }

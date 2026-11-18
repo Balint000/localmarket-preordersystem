@@ -96,6 +96,7 @@ public sealed class VendorApi(ApiClient api)
     public Task<ApiResult<ProductInfo>> UpdateProductAsync(int id, UpdateProductRequest r) => api.PutAsync<ProductInfo>($"api/products/{id}", r, default);
     public Task<ApiResult<ProductInfo>> SetStockAsync(int id, StockRequest r) => api.PutAsync<ProductInfo>($"api/products/{id}/stock", r, default);
     public Task<ApiResult<PickupSlotInfo>> CreatePickupSlotAsync(CreatePickupSlotRequest r) => api.PostAsync<PickupSlotInfo>("api/pickup-slots", r);
+    public Task<ApiResult<ProducerInfo>> GetMineAsync(CancellationToken ct = default) => api.GetAsync<ProducerInfo>("api/producers/me", ct);
     public Task<ApiResult<ProducerInfo>> UpdateMineAsync(UpdateMyProducerRequest r) => api.PutAsync<ProducerInfo>("api/producers/me", r, default);
     public Task<ApiResult<ProductInfo>> SetImageAsync(int id, string fileName, string contentType, byte[] content) => api.PutFileAsync<ProductInfo>($"api/products/{id}/image", fileName, contentType, content);
     public Task<ApiResult<ProductInfo>> DeleteImageAsync(int id) => api.DeleteAsync<ProductInfo>($"api/products/{id}/image");
@@ -115,11 +116,11 @@ public sealed class AdminApi(ApiClient api)
     public Task<ApiResult<IReadOnlyList<VendorRevenueInfo>>> VendorRevenueAsync(DateTime? from, DateTime? to) => api.GetAsync<IReadOnlyList<VendorRevenueInfo>>("api/reports/vendor-revenue" + Range(from, to), default);
     public Task<ApiResult<IReadOnlyList<UnclaimedOrderInfo>>> UnclaimedAsync(DateTime? from, DateTime? to) => api.GetAsync<IReadOnlyList<UnclaimedOrderInfo>>("api/reports/unclaimed-orders" + Range(from, to), default);
 
-    public Task<ApiResult<PagedResult<AuditLogInfo>>> AuditAsync(string? entityName, int page, int pageSize = 25, CancellationToken ct = default)
+    public Task<ApiResult<PagedResponse<AuditLogInfo>>> AuditAsync(string? entityName, int page, int pageSize = 25, CancellationToken ct = default)
     {
         var q = new List<string> { "page=" + page, "pageSize=" + pageSize };
         if (!string.IsNullOrWhiteSpace(entityName)) q.Add("entityName=" + Uri.EscapeDataString(entityName.Trim()));
-        return api.GetAsync<PagedResult<AuditLogInfo>>("api/audit?" + string.Join('&', q), ct);
+        return api.GetAsync<PagedResponse<AuditLogInfo>>("api/audit?" + string.Join('&', q), ct);
     }
 
     private static string Range(DateTime? from, DateTime? to, string? extra = null)

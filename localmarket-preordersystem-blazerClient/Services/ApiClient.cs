@@ -23,27 +23,25 @@ public sealed class ApiClient(HttpClient http, AuthStateService auth)
     public Task<ApiResult<T>> PutAsync<T>(string url, object? body, CancellationToken ct = default) => SendAsync<T>(HttpMethod.Put, url, body, ct);
     public Task<ApiResult<T>> DeleteAsync<T>(string url, CancellationToken ct = default) => SendAsync<T>(HttpMethod.Delete, url, null, ct);
 
+    /// <summary>A szerver által megengedett legnagyobb oldalméret (PageRequest.PageSize: 1..100).</summary>
+    private const int MaxPageSize = 100;
+
     /// <summary>
-    /// Lapozott végpont (products, orders, audit) összes oldalának beolvasása. A lista-oldalak
-    /// kliensoldali szűrést/rendezést végeznek, ezért 100-as oldalakkal végigmegyünk az eredményen.
+    /// Lapozott végpont (<c>{ items, total, page, pageSize, totalPages }</c>) összes oldalának lekérése,
+    /// egyetlen listává összefűzve: a felület a teljes listát jeleníti meg.
     /// </summary>
     public async Task<ApiResult<IReadOnlyList<T>>> GetAllPagesAsync<T>(string url, CancellationToken ct = default)
     {
-        const int pageSize = 100;
-        const int maxPages = 200; // védelem végtelen ciklus ellen
-        var all = new List<T>();
         var separator = url.Contains('?') ? '&' : '?';
-
-        for (var page = 1; page <= maxPages; page++)
+        var items = new List<T>();
+        for (var page = 1; ; page++)
         {
-            var result = await GetAsync<PagedResult<T>>($"{url}{separator}page={page}&pageSize={pageSize}", ct);
+            var result = await GetAsync<PagedResponse<T>>($"{url}{separator}page={page}&pageSize={MaxPageSize}", ct);
             if (!result.IsSuccess) return ApiResult<IReadOnlyList<T>>.Fail(result.Problem!);
 
-            var paged = result.Value!;
-            all.AddRange(paged.Items);
-            if (paged.Items.Count == 0 || all.Count >= paged.Total) break;
+            items.AddRange(result.Value!.Items);
+            if (page >= result.Value.TotalPages) return ApiResult<IReadOnlyList<T>>.Ok(items);
         }
-        return ApiResult<IReadOnlyList<T>>.Ok(all);
     }
 
     /// <summary>Fájl feltöltése multipart/form-data kérésben (pl. termékkép), "file" mezőnévvel.</summary>
@@ -130,8 +128,7 @@ public sealed class ApiClient(HttpClient http, AuthStateService auth)
         }
         catch (JsonException)
         {
-            // pl. a szerver nem JSON-t (proxy hibaoldal) vagy váratlan alakú választ adott
-            return ApiResult<T>.Fail(new ApiProblem(ApiFailure.Server, "A szerver válasza nem értelmezhető.", null, Empty));
+            return ApiResult<T>.Fail(new ApiProblem(ApiFailure.Server, "Érvénytelen válasz érkezett a szervertől.", null, Empty));
         }
         catch (Exception ex) when (IsNetworkError(ex, ct))
         {
