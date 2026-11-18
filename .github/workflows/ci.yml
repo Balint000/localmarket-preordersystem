@@ -58,7 +58,7 @@ jobs:
       Jwt__Secret: ci-only-secret-key-with-at-least-32-characters
       Database__MigrateOnStartup: "true"
       Seed__AdminPassword: Admin123!
-      ImageStorage__RootPath: ${{ runner.temp }}/uploads
+      ImageStorage__RootPath: /tmp/lm-uploads
     steps:
       - uses: actions/checkout@v4
 
