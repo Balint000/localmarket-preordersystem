@@ -1,5 +1,6 @@
 @page "/products/{Id:int}"
 @inject CatalogApi Catalog
+@inject ApiUrls Urls
 @inject CartService Cart
 @inject AuthStateService Auth
 @inject ToastService Toasts
@@ -23,7 +24,16 @@
     {
         <div class="row g-4">
             <div class="col-md-5">
-                <div class="lm-product-img rounded @Look.Css" style="height:260px;font-size:5rem" aria-hidden="true">@Look.Emoji</div>
+                <div class="lm-product-img rounded @Look.Css" style="height:260px;font-size:5rem;overflow:hidden">
+                    @if (Urls.Image(_product.ImageUrl) is { } img)
+                    {
+                        <img class="lm-product-photo" src="@img" alt="@_product.Name" />
+                    }
+                    else
+                    {
+                        <span aria-hidden="true">@Look.Emoji</span>
+                    }
+                </div>
             </div>
             <div class="col-md-7">
                 <div class="lm-card">

@@ -21,8 +21,4 @@
       <ProjectReference Include="..\localmarket-preordersystem.Infrastructure\localmarket-preordersystem.Infrastructure.csproj" />
     </ItemGroup>
 
-    <ItemGroup>
-      <Folder Include="Controller\" />
-    </ItemGroup>
-
 </Project>

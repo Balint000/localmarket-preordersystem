@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      # A docker-compose.dcproj (Microsoft.Docker.Sdk) Linuxon nem építhető, ezért a megoldás helyett
+      # projektenként építünk: az API húzza be az Application/Infrastructure/Domain rétegeket.
+      - name: Build API
+        run: dotnet build localmarket-preordersystem.api/localmarket-preordersystem.api.csproj -c Release
+
+      - name: Build Blazor client
+        run: dotnet build localmarket-preordersystem-blazerClient/localmarket-preordersystem-blazerClient.csproj -c Release
+
+      - name: Test
+        run: dotnet test localmarket-preordersystem.Tests/localmarket-preordersystem.Tests.csproj -c Release --logger "trx;LogFileName=test-results.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: "**/test-results.trx"

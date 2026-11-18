@@ -8,6 +8,7 @@ public static class Policies
     public const string Producer = nameof(Producer);
     public const string Manager = nameof(Manager);
     public const string ProducerOrManager = nameof(ProducerOrManager);
+    public const string CustomerOrProducer = nameof(CustomerOrProducer);
 }
 
 public static class AuthorizationExtensions
@@ -18,7 +19,8 @@ public static class AuthorizationExtensions
             .AddPolicy(Policies.Customer, p => p.RequireRole(nameof(Role.Customer)))
             .AddPolicy(Policies.Producer, p => p.RequireRole(nameof(Role.Producer)))
             .AddPolicy(Policies.Manager, p => p.RequireRole(nameof(Role.Admin)))
-            .AddPolicy(Policies.ProducerOrManager, p => p.RequireRole(nameof(Role.Producer), nameof(Role.Admin)));
+            .AddPolicy(Policies.ProducerOrManager, p => p.RequireRole(nameof(Role.Producer), nameof(Role.Admin)))
+            .AddPolicy(Policies.CustomerOrProducer, p => p.RequireRole(nameof(Role.Customer), nameof(Role.Producer)));
         return services;
     }
 }

@@ -34,6 +34,19 @@ namespace localmarket_preordersystem.Application.Users.RegisterCustomer
             if (string.IsNullOrWhiteSpace(command.Password) || command.Password.Length < 8)
                 AddError(nameof(command.Password), "A jelszónak legalább 8 karakter hosszúnak kell lennie.");
 
+            void CheckMax(string field, string? value, int max)
+            {
+                if (value is not null && value.Trim().Length > max)
+                    AddError(field, $"Legfeljebb {max} karakter lehet.");
+            }
+
+            CheckMax(nameof(command.FirstName), command.FirstName, 100);
+            CheckMax(nameof(command.LastName), command.LastName, 100);
+            CheckMax(nameof(command.Email), command.Email, 320);
+            CheckMax(nameof(command.PhoneNumber), command.PhoneNumber, 30);
+            if (command.Password is { Length: > 128 })
+                AddError(nameof(command.Password), "A jelszó legfeljebb 128 karakter lehet.");
+
             if (errors.Count > 0)
                 throw new ValidationException(errors.ToDictionary(e => e.Key, e => e.Value.ToArray()));
         }

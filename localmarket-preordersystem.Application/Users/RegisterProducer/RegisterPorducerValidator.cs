@@ -36,6 +36,20 @@ namespace localmarket_preordersystem.Application.Users.RegisterProducer
             if (command.StallNumber < 0)
                 AddError(nameof(command.StallNumber), "A standszám nem lehet negatív.");
 
+            void CheckMax(string field, string? value, int max)
+            {
+                if (value is not null && value.Trim().Length > max)
+                    AddError(field, $"Legfeljebb {max} karakter lehet.");
+            }
+
+            CheckMax(nameof(command.FirstName), command.FirstName, 100);
+            CheckMax(nameof(command.LastName), command.LastName, 100);
+            CheckMax(nameof(command.Email), command.Email, 320);
+            CheckMax(nameof(command.PhoneNumber), command.PhoneNumber, 30);
+            if (command.Password is { Length: > 128 })
+                AddError(nameof(command.Password), "A jelszó legfeljebb 128 karakter lehet.");
+            CheckMax(nameof(command.ProducerName), command.ProducerName, 200);
+
             if (errors.Count > 0)
                 throw new ValidationException(errors.ToDictionary(e => e.Key, e => e.Value.ToArray()));
         }

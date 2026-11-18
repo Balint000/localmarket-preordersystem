@@ -7,12 +7,17 @@ public sealed record RegisteredResult(int Id);
 
 public sealed record MarketInfo(int Id, string Name, string Address, bool IsActive, double? Latitude, double? Longitude, IReadOnlyList<string> OpeningDays);
 public sealed record CategoryInfo(int Id, string Name, string Description);
+public sealed record AuditLogInfo(int Id, int? UserId, string Action, string EntityName, int EntityId, string? OldValue, string? NewValue, DateTime CreatedAt);
 
 public sealed record ProductStockInfo(DateTime WeekStartDate, decimal Quantity, decimal ReservedQuantity, decimal AvailableQuantity, string Unit, decimal UnitPrice);
 public sealed record ProductInfo(
     int Id, int ProducerId, string? ProducerName, string Name, string Description,
     IReadOnlyList<CategoryInfo> Categories, IReadOnlyList<string> Allergies,
-    ProductStockInfo? NextStock, IReadOnlyList<ProductStockInfo> WeeklyStocks);
+    ProductStockInfo? NextStock, IReadOnlyList<ProductStockInfo> WeeklyStocks,
+    string? ImageUrl = null);
+
+/// <summary>Az API lapozott válasza (products, orders, audit).</summary>
+public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Total, int Page, int PageSize);
 
 public sealed record PickupSlotInfo(int Id, int ProducerId, DateTime Date, TimeOnly StartTime, TimeOnly EndTime, int Capacity, int BookedCount, int FreeCapacity);
 

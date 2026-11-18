@@ -3,6 +3,7 @@
 @attribute [Authorize(Roles = "Producer")]
 @inject CatalogApi Catalog
 @inject VendorApi Vendor
+@inject ApiUrls Urls
 @inject ToastService Toasts
 @inject NavigationManager Navigation
 
@@ -53,6 +54,28 @@
                         <FormProblem Problem="_saveProblem" />
                         <SubmitButton Busy="_busy" Disabled="string.IsNullOrWhiteSpace(_name) || _selectedCategories.Count == 0" CssClass="btn-primary" OnClick="SaveAsync">@(Id is null ? "Meghirdetés" : "Mentés")</SubmitButton>
                     </div>
+
+                    @if (Id is not null)
+                    {
+                        <div class="lm-card mt-3">
+                            <h2 class="h6">Termékkép</h2>
+                            @if (Urls.Image(_imageUrl) is { } preview)
+                            {
+                                <img class="lm-image-preview mb-2" src="@preview" alt="A termék jelenlegi képe" />
+                            }
+                            else
+                            {
+                                <p class="small text-muted">Még nincs feltöltött kép.</p>
+                            }
+                            <label class="form-label" for="p-image">Kép feltöltése (JPEG, PNG vagy WebP, legfeljebb 2 MB)</label>
+                            <InputFile id="p-image" class="form-control mb-2" accept="image/jpeg,image/png,image/webp" OnChange="UploadImageAsync" disabled="@_imageBusy" />
+                            @if (_imageUrl is not null)
+                            {
+                                <button type="button" class="btn btn-outline-danger btn-sm" disabled="@_imageBusy" @onclick="DeleteImageAsync">Kép törlése</button>
+                            }
+                            <FormProblem Problem="_imageProblem" />
+                        </div>
+                    }
                 </div>
 
                 @if (Id is not null)
@@ -112,8 +135,10 @@
     private readonly HashSet<string> _selectedAllergies = new();
     private string _name = "", _description = "", _unit = "Kilogram", _qty = "", _price = "";
     private DateTime _week = DateTime.Today;
-    private ApiProblem? _problem, _saveProblem, _stockProblem;
-    private bool _loading = true, _busy, _stockBusy;
+    private ApiProblem? _problem, _saveProblem, _stockProblem, _imageProblem;
+    private bool _loading = true, _busy, _stockBusy, _imageBusy;
+    private string? _imageUrl;
+    private const long MaxImageBytes = 2 * 1024 * 1024;
 
     protected override async Task OnParametersSetAsync() => await LoadAsync();
 
@@ -124,7 +149,7 @@
         if (!cats.IsSuccess) { _problem = cats.Problem; _loading = false; return; }
         _categories = cats.Value!;
 
-        _name = _description = ""; _selectedCategories.Clear(); _selectedAllergies.Clear(); _stocks = [];
+        _name = _description = ""; _selectedCategories.Clear(); _selectedAllergies.Clear(); _stocks = []; _imageUrl = null;
         if (Id is int id)
         {
             var r = await Catalog.ProductAsync(id);
@@ -140,7 +165,46 @@
         _selectedCategories.Clear(); foreach (var c in p.Categories) _selectedCategories.Add(c.Id);
         _selectedAllergies.Clear(); foreach (var a in p.Allergies) _selectedAllergies.Add(a);
         _stocks = p.WeeklyStocks;
+        _imageUrl = p.ImageUrl;
         if (p.NextStock is { } s) _unit = s.Unit;
+    }
+
+    private async Task UploadImageAsync(InputFileChangeEventArgs e)
+    {
+        if (_imageBusy || Id is not int id) return;
+        _imageBusy = true; _imageProblem = null;
+        try
+        {
+            var file = e.File;
+            if (file.Size > MaxImageBytes)
+            {
+                _imageProblem = new ApiProblem(ApiFailure.Validation, "Túl nagy kép", "A kép legfeljebb 2 MB lehet.", new Dictionary<string, string[]>());
+                return;
+            }
+
+            await using var stream = file.OpenReadStream(MaxImageBytes);
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer);
+
+            var r = await Vendor.SetImageAsync(id, file.Name, file.ContentType, buffer.ToArray());
+            if (r.IsSuccess) { _imageUrl = r.Value!.ImageUrl; Toasts.Success("Kép elmentve."); }
+            else _imageProblem = r.Problem;
+        }
+        catch (IOException)
+        {
+            _imageProblem = new ApiProblem(ApiFailure.Validation, "A fájl nem olvasható", "A fájl nem olvasható, vagy túl nagy (legfeljebb 2 MB).", new Dictionary<string, string[]>());
+        }
+        finally { _imageBusy = false; }
+    }
+
+    private async Task DeleteImageAsync()
+    {
+        if (_imageBusy || Id is not int id) return;
+        _imageBusy = true; _imageProblem = null;
+        var r = await Vendor.DeleteImageAsync(id);
+        if (r.IsSuccess) { _imageUrl = r.Value!.ImageUrl; Toasts.Success("Kép törölve."); }
+        else _imageProblem = r.Problem;
+        _imageBusy = false;
     }
 
     private static void Toggle<T>(HashSet<T> set, T item, bool on) { if (on) set.Add(item); else set.Remove(item); }

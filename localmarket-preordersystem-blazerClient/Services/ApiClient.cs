@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using localmarket_preordersystem.Models;
 
 namespace localmarket_preordersystem.Services;
 
@@ -21,6 +22,67 @@ public sealed class ApiClient(HttpClient http, AuthStateService auth)
     public Task<ApiResult<T>> PostAsync<T>(string url, object? body = null, CancellationToken ct = default) => SendAsync<T>(HttpMethod.Post, url, body, ct);
     public Task<ApiResult<T>> PutAsync<T>(string url, object? body, CancellationToken ct = default) => SendAsync<T>(HttpMethod.Put, url, body, ct);
     public Task<ApiResult<T>> DeleteAsync<T>(string url, CancellationToken ct = default) => SendAsync<T>(HttpMethod.Delete, url, null, ct);
+
+    /// <summary>
+    /// Lapozott végpont (products, orders, audit) összes oldalának beolvasása. A lista-oldalak
+    /// kliensoldali szűrést/rendezést végeznek, ezért 100-as oldalakkal végigmegyünk az eredményen.
+    /// </summary>
+    public async Task<ApiResult<IReadOnlyList<T>>> GetAllPagesAsync<T>(string url, CancellationToken ct = default)
+    {
+        const int pageSize = 100;
+        const int maxPages = 200; // védelem végtelen ciklus ellen
+        var all = new List<T>();
+        var separator = url.Contains('?') ? '&' : '?';
+
+        for (var page = 1; page <= maxPages; page++)
+        {
+            var result = await GetAsync<PagedResult<T>>($"{url}{separator}page={page}&pageSize={pageSize}", ct);
+            if (!result.IsSuccess) return ApiResult<IReadOnlyList<T>>.Fail(result.Problem!);
+
+            var paged = result.Value!;
+            all.AddRange(paged.Items);
+            if (paged.Items.Count == 0 || all.Count >= paged.Total) break;
+        }
+        return ApiResult<IReadOnlyList<T>>.Ok(all);
+    }
+
+    /// <summary>Fájl feltöltése multipart/form-data kérésben (pl. termékkép), "file" mezőnévvel.</summary>
+    public async Task<ApiResult<T>> PutFileAsync<T>(string url, string fileName, string contentType, byte[] content, CancellationToken ct = default)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Put, url);
+            if (auth.Token is { } token)
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            var file = new ByteArrayContent(content);
+            file.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+            var form = new MultipartFormDataContent { { file, "file", fileName } };
+            request.Content = form;
+
+            using var response = await http.SendAsync(request, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                var problem = await ToProblemAsync(response, ct);
+                if (problem.Kind == ApiFailure.Unauthorized && auth.IsAuthenticated)
+                    await auth.SignOutAsync(expired: true);
+                return ApiResult<T>.Fail(problem);
+            }
+
+            var value = await response.Content.ReadFromJsonAsync<T>(Json, ct);
+            return value is null
+                ? ApiResult<T>.Fail(new ApiProblem(ApiFailure.Server, "Üres válasz érkezett a szervertől.", null, Empty))
+                : ApiResult<T>.Ok(value);
+        }
+        catch (JsonException)
+        {
+            return ApiResult<T>.Fail(new ApiProblem(ApiFailure.Server, "A szerver válasza nem értelmezhető.", null, Empty));
+        }
+        catch (Exception ex) when (IsNetworkError(ex, ct))
+        {
+            return ApiResult<T>.Fail(NetworkProblem(ex));
+        }
+    }
 
     /// <summary>Fájl (export) letöltése bájtokként.</summary>
     public async Task<ApiResult<DownloadedFile>> GetFileAsync(string url, CancellationToken ct = default)
@@ -65,6 +127,11 @@ public sealed class ApiClient(HttpClient http, AuthStateService auth)
             return value is null
                 ? ApiResult<T>.Fail(new ApiProblem(ApiFailure.Server, "Üres válasz érkezett a szervertől.", null, Empty))
                 : ApiResult<T>.Ok(value);
+        }
+        catch (JsonException)
+        {
+            // pl. a szerver nem JSON-t (proxy hibaoldal) vagy váratlan alakú választ adott
+            return ApiResult<T>.Fail(new ApiProblem(ApiFailure.Server, "A szerver válasza nem értelmezhető.", null, Empty));
         }
         catch (Exception ex) when (IsNetworkError(ex, ct))
         {
