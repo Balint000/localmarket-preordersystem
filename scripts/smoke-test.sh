@@ -29,8 +29,8 @@ expect() { # expect STATUS LEIRAS
   echo "ok  $2"
 }
 
-login() { req POST /api/auth/login "" "{\"email\":\"$1\",\"password\":\"$2\"}"; expect 200 "bejelentkezés: $1"; echo "$BODY" | jq -r .token; }
-order_status() { req GET "/api/orders/$2" "$1"; expect 200 "rendelés lekérése #$2"; echo "$BODY" | jq -r .status; }
+login() { req POST /api/auth/login "" "{\"email\":\"$1\",\"password\":\"$2\"}"; expect 200 "bejelentkezés: $1" >&2; echo "$BODY" | jq -r .token; }
+order_status() { req GET "/api/orders/$2" "$1"; expect 200 "rendelés lekérése #$2" >&2; echo "$BODY" | jq -r .status; }
 assert_eq() { if [[ "$1" != "$2" ]]; then echo "HIBA: $3 (várt: $2, kapott: $1)"; exit 1; fi; echo "ok  $3"; }
 
 echo "== Egészség és alapadatok"
