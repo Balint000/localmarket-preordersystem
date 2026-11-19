@@ -1,5 +1,6 @@
 using localmarket_preordersystem.Components;
 using localmarket_preordersystem.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,6 +11,7 @@ builder.Services.AddRazorComponents()
 // hitelesítési állapot: egy közös szolgáltatás, amit az AuthenticationStateProvider is használ
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddAuthorizationCore();
+builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, PassThroughAuthorizationHandler>();
 builder.Services.AddScoped<AuthStateService>();
 builder.Services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredService<AuthStateService>());
 
@@ -33,6 +35,7 @@ builder.Services.AddHttpClient<ApiClient>(client =>
 builder.Services.AddScoped<ToastService>();
 builder.Services.AddScoped<FileDownloader>();
 builder.Services.AddScoped<AuthApi>();
+builder.Services.AddScoped<ProfileApi>();
 builder.Services.AddScoped<CatalogApi>();
 builder.Services.AddScoped<CartService>();
 builder.Services.AddScoped<OrdersApi>();

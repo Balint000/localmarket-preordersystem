@@ -3,32 +3,75 @@
 @inject AuthStateService Auth
 @inject CatalogApi Catalog
 @inject VendorApi Vendor
+@inject ProfileApi ProfileClient
+@inject CartService Cart
+@inject NavigationManager Navigation
 @inject ToastService Toasts
 
 <PageTitle>Profil – LocalMarket</PageTitle>
 
-<PageContainer Title="Profilom">
+<PageContainer Title="Profilom" Subtitle="Személyes adatok és biztonság">
     <ChildContent>
-        <div class="row g-4">
-            <div class="col-lg-5">
-                <div class="lm-card">
-                    @* Az e-mail és a szerepkör a bejelentkezési tokenből jön. *@
-                    <dl class="mb-0">
-                        <dt>E-mail</dt><dd>@Auth.Email</dd>
-                        <dt>Szerepkör</dt><dd>@Labels.Role(Auth.Role ?? "")</dd>
-                        @if (Auth.ProducerId is { } pid) { <dt>Árus azonosító</dt><dd>@pid</dd> }
-                    </dl>
-                </div>
-            </div>
+        @if (_loading) { <LoadingIndicator /> }
+        else
+        {
+            <div class="alert alert-info small" role="note">Demó mód: a módosítások azonnal érvénybe lépnek, e-mailes megerősítés nincs.</div>
 
-            @if (Auth.Role == "Producer")
-            {
-                <div class="col-lg-7">
+            <div class="row g-4">
+                <div class="col-lg-6">
                     <div class="lm-card">
-                        <h2 class="h6">Gazdaság adatai</h2>
-                        @if (_loading) { <LoadingIndicator /> }
-                        else
-                        {
+                        <h2 class="h6">Személyes adatok</h2>
+                        <dl class="small text-muted mb-3">
+                            <dt>E-mail</dt><dd>@(_me?.Email ?? Auth.Email)</dd>
+                            <dt>Szerepkör</dt><dd>@Labels.Role(Auth.Role ?? "")</dd>
+                            @if (_me is not null)
+                            {
+                                <dt>Regisztráció dátuma</dt><dd>@Labels.Date(_me.CreatedAt)</dd>
+                            }
+                            @if (_me?.ProducerStatus is { } status)
+                            {
+                                <dt>Árus státusz</dt><dd><span class="lm-badge @Labels.ProducerStatusClass(status)">@Labels.ProducerStatus(status)</span></dd>
+                            }
+                        </dl>
+                        <div class="mb-2"><label class="form-label" for="pf-last">Vezetéknév</label><input id="pf-last" class="form-control" maxlength="100" @bind="_lastName" @bind:event="oninput" /></div>
+                        <div class="mb-2"><label class="form-label" for="pf-first">Keresztnév</label><input id="pf-first" class="form-control" maxlength="100" @bind="_firstName" @bind:event="oninput" /></div>
+                        <div class="mb-3"><label class="form-label" for="pf-phone">Telefonszám</label><input id="pf-phone" type="tel" class="form-control" maxlength="30" @bind="_phone" @bind:event="oninput" autocomplete="tel" /></div>
+                        <FormProblem Problem="_profileProblem" />
+                        <SubmitButton Busy="_profileBusy" Disabled="@(string.IsNullOrWhiteSpace(_firstName) || string.IsNullOrWhiteSpace(_lastName))" CssClass="btn-primary" OnClick="SaveProfileAsync">Mentés</SubmitButton>
+                    </div>
+                </div>
+
+                <div class="col-lg-6">
+                    <div class="lm-card">
+                        <h2 class="h6">Jelszó módosítása</h2>
+                        <div class="mb-2"><label class="form-label" for="pw-cur">Jelenlegi jelszó</label><input id="pw-cur" type="@PwType" class="form-control" @bind="_currentPw" @bind:event="oninput" autocomplete="current-password" /></div>
+                        <div class="mb-2"><label class="form-label" for="pw-new">Új jelszó (legalább 8 karakter)</label><input id="pw-new" type="@PwType" class="form-control" @bind="_newPw" @bind:event="oninput" autocomplete="new-password" /></div>
+                        @if (_newPw.Length > 0) { <div class="small mb-2">Jelszóerősség: <strong>@Strength()</strong></div> }
+                        <div class="mb-2"><label class="form-label" for="pw-conf">Új jelszó újra</label><input id="pw-conf" type="@PwType" class="form-control" @bind="_confirmPw" @bind:event="oninput" autocomplete="new-password" /></div>
+                        <div class="form-check mb-3"><input id="pw-show" type="checkbox" class="form-check-input" @bind="_showPw" /><label class="form-check-label small" for="pw-show">Jelszó mutatása</label></div>
+                        @if (_pwMessage is not null) { <div class="text-danger small mb-2" role="alert">@_pwMessage</div> }
+                        <FormProblem Problem="_pwProblem" />
+                        <SubmitButton Busy="_pwBusy" Disabled="@(string.IsNullOrEmpty(_currentPw) || string.IsNullOrEmpty(_newPw))" CssClass="btn-primary" OnClick="ChangePasswordAsync">Jelszó módosítása</SubmitButton>
+                    </div>
+                </div>
+
+                <div class="col-lg-6">
+                    <div class="lm-card">
+                        <h2 class="h6">E-mail cím módosítása</h2>
+                        <p class="small text-muted">A módosítás után újra be kell jelentkezned az új címmel.</p>
+                        <div class="mb-2"><label class="form-label" for="em-new">Új e-mail cím</label><input id="em-new" type="email" class="form-control" maxlength="320" @bind="_newEmail" @bind:event="oninput" autocomplete="email" /></div>
+                        <div class="mb-3"><label class="form-label" for="em-pw">Jelenlegi jelszó</label><input id="em-pw" type="password" class="form-control" @bind="_emailPw" @bind:event="oninput" autocomplete="current-password" /></div>
+                        @if (_emailMessage is not null) { <div class="text-danger small mb-2" role="alert">@_emailMessage</div> }
+                        <FormProblem Problem="_emailProblem" />
+                        <SubmitButton Busy="_emailBusy" Disabled="@(string.IsNullOrWhiteSpace(_newEmail) || string.IsNullOrEmpty(_emailPw))" CssClass="btn-primary" OnClick="ChangeEmailAsync">E-mail módosítása</SubmitButton>
+                    </div>
+                </div>
+
+                @if (Auth.Role == "Producer")
+                {
+                    <div class="col-lg-6">
+                        <div class="lm-card">
+                            <h2 class="h6">Gazdaság adatai</h2>
                             @if (_market is not null)
                             {
                                 <p class="small text-muted">Piac: <strong>@_market.Name</strong> (@_market.Address)</p>
@@ -37,34 +80,106 @@
                             <div class="mb-3"><label class="form-label" for="pr-stall">Standszám</label><input id="pr-stall" type="number" min="0" class="form-control" @bind="_stall" /></div>
                             <FormProblem Problem="_problem" />
                             <SubmitButton Busy="_busy" Disabled="string.IsNullOrWhiteSpace(_name)" CssClass="btn-primary" OnClick="SaveAsync">Mentés</SubmitButton>
-                        }
+                        </div>
                     </div>
-                </div>
-            }
-        </div>
+                }
+            </div>
+        }
     </ChildContent>
 </PageContainer>
 
 @code {
+    private UserInfo? _me;
+    private string _firstName = "", _lastName = "", _phone = "";
+    private string _currentPw = "", _newPw = "", _confirmPw = "";
+    private string _newEmail = "", _emailPw = "";
+    private string? _pwMessage, _emailMessage;
     private string _name = "";
     private int _stall;
-    private bool _loading, _busy;
+    private bool _loading = true, _busy, _profileBusy, _pwBusy, _emailBusy, _showPw;
     private MarketInfo? _market;
-    private ApiProblem? _problem;
+    private ApiProblem? _problem, _profileProblem, _pwProblem, _emailProblem;
+
+    private string PwType => _showPw ? "text" : "password";
 
     protected override async Task OnInitializedAsync()
     {
         await Auth.GetAuthenticationStateAsync();
-        if (Auth.Role != "Producer") return;
-        _loading = true;
-        var mine = (await Vendor.GetMineAsync()).Value;
-        if (mine is not null)
+
+        _me = (await ProfileClient.GetAsync()).Value;
+        if (_me is not null) { _firstName = _me.FirstName; _lastName = _me.LastName; _phone = _me.PhoneNumber; }
+
+        if (Auth.Role == "Producer")
         {
-            _name = mine.Name; _stall = mine.StallNumber;
-            var markets = await Catalog.MarketsAsync();
-            _market = markets.Value?.FirstOrDefault(m => m.Id == mine.MarketId);
+            var mine = (await Vendor.GetMineAsync()).Value;
+            if (mine is not null)
+            {
+                _name = mine.Name; _stall = mine.StallNumber;
+                var markets = await Catalog.MarketsAsync();
+                _market = markets.Value?.FirstOrDefault(m => m.Id == mine.MarketId);
+            }
         }
         _loading = false;
+    }
+
+    // egyszerű jelző: hossz + karakterfajták száma (nem biztonsági ellenőrzés)
+    private string Strength()
+    {
+        var kinds = 0;
+        if (_newPw.Any(char.IsLower)) kinds++;
+        if (_newPw.Any(char.IsUpper)) kinds++;
+        if (_newPw.Any(char.IsDigit)) kinds++;
+        if (_newPw.Any(c => !char.IsLetterOrDigit(c))) kinds++;
+        if (_newPw.Length < 8) return "túl rövid";
+        return (_newPw.Length >= 12 && kinds >= 3) || kinds == 4 ? "erős" : kinds >= 2 ? "közepes" : "gyenge";
+    }
+
+    private async Task SaveProfileAsync()
+    {
+        if (_profileBusy) return;
+        _profileBusy = true; _profileProblem = null;
+        var r = await ProfileClient.UpdateAsync(new UpdateProfileRequest(_firstName.Trim(), _lastName.Trim(), _phone.Trim()));
+        if (r.IsSuccess) Toasts.Success("Személyes adatok elmentve."); else _profileProblem = r.Problem;
+        _profileBusy = false;
+    }
+
+    private async Task ChangePasswordAsync()
+    {
+        if (_pwBusy) return;
+        _pwMessage = null; _pwProblem = null;
+        if (_newPw.Length < 8) { _pwMessage = "Az új jelszónak legalább 8 karakter hosszúnak kell lennie."; return; }
+        if (_newPw != _confirmPw) { _pwMessage = "A két új jelszó nem egyezik."; return; }
+
+        _pwBusy = true;
+        var r = await ProfileClient.ChangePasswordAsync(new ChangePasswordRequest(_currentPw, _newPw));
+        if (r.IsSuccess)
+        {
+            Toasts.Success("A jelszó megváltozott.");
+            _currentPw = _newPw = _confirmPw = "";
+        }
+        else _pwProblem = r.Problem;
+        _pwBusy = false;
+    }
+
+    private async Task ChangeEmailAsync()
+    {
+        if (_emailBusy) return;
+        _emailMessage = null; _emailProblem = null;
+        if (!_newEmail.Contains('@')) { _emailMessage = "Érvénytelen e-mail cím formátum."; return; }
+
+        _emailBusy = true;
+        var r = await ProfileClient.ChangeEmailAsync(new ChangeEmailRequest(_newEmail.Trim(), _emailPw));
+        if (r.IsSuccess)
+        {
+            // az e-mail a tokenben van, ezért új bejelentkezés kell
+            Toasts.Success("Az e-mail cím megváltozott, jelentkezz be újra.");
+            await Auth.SignOutAsync();
+            Cart.Reset();
+            Navigation.NavigateTo("login");
+            return;
+        }
+        _emailProblem = r.Problem;
+        _emailBusy = false;
     }
 
     private async Task SaveAsync()

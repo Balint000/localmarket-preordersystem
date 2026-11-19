@@ -61,6 +61,9 @@ public static class DatabaseInitializer
         }
 
         await db.SaveChangesAsync();
+
+        if (app.Environment.IsDevelopment())
+            await DemoDataSeeder.SeedAsync(db, hasher, ResolvePassword(cfg, "Seed:CustomerPassword", "Customer123!", app.Environment));
     }
 
     private static string ResolvePassword(IConfiguration cfg, string key, string devDefault, IHostEnvironment env)
