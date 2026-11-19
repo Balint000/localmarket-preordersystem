@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      # A docker-compose.dcproj (Microsoft.Docker.Sdk) Linuxon nem építhető, ezért a megoldás helyett
+      # projektenként építünk: az API húzza be az Application/Infrastructure/Domain rétegeket.
+      - name: Build API
+        run: dotnet build localmarket-preordersystem.api/localmarket-preordersystem.api.csproj -c Release
+
+      - name: Build Blazor client
+        run: dotnet build localmarket-preordersystem-blazerClient/localmarket-preordersystem-blazerClient.csproj -c Release
+
+      - name: Test
+        run: dotnet test localmarket-preordersystem.Tests/localmarket-preordersystem.Tests.csproj -c Release --logger "trx;LogFileName=test-results.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: "**/test-results.trx"
+
+  # Valódi PostgreSQL-lel elindítja az API-t (migrációk + seed), és végigviszi a teljes üzleti folyamatot.
+  integration-smoke:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: localmarket
+          POSTGRES_USER: localmarket
+          POSTGRES_PASSWORD: ci-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U localmarket -d localmarket"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://localhost:5205
+      ConnectionStrings__DefaultConnection: Host=localhost;Port=5432;Database=localmarket;Username=localmarket;Password=ci-password
+      Jwt__Secret: ci-only-secret-key-with-at-least-32-characters
+      Database__MigrateOnStartup: "true"
+      Seed__AdminPassword: Admin123!
+      ImageStorage__RootPath: /tmp/lm-uploads
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Start API
+        run: |
+          dotnet run --project localmarket-preordersystem.api/localmarket-preordersystem.api.csproj -c Release --no-launch-profile > "$RUNNER_TEMP/api.log" 2>&1 &
+          for i in $(seq 1 90); do
+            if curl -fsS http://localhost:5205/health > /dev/null 2>&1; then echo "API fut"; exit 0; fi
+            sleep 2
+          done
+          echo "Az API nem indult el:"; cat "$RUNNER_TEMP/api.log"; exit 1
+
+      - name: Smoke test
+        run: scripts/smoke-test.sh http://localhost:5205
+
+      - name: API log
+        if: always()
+        run: tail -n 200 "$RUNNER_TEMP/api.log" || true

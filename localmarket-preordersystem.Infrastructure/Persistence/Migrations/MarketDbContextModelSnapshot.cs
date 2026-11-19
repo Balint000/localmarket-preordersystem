@@ -17,7 +17,7 @@ namespace localmarket_preordersystem.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.14")
+                .HasAnnotation("ProductVersion", "10.0.7")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -334,7 +334,7 @@ namespace localmarket_preordersystem.Infrastructure.Persistence.Migrations
 
                     b.ToTable("Payments", null, t =>
                         {
-                            t.HasCheckConstraint("CK_Payments_Amount", "\"Amount\" > 0");
+                            t.HasCheckConstraint("CK_Payments_Amount", "\"Amount\" >= 0");
                         });
                 });
 
@@ -437,6 +437,10 @@ namespace localmarket_preordersystem.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("ImageFileName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -473,10 +477,10 @@ namespace localmarket_preordersystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer");
 
                     b.Property<decimal>("Quantity")
-                        .HasColumnType("decimal(18,2)");
+                        .HasColumnType("numeric(12,3)");
 
                     b.Property<decimal>("ReservedQuantity")
-                        .HasColumnType("decimal(18,2)");
+                        .HasColumnType("numeric(12,3)");
 
                     b.Property<string>("Unit")
                         .IsRequired()
@@ -484,7 +488,7 @@ namespace localmarket_preordersystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(30)");
 
                     b.Property<decimal>("UnitPrice")
-                        .HasColumnType("decimal(18,2)");
+                        .HasColumnType("numeric(12,2)");
 
                     b.Property<DateTime>("WeekStartDate")
                         .HasColumnType("date");
@@ -502,7 +506,7 @@ namespace localmarket_preordersystem.Infrastructure.Persistence.Migrations
 
                     b.ToTable("ProductStocks", null, t =>
                         {
-                            t.HasCheckConstraint("CK_ProductStocks_Quantity", "\"Quantity\" > 0");
+                            t.HasCheckConstraint("CK_ProductStocks_Quantity", "\"Quantity\" >= 0");
 
                             t.HasCheckConstraint("CK_ProductStocks_Reserved", "\"ReservedQuantity\" >= 0 AND \"ReservedQuantity\" <= \"Quantity\"");
                         });

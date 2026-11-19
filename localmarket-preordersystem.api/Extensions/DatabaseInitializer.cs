@@ -18,7 +18,6 @@ public static class DatabaseInitializer
 
         if (db.Database.GetMigrations().Any())
             await db.Database.MigrateAsync();
-      
         else if (app.Environment.IsDevelopment())
         {
             log.LogWarning("Nincs EF migráció, EnsureCreated fut (csak Development).");
@@ -34,12 +33,24 @@ public static class DatabaseInitializer
             db.Markets.Add(market);
         }
 
+        if (!await db.Categories.AnyAsync())
+        {
+            db.Categories.AddRange(
+                Category.Create("Zöldség", "Friss, helyi zöldségek"),
+                Category.Create("Gyümölcs", "Szezonális gyümölcsök"),
+                Category.Create("Pékáru", "Kenyér, péksütemények"),
+                Category.Create("Tejtermék", "Sajtok, tejföl, joghurt"),
+                Category.Create("Hús és felvágott", "Helyi termelők húskészítményei"),
+                Category.Create("Méz és lekvár", "Méz, lekvárok, szörpök"),
+                Category.Create("Italok", "Házi üdítők, borok, pálinkák"));
+        }
+
         var hasher = sp.GetRequiredService<IPasswordHasher>();
 
         if (!await db.Users.AnyAsync(u => u.Role == Role.Admin))
         {
             db.Users.Add(User.Register("Piac", "Vezető", "admin@localmarket.test",
-                hasher.Hash(cfg["Seed:AdminPassword"] ?? "Admin123!"), Role.Admin, "+3612345678"));
+                hasher.Hash(ResolvePassword(cfg, "Seed:AdminPassword", "Admin123!", app.Environment)), Role.Admin, "+3612345678"));
         }
 
         if (app.Environment.IsDevelopment() && !await db.Users.AnyAsync(u => u.Email == "vevo@localmarket.test"))

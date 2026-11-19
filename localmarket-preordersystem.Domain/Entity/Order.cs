@@ -160,6 +160,8 @@ namespace localmarket_preordersystem.Domain.Entity
 
         public IReadOnlyList<ReservedItem> Cancel()
         {
+            // a vitatott rendelésről kizárólag a piacvezető dönt (ResolveDisputeAsCancelled / AsPickedUp)
+            EnsureNotDisputed();
             var held = GetHeldReservations();
             Transition(OrderStatus.Cancelled);
             if (Payment is { Status: PaymentStatus.Pending or PaymentStatus.Error })
@@ -171,6 +173,7 @@ namespace localmarket_preordersystem.Domain.Entity
 
         public void MarkPickedUp()
         {
+            EnsureNotDisputed();
             Transition(OrderStatus.PickedUp);
             if (Payment is { Status: PaymentStatus.Pending })
                 Payment.MarkCompleted();
@@ -193,6 +196,9 @@ namespace localmarket_preordersystem.Domain.Entity
                 throw new DomainException("Csak vitatott rendelés zárható le.");
             Transition(OrderStatus.PickedUp);
             DisputeNote = AppendNote(note);
+            // a függőben maradt fizetés az átvétellel teljesítettnek számít (mint a MarkPickedUp-nál)
+            if (Payment is { Status: PaymentStatus.Pending })
+                Payment.MarkCompleted();
         }
 
         /// <summary>Piacvezetői döntés: a vitatott rendelés lemondásra kerül.</summary>
@@ -210,6 +216,12 @@ namespace localmarket_preordersystem.Domain.Entity
 
         private string AppendNote(string note) =>
             string.IsNullOrWhiteSpace(note) ? DisputeNote ?? string.Empty : $"{DisputeNote} | Döntés: {note.Trim()}";
+
+        private void EnsureNotDisputed()
+        {
+            if (Status == OrderStatus.Disputed)
+                throw new DomainException("A vitatott rendelésről a piacvezető dönt; a rendelés más módon nem zárható le.");
+        }
 
         private void EnsureCanMoveTo(OrderStatus target)
         {

@@ -12,7 +12,7 @@
         <div class="row g-4">
             <div class="col-lg-4">
                 <div class="lm-card">
-                    <h2 class="h6">Új időpont</h2>
+                    <h2 class="h6">@(_editId is null ? "Új időpont" : "Időpont szerkesztése")</h2>
                     <div class="mb-2"><label class="form-label" for="sl-date">Nap</label><input id="sl-date" type="date" class="form-control" @bind="_date" /></div>
                     <div class="row g-2 mb-2">
                         <div class="col"><label class="form-label" for="sl-from">Kezdés</label><input id="sl-from" type="time" class="form-control" @bind="_from" /></div>
@@ -20,7 +20,8 @@
                     </div>
                     <div class="mb-3"><label class="form-label" for="sl-cap">Kapacitás (rendelések száma)</label><input id="sl-cap" type="number" min="1" class="form-control" @bind="_capacity" /></div>
                     <FormProblem Problem="_createProblem" />
-                    <SubmitButton Busy="_busy" CssClass="btn-primary" OnClick="CreateAsync">Időpont meghirdetése</SubmitButton>
+                    <SubmitButton Busy="_busy" CssClass="btn-primary" OnClick="SaveAsync">@(_editId is null ? "Időpont meghirdetése" : "Mentés")</SubmitButton>
+                    @if (_editId is not null) { <button type="button" class="btn btn-outline-secondary ms-2" @onclick="CancelEdit">Mégse</button> }
                 </div>
             </div>
             <div class="col-lg-8">
@@ -31,11 +32,15 @@
                 {
                     <div class="lm-table-wrap">
                         <table class="table lm-table">
-                            <thead><tr><th>Nap</th><th>Időszak</th><th class="text-end">Foglalt</th><th class="text-end">Szabad</th></tr></thead>
+                            <thead><tr><th>Nap</th><th>Időszak</th><th class="text-end">Foglalt</th><th class="text-end">Szabad</th><th class="text-end">Művelet</th></tr></thead>
                             <tbody>
                             @foreach (var s in _slots.OrderBy(s => s.Date).ThenBy(s => s.StartTime))
                             {
-                                <tr><td>@Labels.Date(s.Date)</td><td>@Labels.Time(s.StartTime) – @Labels.Time(s.EndTime)</td><td class="text-end">@s.BookedCount / @s.Capacity</td><td class="text-end">@s.FreeCapacity</td></tr>
+                                <tr><td>@Labels.Date(s.Date)</td><td>@Labels.Time(s.StartTime) – @Labels.Time(s.EndTime)</td><td class="text-end">@s.BookedCount / @s.Capacity</td><td class="text-end">@s.FreeCapacity</td>
+                                    <td class="text-end text-nowrap">
+                                        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => StartEdit(s)">Szerkesztés</button>
+                                        <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => _deleting = s">Törlés</button>
+                                    </td></tr>
                             }
                             </tbody>
                         </table>
@@ -43,6 +48,11 @@
                 }
             </div>
         </div>
+
+        <ConfirmDialog Visible="_deleting is not null" Title="Törlöd az átvételi időpontot?" Danger="true" Busy="_busy"
+                       Message="Csak olyan időpont törölhető, amelyre még nincs foglalás."
+                       ConfirmText="Igen, törlöm" CancelText="Mégsem"
+                       OnConfirm="DeleteAsync" OnCancel="() => _deleting = null" />
     </ChildContent>
 </PageContainer>
 
@@ -53,6 +63,8 @@
     private DateTime _date = DateTime.Today.AddDays(1);
     private TimeOnly _from = new(8, 0), _to = new(12, 0);
     private int _capacity = 10;
+    private int? _editId;
+    private PickupSlotInfo? _deleting;
 
     protected override async Task OnInitializedAsync()
     {
@@ -75,12 +87,44 @@
         _loading = false;
     }
 
-    private async Task CreateAsync()
+    private void StartEdit(PickupSlotInfo s)
+    {
+        _editId = s.Id; _date = s.Date; _from = s.StartTime; _to = s.EndTime; _capacity = s.Capacity;
+        _createProblem = null;
+    }
+
+    private void CancelEdit()
+    {
+        _editId = null; _createProblem = null;
+        _date = DateTime.Today.AddDays(1); _from = new(8, 0); _to = new(12, 0); _capacity = 10;
+    }
+
+    private async Task SaveAsync()
     {
         if (_busy) return;
         _busy = true; _createProblem = null;
-        var r = await Vendor.CreatePickupSlotAsync(new CreatePickupSlotRequest(_date, _from, _to, _capacity));
-        if (r.IsSuccess) { Toasts.Success("Időpont meghirdetve."); await LoadAsync(); } else _createProblem = r.Problem;
+        var request = new CreatePickupSlotRequest(_date, _from, _to, _capacity);
+        var r = _editId is int id
+            ? await Vendor.UpdatePickupSlotAsync(id, request)
+            : await Vendor.CreatePickupSlotAsync(request);
+        if (r.IsSuccess)
+        {
+            Toasts.Success(_editId is null ? "Időpont meghirdetve." : "Időpont módosítva.");
+            if (_editId is not null) CancelEdit();
+            await LoadAsync();
+        }
+        else _createProblem = r.Problem;
+        _busy = false;
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (_busy || _deleting is null) return;
+        _busy = true;
+        var r = await Vendor.DeletePickupSlotAsync(_deleting.Id);
+        if (r.IsSuccess) { Toasts.Success("Időpont törölve."); if (_editId == _deleting.Id) CancelEdit(); await LoadAsync(); }
+        else Toasts.Error(r.Problem!.Message);
+        _deleting = null;
         _busy = false;
     }
 }

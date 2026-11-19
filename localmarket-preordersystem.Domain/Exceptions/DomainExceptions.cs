@@ -1,6 +1,6 @@
 ﻿namespace localmarket_preordersystem.Domain.Exceptions
 {
-    // Domain exceptionsre csináltam boss, majd bővíthetjük
+    /// <summary>Üzleti szabály megsértése (API: 400). A domain invariánsai ezt dobják.</summary>
     public class DomainException : Exception
     {
         public DomainException(string message) : base(message)

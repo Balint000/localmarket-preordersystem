@@ -9,6 +9,5 @@ namespace localmarket_preordersystem.Domain.ValueObject
         Cash = 1,
         Card = 2,
         BankTransfer = 3,
-        DishWashing = 4,
     }
 }

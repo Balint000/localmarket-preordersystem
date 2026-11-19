@@ -34,6 +34,9 @@ services:
       Jwt__Secret: "${JWT_SECRET:?Állítsd be a JWT_SECRET-et a .env fájlban (min. 32 karakter)}"
       Cors__Origins__0: "http://localhost:5219"
       ImageStorage__RootPath: /app/uploads/products
+      App__TimeZone: "${APP_TIMEZONE:-Europe/Budapest}"
+      Seed__AdminPassword: "${ADMIN_PASSWORD:-Admin123!}"
+      Seed__CustomerPassword: "${CUSTOMER_PASSWORD:-Customer123!}"
     volumes:
       - uploads:/app/uploads/products
     ports:
@@ -49,6 +52,8 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       Api__BaseUrl: http://api:8080
+      # a böngésző által elérhető API-cím (a feltöltött termékképekhez)
+      Api__PublicBaseUrl: "${API_PUBLIC_URL:-http://localhost:5205}"
     ports:
       - "5219:8080"
 

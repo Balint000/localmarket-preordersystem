@@ -12,6 +12,7 @@ namespace localmarket_preordersystem.Application.Markets.CreateMarket
                 .Required(nameof(c.Name), c.Name, "A piac nevének megadása kötelező.")
                 .MaxLength(nameof(c.Name), c.Name, 100)
                 .Required(nameof(c.Address), c.Address, "A piac címének megadása kötelező.")
+                .MaxLength(nameof(c.Address), c.Address, 500)
                 .Must(nameof(c.OpeningDays), c.OpeningDays is not null && c.OpeningDays.All(Enum.IsDefined), "Érvénytelen nyitvatartási nap.")
                 .ThrowIfInvalid();
         }

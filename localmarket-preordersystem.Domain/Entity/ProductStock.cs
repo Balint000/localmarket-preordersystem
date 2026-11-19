@@ -1,7 +1,5 @@
 ﻿using localmarket_preordersystem.Domain.Exceptions;
 using localmarket_preordersystem.Domain.ValueObject;
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 
 namespace localmarket_preordersystem.Domain.Entity
 {
@@ -15,20 +13,15 @@ namespace localmarket_preordersystem.Domain.Entity
         /// <summary>A hét hétfői napja. Mindig normalizált (ld. GetWeekStart).</summary>
         public DateTime WeekStartDate { get; private set; }
 
-        // 0 = "erre a hétre elfogyott / nem kínálom" (az adatbázis CK_ProductStocks_Quantity is >= 0-t enged).
-        [Range(0, 1000000)]
-        [Column(TypeName = "decimal(18,2)")]
+        // 0 = "erre a hétre elfogyott / nem kínálom" (a CK_ProductStocks_Quantity megszorítás is >= 0-t enged).
         public decimal Quantity { get; private set; }
 
-        [Column(TypeName = "decimal(18,2)")]
         public decimal ReservedQuantity { get; private set; }
 
         public decimal AvailableQuantity => Quantity - ReservedQuantity;
 
         public Units Unit { get; private set; }
 
-        [Range(0.01, 1000000)]
-        [Column(TypeName = "decimal(18,2)")]
         public decimal UnitPrice { get; private set; }
 
         public DateTime LastUpdated { get; private set; } = DateTime.UtcNow;
@@ -96,6 +89,10 @@ namespace localmarket_preordersystem.Domain.Entity
         {
             if (quantity <= 0)
                 throw new DomainException("A lefoglalandó mennyiségnek pozitívnak kell lennie.");
+            if (decimal.Round(quantity, 3) != quantity)
+                throw new DomainException("A mennyiség legfeljebb három tizedesjegyet tartalmazhat.");
+            if (Unit.IsCountable() && quantity != decimal.Truncate(quantity))
+                throw new DomainException("Ennél a terméknél csak egész mennyiség rendelhető.");
             if (quantity > AvailableQuantity)
                 throw new DomainException("Nincs elég elérhető készlet ehhez a mennyiséghez.");
 

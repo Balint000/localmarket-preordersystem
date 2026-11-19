@@ -23,11 +23,11 @@ public sealed class CatalogApi(ApiClient api)
         if (categoryId is int c) query.Add("categoryId=" + c);
         query.AddRange(excludeAllergies.Select(a => "excludeAllergies=" + Uri.EscapeDataString(a)));
         var url = "api/products" + (query.Count > 0 ? "?" + string.Join('&', query) : "");
-        return api.GetAsync<IReadOnlyList<ProductInfo>>(url, ct);
+        return api.GetAllPagesAsync<ProductInfo>(url, ct);
     }
 
     public Task<ApiResult<ProductInfo>> ProductAsync(int id, CancellationToken ct = default) => api.GetAsync<ProductInfo>($"api/products/{id}", ct);
-    public Task<ApiResult<IReadOnlyList<ProductInfo>>> ProductsOfProducerAsync(int producerId, CancellationToken ct = default) => api.GetAsync<IReadOnlyList<ProductInfo>>($"api/products?producerId={producerId}", ct);
+    public Task<ApiResult<IReadOnlyList<ProductInfo>>> ProductsOfProducerAsync(int producerId, CancellationToken ct = default) => api.GetAllPagesAsync<ProductInfo>($"api/products?producerId={producerId}", ct);
     public Task<ApiResult<IReadOnlyList<ProducerInfo>>> ProducersAsync(string? status = null, int? marketId = null, CancellationToken ct = default)
     {
         var q = new List<string>();
@@ -68,8 +68,8 @@ public sealed class OrdersApi(ApiClient api, CartService cart)
         return result;
     }
 
-    public Task<ApiResult<IReadOnlyList<OrderInfo>>> MineAsync(string? status, CancellationToken ct = default) => api.GetAsync<IReadOnlyList<OrderInfo>>("api/orders/my" + StatusQuery(status), ct);
-    public Task<ApiResult<IReadOnlyList<OrderInfo>>> ForProducerAsync(string? status, CancellationToken ct = default) => api.GetAsync<IReadOnlyList<OrderInfo>>("api/orders/producer" + StatusQuery(status), ct);
+    public Task<ApiResult<IReadOnlyList<OrderInfo>>> MineAsync(string? status, CancellationToken ct = default) => api.GetAllPagesAsync<OrderInfo>("api/orders/my" + StatusQuery(status), ct);
+    public Task<ApiResult<IReadOnlyList<OrderInfo>>> ForProducerAsync(string? status, CancellationToken ct = default) => api.GetAllPagesAsync<OrderInfo>("api/orders/producer" + StatusQuery(status), ct);
     public Task<ApiResult<OrderInfo>> GetAsync(int id, CancellationToken ct = default) => api.GetAsync<OrderInfo>($"api/orders/{id}", ct);
 
     public Task<ApiResult<OrderInfo>> CancelAsync(int id) => api.PostAsync<OrderInfo>($"api/orders/{id}/cancel");
@@ -79,7 +79,7 @@ public sealed class OrdersApi(ApiClient api, CartService cart)
     public Task<ApiResult<OrderInfo>> ReadyAsync(int id) => api.PostAsync<OrderInfo>($"api/orders/{id}/ready");
     public Task<ApiResult<OrderInfo>> PickedUpAsync(int id) => api.PostAsync<OrderInfo>($"api/orders/{id}/picked-up");
     public Task<ApiResult<OrderInfo>> NotPickedUpAsync(int id) => api.PostAsync<OrderInfo>($"api/orders/{id}/not-picked-up");
-    public Task<ApiResult<IReadOnlyList<OrderInfo>>> DisputedAsync(CancellationToken ct = default) => api.GetAsync<IReadOnlyList<OrderInfo>>("api/orders/disputed", ct);
+    public Task<ApiResult<IReadOnlyList<OrderInfo>>> DisputedAsync(CancellationToken ct = default) => api.GetAllPagesAsync<OrderInfo>("api/orders/disputed", ct);
     public Task<ApiResult<OrderInfo>> ResolveDisputeAsync(int id, string decision, string? note) => api.PostAsync<OrderInfo>($"api/orders/{id}/resolve-dispute", new ResolveRequest(decision, note));
     public Task<ApiResult<OrderInfo>> DisputeAsync(int id, string note) => api.PostAsync<OrderInfo>($"api/orders/{id}/dispute", new NoteRequest(note));
 
@@ -96,7 +96,13 @@ public sealed class VendorApi(ApiClient api)
     public Task<ApiResult<ProductInfo>> UpdateProductAsync(int id, UpdateProductRequest r) => api.PutAsync<ProductInfo>($"api/products/{id}", r, default);
     public Task<ApiResult<ProductInfo>> SetStockAsync(int id, StockRequest r) => api.PutAsync<ProductInfo>($"api/products/{id}/stock", r, default);
     public Task<ApiResult<PickupSlotInfo>> CreatePickupSlotAsync(CreatePickupSlotRequest r) => api.PostAsync<PickupSlotInfo>("api/pickup-slots", r);
+    public Task<ApiResult<ProducerInfo>> GetMineAsync(CancellationToken ct = default) => api.GetAsync<ProducerInfo>("api/producers/me", ct);
     public Task<ApiResult<ProducerInfo>> UpdateMineAsync(UpdateMyProducerRequest r) => api.PutAsync<ProducerInfo>("api/producers/me", r, default);
+    public Task<ApiResult<ProductInfo>> SetImageAsync(int id, string fileName, string contentType, byte[] content) => api.PutFileAsync<ProductInfo>($"api/products/{id}/image", fileName, contentType, content);
+    public Task<ApiResult<Unit>> DeleteProductAsync(int id) => api.DeleteAsync<Unit>($"api/products/{id}");
+    public Task<ApiResult<PickupSlotInfo>> UpdatePickupSlotAsync(int id, CreatePickupSlotRequest r) => api.PutAsync<PickupSlotInfo>($"api/pickup-slots/{id}", r, default);
+    public Task<ApiResult<Unit>> DeletePickupSlotAsync(int id) => api.DeleteAsync<Unit>($"api/pickup-slots/{id}");
+    public Task<ApiResult<ProductInfo>> DeleteImageAsync(int id) => api.DeleteAsync<ProductInfo>($"api/products/{id}/image");
 }
 
 /// <summary>Admin-műveletek: árusok jóváhagyása, piacok, kategóriák, riportok.</summary>
@@ -107,11 +113,20 @@ public sealed class AdminApi(ApiClient api)
     public Task<ApiResult<MarketInfo>> CreateMarketAsync(CreateMarketRequest r) => api.PostAsync<MarketInfo>("api/markets", r);
     public Task<ApiResult<MarketInfo>> UpdateMarketAsync(int id, UpdateMarketRequest r) => api.PutAsync<MarketInfo>($"api/markets/{id}", r, default);
     public Task<ApiResult<CategoryInfo>> CreateCategoryAsync(CreateCategoryRequest r) => api.PostAsync<CategoryInfo>("api/categories", r);
+    public Task<ApiResult<CategoryInfo>> UpdateCategoryAsync(int id, CreateCategoryRequest r) => api.PutAsync<CategoryInfo>($"api/categories/{id}", r, default);
+    public Task<ApiResult<Unit>> DeleteCategoryAsync(int id) => api.DeleteAsync<Unit>($"api/categories/{id}");
 
     public Task<ApiResult<IReadOnlyList<TopProductInfo>>> TopProductsAsync(DateTime? from, DateTime? to, int top = 10) => api.GetAsync<IReadOnlyList<TopProductInfo>>("api/reports/top-products" + Range(from, to, "top=" + top), default);
     public Task<ApiResult<CancellationRateInfo>> CancellationRateAsync(DateTime? from, DateTime? to) => api.GetAsync<CancellationRateInfo>("api/reports/cancellation-rate" + Range(from, to), default);
     public Task<ApiResult<IReadOnlyList<VendorRevenueInfo>>> VendorRevenueAsync(DateTime? from, DateTime? to) => api.GetAsync<IReadOnlyList<VendorRevenueInfo>>("api/reports/vendor-revenue" + Range(from, to), default);
     public Task<ApiResult<IReadOnlyList<UnclaimedOrderInfo>>> UnclaimedAsync(DateTime? from, DateTime? to) => api.GetAsync<IReadOnlyList<UnclaimedOrderInfo>>("api/reports/unclaimed-orders" + Range(from, to), default);
+
+    public Task<ApiResult<PagedResponse<AuditLogInfo>>> AuditAsync(string? entityName, int page, int pageSize = 25, CancellationToken ct = default)
+    {
+        var q = new List<string> { "page=" + page, "pageSize=" + pageSize };
+        if (!string.IsNullOrWhiteSpace(entityName)) q.Add("entityName=" + Uri.EscapeDataString(entityName.Trim()));
+        return api.GetAsync<PagedResponse<AuditLogInfo>>("api/audit?" + string.Join('&', q), ct);
+    }
 
     private static string Range(DateTime? from, DateTime? to, string? extra = null)
     {

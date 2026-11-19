@@ -13,16 +13,16 @@
     <ItemGroup>
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
         <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.7">
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+          <PrivateAssets>all</PrivateAssets>
+        </PackageReference>
         <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.24.2-preview.1" />
     </ItemGroup>
 
     <ItemGroup>
       <ProjectReference Include="..\localmarket-preordersystem.Application\localmarket-preordersystem.Application.csproj" />
       <ProjectReference Include="..\localmarket-preordersystem.Infrastructure\localmarket-preordersystem.Infrastructure.csproj" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <Folder Include="Controller\" />
     </ItemGroup>
 
 </Project>

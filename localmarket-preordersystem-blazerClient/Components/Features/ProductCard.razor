@@ -1,6 +1,14 @@
+@inject ApiUrls Urls
 <article class="lm-product">
     <div class="lm-product-img @_look.Css" aria-hidden="true">
-        @_look.Emoji
+        @if (Urls.Image(Product.ImageUrl) is { } img)
+        {
+            <img class="lm-product-photo" src="@img" alt="" loading="lazy" />
+        }
+        else
+        {
+            @_look.Emoji
+        }
         @if (Product.NextStock is { } st)
         {
             <span class="lm-product-flag @(st.AvailableQuantity > 0 ? "ok" : "out")">@(st.AvailableQuantity > 0 ? "Elérhető" : "Elfogyott")</span>

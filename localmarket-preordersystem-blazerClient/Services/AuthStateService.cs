@@ -81,7 +81,7 @@ public sealed class AuthStateService(ProtectedSessionStorage storage) : Authenti
         var claims = ReadClaims(token);
         UserId = int.TryParse(claims.GetValueOrDefault("sub"), out var id) ? id : null;
         Role = claims.GetValueOrDefault("role");
-        ProducerId = int.TryParse(claims.GetValueOrDefault("producer_id"), out var pid) ? pid : null;
+        ProducerId = int.TryParse(claims.GetValueOrDefault("producerId"), out var pid) ? pid : null;
         Email = claims.GetValueOrDefault("email");
     }
 
@@ -98,7 +98,7 @@ public sealed class AuthStateService(ProtectedSessionStorage storage) : Authenti
         if (UserId is int id) claims.Add(new Claim(ClaimTypes.NameIdentifier, id.ToString()));
         if (Email is not null) claims.Add(new Claim(ClaimTypes.Name, Email));
         if (Role is not null) claims.Add(new Claim(ClaimTypes.Role, Role));
-        if (ProducerId is int pid) claims.Add(new Claim("producer_id", pid.ToString()));
+        if (ProducerId is int pid) claims.Add(new Claim("producerId", pid.ToString()));
         return new ClaimsPrincipal(new ClaimsIdentity(claims, "jwt"));
     }
 
