@@ -6,8 +6,15 @@
 
 <PageTitle>Rendelés #@Id – LocalMarket</PageTitle>
 
-<PageContainer Title="@($"Rendelés #{Id}")">
-    <Actions><a class="btn btn-outline-secondary" href="vendor/orders">← Beérkező rendelések</a></Actions>
+<PageContainer Title="@(_order is null ? $"Rendelés #{Id}" : $"{_order.CustomerName ?? "Rendelés"} – #{Id}")" BackHref="vendor/orders" BackText="Beérkező rendelések"
+               Subtitle="@(_order is null ? null : $"Leadva: {Labels.DateTimeText(_order.CreatedAt)}")">
+    <Actions>
+        @if (_order is not null)
+        {
+            <button class="btn btn-outline-secondary" disabled="@_exporting" @onclick='() => ExportAsync("Csv")'><Icon Name="download" />CSV</button>
+            <button class="btn btn-outline-secondary" disabled="@_exporting" @onclick='() => ExportAsync("Json")'><Icon Name="download" />JSON</button>
+        }
+    </Actions>
     <ChildContent>
 
     @if (_loading)
@@ -20,45 +27,68 @@
     }
     else if (_order is not null)
     {
-        <div class="row g-3">
-            <div class="col-lg-5"><div class="lm-card"><OrderInfoPanel Order="_order" ShowCustomer="true" /></div></div>
-            <div class="col-lg-7"><div class="lm-card"><OrderItemsTable Order="_order" /></div></div>
+        @* A tényleges állapotátmenetet a backend ellenőrzi; itt csak az adott állapotban értelmes gombokat mutatjuk. *@
+        @if (NextStep is { } next)
+        {
+            <section class="lm-next" aria-labelledby="next-title">
+                <div>
+                    <h2 id="next-title">@next.Title</h2>
+                    <p>@next.Text</p>
+                </div>
+                <div class="lm-next-actions">
+                    @switch (_order.Status)
+                    {
+                        case "Pending":
+                            <button class="btn btn-primary" disabled="@_busy" @onclick='() => RunAsync(() => Api.AcceptAsync(Id), "Rendelés elfogadva.")'><Icon Name="check" />Elfogadom</button>
+                            <button class="btn btn-outline-primary" disabled="@_busy" @onclick="OpenPartial">Részben teljesítem</button>
+                            <button class="btn btn-outline-danger" disabled="@_busy" @onclick="() => _dialog = Dialog.Reject">Elutasítom</button>
+                            break;
+                        case "Accepted" or "PartiallyFulfilled":
+                            <button class="btn btn-primary" disabled="@_busy" @onclick='() => RunAsync(() => Api.ReadyAsync(Id), "Átvehetőnek jelölve.")'><Icon Name="package" />Átvehetőnek jelölöm</button>
+                            break;
+                        case "Ready":
+                            <button class="btn btn-primary" disabled="@_busy" @onclick='() => RunAsync(() => Api.PickedUpAsync(Id), "Átvettnek jelölve.")'><Icon Name="hand" />Átvette</button>
+                            <button class="btn btn-outline-danger" disabled="@_busy" @onclick='() => _dialog = Dialog.NotPickedUp'>Nem jött el</button>
+                            break;
+                        case "PickedUp" or "NotPickedUp":
+                            <button class="btn btn-outline-danger" disabled="@_busy" @onclick="() => _dialog = Dialog.Dispute"><Icon Name="scale" />Vitatom</button>
+                            break;
+                    }
+                </div>
+            </section>
+        }
+
+        <div class="mb-4"><OrderProgress Status="@_order.Status" ForVendor="true" ShowHint="NextStep is null" /></div>
+
+        <div class="row g-4">
+            <div class="col-lg-7">
+                <div class="lm-card">
+                    <div class="lm-card-title"><h2><Icon Name="package" />Tételek</h2></div>
+                    <OrderItemsTable Order="_order" />
+                </div>
+            </div>
+            <div class="col-lg-5">
+                <div class="lm-card">
+                    <div class="lm-card-title"><h2><Icon Name="info" />Részletek</h2></div>
+                    <OrderInfoPanel Order="_order" ShowCustomer="true" />
+                </div>
+            </div>
         </div>
 
-        @* A tényleges állapotátmenetet a backend ellenőrzi; itt csak az adott állapotban értelmes gombokat mutatjuk. *@
-        <div class="d-flex flex-wrap gap-2 mt-3">
-            @switch (_order.Status)
-            {
-                case "Pending":
-                    <button class="btn btn-primary" disabled="@_busy" @onclick='() => RunAsync(() => Api.AcceptAsync(Id), "Rendelés elfogadva.")'>Elfogadás</button>
-                    <button class="btn btn-outline-primary" disabled="@_busy" @onclick="OpenPartial">Részleges teljesítés</button>
-                    <button class="btn btn-outline-danger" disabled="@_busy" @onclick="() => _dialog = Dialog.Reject">Elutasítás</button>
-                    break;
-                case "Accepted" or "PartiallyFulfilled":
-                    <button class="btn btn-primary" disabled="@_busy" @onclick='() => RunAsync(() => Api.ReadyAsync(Id), "Átvehetőnek jelölve.")'>Átvehető</button>
-                    break;
-                case "Ready":
-                    <button class="btn btn-primary" disabled="@_busy" @onclick='() => RunAsync(() => Api.PickedUpAsync(Id), "Átvettnek jelölve.")'>Átvéve</button>
-                    <button class="btn btn-outline-danger" disabled="@_busy" @onclick='() => RunAsync(() => Api.NotPickedUpAsync(Id), "Nem átvettnek jelölve.")'>Nem vette át</button>
-                    break;
-            }
-            @if (_order.Status is "PickedUp" or "NotPickedUp")
-            {
-                <button class="btn btn-outline-danger" disabled="@_busy" @onclick="() => _dialog = Dialog.Dispute">Vitatás</button>
-            }
-            <button class="btn btn-outline-secondary ms-auto" disabled="@_exporting" @onclick='() => ExportAsync("Json")'>Export (JSON)</button>
-            <button class="btn btn-outline-secondary" disabled="@_exporting" @onclick='() => ExportAsync("Csv")'>Export (CSV)</button>
-        </div>
+        <ConfirmDialog Visible="_dialog == Dialog.NotPickedUp" Title="Nem vette át a rendelést?" Danger="true" Busy="_busy"
+                       Message="A rendelés „nem átvett” állapotba kerül. Ezt csak vitával lehet később módosítani."
+                       ConfirmText="Igen, nem jött el" CancelText="Mégse"
+                       OnConfirm='() => RunAsync(() => Api.NotPickedUpAsync(Id), "Nem átvettnek jelölve.")' OnCancel="CloseDialog" />
 
         <ConfirmDialog Visible="_dialog == Dialog.Reject" Title="Rendelés elutasítása" Danger="true" Busy="_busy"
-                       ConfirmText="Elutasítom" ConfirmDisabled="string.IsNullOrWhiteSpace(_text)"
+                       ConfirmText="Elutasítom" Message="A vásárló látni fogja az indoklást." ConfirmDisabled="string.IsNullOrWhiteSpace(_text)"
                        OnConfirm='() => RunAsync(() => Api.RejectAsync(Id, _text.Trim()), "Rendelés elutasítva.")' OnCancel="CloseDialog">
             <label class="form-label" for="reason">Indoklás (kötelező)</label>
             <textarea id="reason" class="form-control" rows="3" maxlength="1000" @bind="_text" @bind:event="oninput"></textarea>
         </ConfirmDialog>
 
         <ConfirmDialog Visible="_dialog == Dialog.Dispute" Title="Rendelés vitatása" Danger="true" Busy="_busy"
-                       ConfirmText="Vitatom" ConfirmDisabled="string.IsNullOrWhiteSpace(_text)"
+                       ConfirmText="Vitát nyitok" Message="A vitát a piacvezető dönti el." ConfirmDisabled="string.IsNullOrWhiteSpace(_text)"
                        OnConfirm='() => RunAsync(() => Api.DisputeAsync(Id, _text.Trim()), "A vitát rögzítettük, a piacvezető dönt.")' OnCancel="CloseDialog">
             <label class="form-label" for="note">Indoklás (kötelező)</label>
             <textarea id="note" class="form-control" rows="3" maxlength="1000" @bind="_text" @bind:event="oninput"></textarea>
@@ -82,7 +112,7 @@
 </PageContainer>
 
 @code {
-    private enum Dialog { None, Reject, Dispute, Partial }
+    private enum Dialog { None, Reject, Dispute, Partial, NotPickedUp }
 
     [Parameter] public int Id { get; set; }
 
@@ -103,6 +133,15 @@
         if (result.IsSuccess) _order = result.Value; else { _order = null; _problem = result.Problem; }
         _loading = false;
     }
+
+    private (string Title, string Text)? NextStep => _order?.Status switch
+    {
+        "Pending" => ("Új rendelés vár válaszra", "Fogadd el, ha mindent tudsz teljesíteni; ha nem, add meg, mennyit vállalsz."),
+        "Accepted" or "PartiallyFulfilled" => ("Készítsd össze a rendelést", $"Átvétel: {Labels.DateLong(_order.PickupDate)}, {Labels.Time(_order.PickupStart)}–{Labels.Time(_order.PickupEnd)}."),
+        "Ready" => ("Átadásra vár", "Ha a vásárló átvette, jelöld meg; ha nem jött el, azt is."),
+        "PickedUp" or "NotPickedUp" => ("Lezárt rendelés", "Ha valami nem stimmelt, vitát nyithatsz; a piacvezető dönt."),
+        _ => null
+    };
 
     private void CloseDialog() { _dialog = Dialog.None; _text = ""; }
 

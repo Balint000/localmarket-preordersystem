@@ -11,7 +11,7 @@
         <div class="row g-4">
             <div class="col-lg-5">
                 <div class="lm-card">
-                    <h2 class="h6">@(_editId is null ? "Új kategória" : "Kategória szerkesztése")</h2>
+                    <div class="lm-card-title"><h2><Icon Name="@(_editId is null ? "plus" : "pencil")" />@(_editId is null ? "Új kategória" : "Kategória szerkesztése")</h2></div>
                     <EditForm Model="_form" OnValidSubmit="SaveAsync" FormName="category-form">
                         <DataAnnotationsValidator />
                         <div class="mb-2">
@@ -32,7 +32,7 @@
             <div class="col-lg-7">
                 @if (_loading) { <LoadingIndicator /> }
                 else if (_problem is not null) { <ErrorMessage Problem="_problem" OnRetry="LoadAsync" /> }
-                else if (_items.Count == 0) { <EmptyState Title="Még nincs kategória" /> }
+                else if (_items.Count == 0) { <EmptyState Title="Még nincs kategória" IconName="tag" Text="A termelők a termékeiket ezekbe sorolják; vegyél fel legalább egyet." /> }
                 else
                 {
                     <ul class="lm-list">
@@ -40,9 +40,9 @@
                         {
                             <li class="d-flex justify-content-between align-items-start gap-2">
                                 <div><strong>@c.Name</strong>@if (!string.IsNullOrWhiteSpace(c.Description)) { <div class="small text-muted">@c.Description</div> }</div>
-                                <div class="text-nowrap">
-                                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => StartEdit(c)">Szerkesztés</button>
-                                    <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => _deleting = c">Törlés</button>
+                                <div class="text-nowrap d-flex gap-1">
+                                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => StartEdit(c)"><Icon Name="pencil" Size="16" />Szerkesztés</button>
+                                    <button type="button" class="lm-icon-btn" aria-label="@c.Name törlése" title="Törlés" @onclick="() => _deleting = c"><Icon Name="trash" Size="18" /></button>
                                 </div>
                             </li>
                         }

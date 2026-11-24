@@ -8,39 +8,50 @@
 <PageTitle>Termékeim – LocalMarket</PageTitle>
 
 <PageContainer Title="Termékeim" Subtitle="Hirdesd meg termékeidet, és add meg a heti készletet">
-    <Actions><a class="btn btn-primary" href="vendor/products/new">Új termék meghirdetése</a></Actions>
+    <Actions><a class="btn btn-primary" href="vendor/products/new"><Icon Name="plus" />Új termék</a></Actions>
     <ChildContent>
         @if (_loading) { <LoadingIndicator /> }
         else if (_problem is not null) { <ErrorMessage Problem="_problem" OnRetry="LoadAsync" /> }
         else if (_products.Count == 0)
         {
-            <EmptyState Title="Még nincs meghirdetett terméked" Text="Vegyél fel egy terméket, majd add meg a heti készletét, hogy a vásárlók rendelhessenek.">
-                <a class="btn btn-primary" href="vendor/products/new">Első termék felvétele</a>
+            <EmptyState Title="Még nincs meghirdetett terméked" IconName="sprout" Text="Vegyél fel egy terméket, majd add meg a heti készletét és árát, hogy a vásárlók rendelhessenek.">
+                <a class="btn btn-primary" href="vendor/products/new"><Icon Name="plus" />Első termék felvétele</a>
             </EmptyState>
         }
         else
         {
             <div class="lm-table-wrap">
                 <table class="table lm-table align-middle">
-                    <thead><tr><th>Termék</th><th>Kategória</th><th>Aktuális kínálat</th><th class="text-end">Ár</th><th class="text-end">Művelet</th></tr></thead>
+                    <thead><tr><th>Termék</th><th>Kategória</th><th>Heti készlet</th><th class="text-end">Ár</th><th class="text-end"><span class="visually-hidden">Műveletek</span></th></tr></thead>
                     <tbody>
                     @foreach (var p in _products)
                     {
                         <tr>
-                            <td><strong>@p.Name</strong></td>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="lm-stat-icon @Labels.CategoryLook(p.Categories.FirstOrDefault()?.Name).Css" style="font-size:1.3rem" aria-hidden="true">@Labels.CategoryLook(p.Categories.FirstOrDefault()?.Name).Emoji</span>
+                                    <a class="fw-bold text-body text-decoration-none" href="vendor/products/@p.Id">@p.Name</a>
+                                </div>
+                            </td>
                             <td>@foreach (var c in p.Categories) { <span class="lm-chip">@c.Name</span> }</td>
                             <td>
                                 @if (p.NextStock is { } s)
                                 {
-                                    <span class="lm-badge @(s.AvailableQuantity > 0 ? "badge-ok" : "badge-bad")">@(s.AvailableQuantity > 0 ? "Elérhető" : "Elfogyott")</span>
-                                    <span class="small text-muted ms-1">@Labels.Qty(s.AvailableQuantity) / @Labels.Qty(s.Quantity) @Labels.Unit(s.Unit) (@Labels.Date(s.WeekStartDate) hete)</span>
+                                    var share = s.Quantity > 0 ? (int)Math.Clamp(Math.Round(s.AvailableQuantity / s.Quantity * 100), 0, 100) : 0;
+                                    <div class="lm-bar-cell">
+                                        <div class="d-flex justify-content-between gap-2 small mb-1">
+                                            <span class="lm-badge @(s.AvailableQuantity > 0 ? "badge-ok" : "badge-bad")">@(s.AvailableQuantity > 0 ? "Elérhető" : "Elfogyott")</span>
+                                            <span class="text-muted">@Labels.Qty(s.AvailableQuantity) / @Labels.Qty(s.Quantity) @Labels.Unit(s.Unit)</span>
+                                        </div>
+                                        <div class="lm-meter @(share == 0 ? "bad" : share <= 20 ? "low" : "")" aria-hidden="true"><span style="width:@(share)%"></span></div>
+                                    </div>
                                 }
                                 else { <span class="lm-badge badge-muted">Nincs meghirdetve</span> }
                             </td>
                             <td class="text-end">@(p.NextStock is { } n ? Labels.Money(n.UnitPrice) + " / " + Labels.Unit(n.Unit) : "–")</td>
                             <td class="text-end text-nowrap">
-                                <a class="btn btn-outline-primary btn-sm" href="vendor/products/@p.Id">Szerkesztés és készlet</a>
-                                <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => _deleting = p">Törlés</button>
+                                <a class="btn btn-outline-primary btn-sm" href="vendor/products/@p.Id"><Icon Name="pencil" Size="16" />Szerkesztés</a>
+                                <button type="button" class="lm-icon-btn" aria-label="@p.Name törlése" title="Törlés" @onclick="() => _deleting = p"><Icon Name="trash" Size="18" /></button>
                             </td>
                         </tr>
                     }

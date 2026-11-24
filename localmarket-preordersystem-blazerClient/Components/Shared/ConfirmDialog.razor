@@ -1,14 +1,19 @@
 ﻿@if (Visible)
 {
-    <div class="lm-modal-backdrop" @onkeydown="OnKeyDown" @onkeydown:stopPropagation="true">
-        <div class="lm-modal" role="dialog" aria-modal="true" aria-labelledby="@_titleId" tabindex="-1" @ref="_dialog">
-            <h2 id="@_titleId" class="h5">@Title</h2>
-            @if (!string.IsNullOrWhiteSpace(Message))
-            {
-                <p>@Message</p>
-            }
+    <div class="lm-modal-backdrop" @onkeydown="OnKeyDown" @onkeydown:stopPropagation="true" @onclick="OnBackdropAsync">
+        <div class="lm-modal" @onclick:stopPropagation="true" role="dialog" aria-modal="true" aria-labelledby="@_titleId" tabindex="-1" @ref="_dialog">
+            <div class="lm-modal-head">
+                <span class="lm-modal-icon @(Danger ? "danger" : "")" aria-hidden="true"><Icon Name="@(IconName ?? (Danger ? "warning" : "info"))" /></span>
+                <div>
+                    <h2 id="@_titleId" class="h5">@Title</h2>
+                    @if (!string.IsNullOrWhiteSpace(Message))
+                    {
+                        <p class="text-muted mb-0 mt-1">@Message</p>
+                    }
+                </div>
+            </div>
             @ChildContent
-            <div class="d-flex justify-content-end gap-2 mt-3">
+            <div class="lm-modal-actions">
                 <button type="button" class="btn btn-outline-secondary" @onclick="OnCancel" disabled="@Busy">@CancelText</button>
                 <SubmitButton Busy="Busy" Disabled="ConfirmDisabled" CssClass="@(Danger ? "btn-danger" : "btn-primary")" OnClick="OnConfirm">@ConfirmText</SubmitButton>
             </div>
@@ -27,6 +32,7 @@
     [Parameter] public string ConfirmText { get; set; } = "Megerősítem";
     [Parameter] public string CancelText { get; set; } = "Mégse";
     [Parameter] public bool Danger { get; set; }
+    [Parameter] public string? IconName { get; set; }
     [Parameter] public bool Busy { get; set; }
     [Parameter] public bool ConfirmDisabled { get; set; }
     [Parameter] public EventCallback OnConfirm { get; set; }
@@ -39,6 +45,12 @@
         if (Visible && !_wasVisible)
             await _dialog.FocusAsync();
         _wasVisible = Visible;
+    }
+
+    // a háttérre kattintás a "Mégse" gombbal egyenértékű; űrlapos párbeszédnél nem, hogy a beírt szöveg ne vesszen el
+    private async Task OnBackdropAsync()
+    {
+        if (!Busy && ChildContent is null) await OnCancel.InvokeAsync();
     }
 
     private async Task OnKeyDown(KeyboardEventArgs e)

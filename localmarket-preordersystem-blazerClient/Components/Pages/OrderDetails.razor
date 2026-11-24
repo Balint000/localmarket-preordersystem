@@ -6,8 +6,15 @@
 
 <PageTitle>Rendelés #@Id – LocalMarket</PageTitle>
 
-<PageContainer Title="@($"Rendelés #{Id}")">
-    <Actions><a class="btn btn-outline-secondary" href="orders">← Rendeléseim</a></Actions>
+<PageContainer Title="@(_order is null ? $"Rendelés #{Id}" : $"{_order.ProducerName ?? "Rendelés"} – #{Id}")" BackHref="orders" BackText="Rendeléseim"
+               Subtitle="@(_order is null ? null : $"Leadva: {Labels.DateTimeText(_order.CreatedAt)}")">
+    <Actions>
+        @if (_order is not null)
+        {
+            <button type="button" class="btn btn-outline-secondary" disabled="@_exporting" @onclick='() => ExportAsync("Csv")'><Icon Name="download" />CSV</button>
+            <button type="button" class="btn btn-outline-secondary" disabled="@_exporting" @onclick='() => ExportAsync("Json")'><Icon Name="download" />JSON</button>
+        }
+    </Actions>
     <ChildContent>
 
     @if (_loading)
@@ -25,24 +32,39 @@
             <ErrorMessage Problem="_problem" />
         }
 
-        <div class="row g-3">
-            <div class="col-lg-5"><div class="lm-card"><OrderInfoPanel Order="_order" /></div></div>
-            <div class="col-lg-7"><div class="lm-card"><OrderItemsTable Order="_order" /></div></div>
-        </div>
+        @if (_order.Status == "Ready")
+        {
+            <div class="lm-callout ok"><Icon Name="check-circle" />
+                <div class="lm-callout-body"><strong>Átvehető a standnál</strong>@Labels.DateLong(_order.PickupDate), @Labels.Time(_order.PickupStart)–@Labels.Time(_order.PickupEnd)</div>
+            </div>
+        }
 
-        <div class="d-flex flex-wrap gap-2 mt-3">
-            <button type="button" class="btn btn-outline-primary" disabled="@_exporting" @onclick='() => ExportAsync("Json")'>Összesítő (JSON)</button>
-            <button type="button" class="btn btn-outline-primary" disabled="@_exporting" @onclick='() => ExportAsync("Csv")'>Összesítő (CSV)</button>
-            @* A lemondhatóságot a backend dönti el; a gomb csak az aktív (még le nem zárt) állapotokban jelenik meg. *@
-            @if (_order.Status is "Pending" or "Accepted" or "PartiallyFulfilled" or "Ready")
-            {
-                <button type="button" class="btn btn-outline-danger ms-auto" @onclick="() => _confirmCancel = true">Rendelés lemondása</button>
-            }
+        <div class="mb-4"><OrderProgress Status="@_order.Status" /></div>
+
+        <div class="row g-4">
+            <div class="col-lg-7">
+                <div class="lm-card">
+                    <div class="lm-card-title"><h2><Icon Name="package" />Tételek</h2></div>
+                    <OrderItemsTable Order="_order" />
+                </div>
+            </div>
+            <div class="col-lg-5">
+                <div class="lm-card">
+                    <div class="lm-card-title"><h2><Icon Name="info" />Részletek</h2></div>
+                    <OrderInfoPanel Order="_order" />
+                    @* A lemondhatóságot a backend dönti el; a gomb csak az aktív (még le nem zárt) állapotokban jelenik meg. *@
+                    @if (_order.Status is "Pending" or "Accepted" or "PartiallyFulfilled" or "Ready")
+                    {
+                        <hr class="my-3" />
+                        <button type="button" class="btn btn-outline-danger w-100" @onclick="() => _confirmCancel = true"><Icon Name="x-circle" />Rendelés lemondása</button>
+                    }
+                </div>
+            </div>
         </div>
 
         <ConfirmDialog Visible="_confirmCancel" Title="Lemondod a rendelést?" Danger="true" Busy="_busy"
-                       Message="A lemondás után a lefoglalt készlet és az átvételi időpont felszabadul. Ez nem vonható vissza."
-                       ConfirmText="Igen, lemondom" CancelText="Mégsem"
+                       Message="A lefoglalt készlet és az átvételi időpont felszabadul. Ezt nem lehet visszavonni."
+                       ConfirmText="Igen, lemondom" CancelText="Megtartom"
                        OnConfirm="CancelAsync" OnCancel="() => _confirmCancel = false" />
     }
 </ChildContent>
@@ -72,7 +94,7 @@
         _busy = true;
         var result = await Api.CancelAsync(Id);
         _confirmCancel = false;
-        if (result.IsSuccess) { _order = result.Value; _problem = null; Toasts.Success("A rendelést lemondtad."); }
+        if (result.IsSuccess) { _order = result.Value; _problem = null; Toasts.Success("Rendelés lemondva."); }
         else { Toasts.Error(result.Problem!.Message); await LoadAsync(); }
         _busy = false;
     }

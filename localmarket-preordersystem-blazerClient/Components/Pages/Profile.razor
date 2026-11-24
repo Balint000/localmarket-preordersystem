@@ -15,13 +15,13 @@
         @if (_loading) { <LoadingIndicator /> }
         else
         {
-            <div class="alert alert-info small" role="note">Demó mód: a módosítások azonnal érvénybe lépnek, e-mailes megerősítés nincs.</div>
+            <div class="lm-callout info" role="note"><Icon Name="info" /><div class="lm-callout-body">Demó mód: a módosítások azonnal érvénybe lépnek, e-mailes megerősítés nincs.</div></div>
 
-            <div class="row g-4">
+            <div class="row g-4 align-items-stretch">
                 <div class="col-lg-6">
-                    <div class="lm-card">
-                        <h2 class="h6">Személyes adatok</h2>
-                        <dl class="small text-muted mb-3">
+                    <div class="lm-card h-100">
+                        <div class="lm-card-title"><h2><Icon Name="user" />Személyes adatok</h2></div>
+                        <dl class="lm-facts mb-4">
                             <dt>E-mail</dt><dd>@(_me?.Email ?? Auth.Email)</dd>
                             <dt>Szerepkör</dt><dd>@Labels.Role(Auth.Role ?? "")</dd>
                             @if (_me is not null)
@@ -37,16 +37,20 @@
                         <div class="mb-2"><label class="form-label" for="pf-first">Keresztnév</label><input id="pf-first" class="form-control" maxlength="100" @bind="_firstName" @bind:event="oninput" /></div>
                         <div class="mb-3"><label class="form-label" for="pf-phone">Telefonszám</label><input id="pf-phone" type="tel" class="form-control" maxlength="30" @bind="_phone" @bind:event="oninput" autocomplete="tel" /></div>
                         <FormProblem Problem="_profileProblem" />
-                        <SubmitButton Busy="_profileBusy" Disabled="@(string.IsNullOrWhiteSpace(_firstName) || string.IsNullOrWhiteSpace(_lastName))" CssClass="btn-primary" OnClick="SaveProfileAsync">Mentés</SubmitButton>
+                        <SubmitButton Busy="_profileBusy" Disabled="@(string.IsNullOrWhiteSpace(_firstName) || string.IsNullOrWhiteSpace(_lastName))" CssClass="btn-primary" OnClick="SaveProfileAsync">Adatok mentése</SubmitButton>
                     </div>
                 </div>
 
                 <div class="col-lg-6">
-                    <div class="lm-card">
-                        <h2 class="h6">Jelszó módosítása</h2>
+                    <div class="lm-card h-100">
+                        <div class="lm-card-title"><h2><Icon Name="lock" />Jelszó módosítása</h2></div>
                         <div class="mb-2"><label class="form-label" for="pw-cur">Jelenlegi jelszó</label><input id="pw-cur" type="@PwType" class="form-control" @bind="_currentPw" @bind:event="oninput" autocomplete="current-password" /></div>
                         <div class="mb-2"><label class="form-label" for="pw-new">Új jelszó (legalább 8 karakter)</label><input id="pw-new" type="@PwType" class="form-control" @bind="_newPw" @bind:event="oninput" autocomplete="new-password" /></div>
-                        @if (_newPw.Length > 0) { <div class="small mb-2">Jelszóerősség: <strong>@Strength()</strong></div> }
+                        @if (_newPw.Length > 0)
+                        {
+                            <div class="lm-pw-meter" data-level="@StrengthLevel()" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+                            <div class="small mb-2 mt-1" aria-live="polite">Jelszóerősség: <strong>@Strength()</strong></div>
+                        }
                         <div class="mb-2"><label class="form-label" for="pw-conf">Új jelszó újra</label><input id="pw-conf" type="@PwType" class="form-control" @bind="_confirmPw" @bind:event="oninput" autocomplete="new-password" /></div>
                         <div class="form-check mb-3"><input id="pw-show" type="checkbox" class="form-check-input" @bind="_showPw" /><label class="form-check-label small" for="pw-show">Jelszó mutatása</label></div>
                         @if (_pwMessage is not null) { <div class="text-danger small mb-2" role="alert">@_pwMessage</div> }
@@ -56,8 +60,8 @@
                 </div>
 
                 <div class="col-lg-6">
-                    <div class="lm-card">
-                        <h2 class="h6">E-mail cím módosítása</h2>
+                    <div class="lm-card h-100">
+                        <div class="lm-card-title"><h2><Icon Name="mail" />E-mail cím módosítása</h2></div>
                         <p class="small text-muted">A módosítás után újra be kell jelentkezned az új címmel.</p>
                         <div class="mb-2"><label class="form-label" for="em-new">Új e-mail cím</label><input id="em-new" type="email" class="form-control" maxlength="320" @bind="_newEmail" @bind:event="oninput" autocomplete="email" /></div>
                         <div class="mb-3"><label class="form-label" for="em-pw">Jelenlegi jelszó</label><input id="em-pw" type="password" class="form-control" @bind="_emailPw" @bind:event="oninput" autocomplete="current-password" /></div>
@@ -70,8 +74,8 @@
                 @if (Auth.Role == "Producer")
                 {
                     <div class="col-lg-6">
-                        <div class="lm-card">
-                            <h2 class="h6">Gazdaság adatai</h2>
+                        <div class="lm-card h-100">
+                            <div class="lm-card-title"><h2><Icon Name="store" />Gazdaság adatai</h2></div>
                             @if (_market is not null)
                             {
                                 <p class="small text-muted">Piac: <strong>@_market.Name</strong> (@_market.Address)</p>
@@ -133,6 +137,8 @@
         if (_newPw.Length < 8) return "túl rövid";
         return (_newPw.Length >= 12 && kinds >= 3) || kinds == 4 ? "erős" : kinds >= 2 ? "közepes" : "gyenge";
     }
+
+    private int StrengthLevel() => Strength() switch { "túl rövid" => 1, "gyenge" => 1, "közepes" => 2, "erős" => 4, _ => 0 };
 
     private async Task SaveProfileAsync()
     {

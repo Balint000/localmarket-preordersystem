@@ -1,46 +1,55 @@
 @inject ApiUrls Urls
 <article class="lm-product">
-    <div class="lm-product-img @_look.Css" aria-hidden="true">
+    <div class="lm-product-img @_look.Css">
         @if (Urls.Image(Product.ImageUrl) is { } img)
         {
             <img class="lm-product-photo" src="@img" alt="" loading="lazy" />
         }
         else
         {
-            @_look.Emoji
+            <span class="lm-emoji" aria-hidden="true">@_look.Emoji</span>
         }
         @if (Product.NextStock is { } st)
         {
-            <span class="lm-product-flag @(st.AvailableQuantity > 0 ? "ok" : "out")">@(st.AvailableQuantity > 0 ? "Elérhető" : "Elfogyott")</span>
+            @if (st.AvailableQuantity <= 0)
+            {
+                <span class="lm-product-flag out">Erre a hétre elfogyott</span>
+            }
+            else if (st.Quantity > 0 && st.AvailableQuantity / st.Quantity <= 0.2m)
+            {
+                <span class="lm-product-flag low">Már csak @Labels.Qty(st.AvailableQuantity) @Labels.Unit(st.Unit)</span>
+            }
+            <PriceTag Price="st.UnitPrice" Unit="@st.Unit" Hang="true" CssClass="@(st.AvailableQuantity <= 0 ? "muted" : null)" />
         }
         else
         {
-            <span class="lm-product-flag none">Nincs kínálat</span>
+            <span class="lm-product-flag">Még nincs kínálat</span>
         }
     </div>
     <div class="lm-product-body">
         <a class="lm-product-name" href="products/@Product.Id">@Product.Name</a>
-        <div class="text-muted small">@(Product.ProducerName ?? "Termelő")</div>
-        <div>
-            @foreach (var c in Product.Categories)
-            {
-                <span class="lm-chip">@c.Name</span>
-            }
-        </div>
-        @if (Product.NextStock is { } stock)
+        <div class="lm-product-producer"><Icon Name="store" Size="14" />@(Product.ProducerName ?? "Termelő")</div>
+        @if (Product.Categories.Count > 0 || Product.Allergies.Count > 0)
         {
-            <div class="lm-price">@Labels.Money(stock.UnitPrice) <span class="text-muted fw-normal small">/ @Labels.Unit(stock.Unit)</span></div>
-            <div class="small @(stock.AvailableQuantity > 0 ? "text-success" : "text-danger")">
-                @(stock.AvailableQuantity > 0 ? $"Elérhető: {Labels.Qty(stock.AvailableQuantity)} {Labels.Unit(stock.Unit)}" : "Elfogyott erre a hétre")
+            <div class="lm-product-chips">
+                @foreach (var c in Product.Categories)
+                {
+                    <span class="lm-chip">@c.Name</span>
+                }
+                @if (Product.Allergies.Count > 0)
+                {
+                    <span class="lm-chip lm-chip-warn" title="@string.Join(", ", Product.Allergies.Select(Labels.Allergy))">
+                        @(Product.Allergies.Count == 1 ? Labels.Allergy(Product.Allergies[0]) : $"{Product.Allergies.Count} allergén")
+                    </span>
+                }
             </div>
         }
-        else
+        @if (Product.NextStock is { AvailableQuantity: > 0 } stock)
         {
-            <div class="small text-muted">Még nincs meghirdetett kínálat.</div>
+            <div class="lm-product-meta">
+                <span class="text-muted">Rendelhető: @Labels.Qty(stock.AvailableQuantity) @Labels.Unit(stock.Unit)</span>
+            </div>
         }
-        <div class="mt-auto pt-2">
-            <a class="btn btn-outline-primary btn-sm" href="products/@Product.Id">Részletek</a>
-        </div>
     </div>
 </article>
 

@@ -34,7 +34,7 @@ public class RegisterForm
     [MinLength(8, ErrorMessage = "A jelszónak legalább 8 karakter hosszúnak kell lennie.")]
     public string Password { get; set; } = "";
 
-    [Required(ErrorMessage = "Told meg a jelszót még egyszer.")]
+    [Required(ErrorMessage = "Írd be a jelszót még egyszer.")]
     [Compare(nameof(Password), ErrorMessage = "A két jelszó nem egyezik.")]
     public string PasswordConfirm { get; set; } = "";
 

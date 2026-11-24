@@ -5,24 +5,32 @@
 @inject NavigationManager Navigation
 
 <a class="lm-skip-link" href="#main-content">Ugrás a tartalomra</a>
-<NavMenu />
 
-<main id="main-content" class="lm-main">
-    <div class="container lm-container">
-        @Body
+<div class="lm-shell">
+    <NavMenu />
+
+    <div class="lm-shell-main">
+        <main id="main-content" class="lm-main" tabindex="-1">
+            <div class="lm-container">
+                @Body
+            </div>
+        </main>
+
+        <footer class="lm-footer">
+            <div class="lm-container">
+                <span>LocalMarket – előrendelés a helyi termelői piacra</span>
+                <span>Átvétel a piacon, a választott időpontban</span>
+            </div>
+        </footer>
     </div>
-</main>
-
-<footer class="lm-footer">
-    <div class="container">LocalMarket – helyi termelői piac előrendelés</div>
-</footer>
+</div>
 
 <ToastHost />
 
-<div id="blazor-error-ui" data-nosnippet>
+<div id="blazor-error-ui" data-nosnippet role="alert">
     Váratlan hiba történt.
-    <a href="." class="reload">Újratöltés</a>
-    <span class="dismiss">🗙</span>
+    <a href="." class="reload">Oldal újratöltése</a>
+    <button type="button" class="dismiss btn-close" aria-label="Bezárás"></button>
 </div>
 
 @code {

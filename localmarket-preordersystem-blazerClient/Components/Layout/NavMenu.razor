@@ -2,70 +2,132 @@
 @inject AuthStateService Auth
 @inject CartService Cart
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
-<header class="lm-header">
-    <div class="container lm-header-inner">
-        <a class="lm-brand" href="@(Auth.IsAuthenticated ? "dashboard" : "")" aria-label="LocalMarket kezdőlap">
-            <span class="lm-brand-mark" aria-hidden="true">LM</span>
-            <span>LocalMarket</span>
-        </a>
+<AuthorizeView>
+    <Authorized>
+        @* mobil sáv: márka, kosár (vásárló), menü *@
+        <header class="lm-mobilebar">
+            <a class="lm-brand" href="dashboard" aria-label="LocalMarket áttekintés">
+                <span class="lm-brand-mark"><Icon Name="leaf" /></span>
+                <span>LocalMarket</span>
+            </a>
+            @if (Auth.Role == "Customer")
+            {
+                <a class="lm-icon-btn" href="cart" aria-label="@CartLabel">
+                    <Icon Name="cart" />
+                    @if (Cart.ItemCount > 0) { <span class="lm-count" aria-hidden="true">@Cart.ItemCount</span> }
+                </a>
+            }
+            <button type="button" id="lm-menu-button" class="lm-icon-btn" aria-label="Menü megnyitása" aria-expanded="@(_open ? "true" : "false")"
+                    aria-controls="lm-sidebar" @onclick="OpenAsync">
+                <Icon Name="menu" />
+            </button>
+        </header>
 
-        <button type="button" class="lm-menu-toggle" aria-label="Menü" aria-expanded="@_open" aria-controls="lm-nav" @onclick="() => _open = !_open">
-            <span aria-hidden="true">☰</span>
-        </button>
+        @if (_open)
+        {
+            <div class="lm-scrim" @onclick="CloseAsync" aria-hidden="true"></div>
+        }
 
-        <nav id="lm-nav" class="lm-nav @(_open ? "open" : "")" aria-label="Főmenü" @onclick="() => _open = false">
-            <NavLink class="lm-nav-link" href="products">Termékek</NavLink>
+        <aside id="lm-sidebar" class="lm-sidebar @(_open ? "open" : "")" aria-label="Oldalsáv" @onkeydown="OnKeyDown">
+            <div class="lm-sidebar-head">
+                <a class="lm-brand" href="dashboard" aria-label="LocalMarket áttekintés">
+                    <span class="lm-brand-mark"><Icon Name="leaf" /></span>
+                    <span>LocalMarket</span>
+                </a>
+                <button type="button" id="lm-sidebar-close" class="lm-icon-btn lm-sidebar-close" aria-label="Menü bezárása" @onclick="CloseAsync">
+                    <Icon Name="x" />
+                </button>
+            </div>
 
-            <AuthorizeView Roles="Customer">
-                <NavLink class="lm-nav-link" href="dashboard">Irányítópult</NavLink>
-                <NavLink class="lm-nav-link" href="orders">Rendeléseim</NavLink>
-                <NavLink class="lm-nav-link" href="cart">
-                    Kosár
-                    @if (Cart.ItemCount > 0)
-                    {
-                        <span class="lm-cart-badge" aria-label="@Cart.ItemCount tétel a kosárban">@Cart.ItemCount</span>
-                    }
-                </NavLink>
-            </AuthorizeView>
-            <AuthorizeView Roles="Producer">
-                <NavLink class="lm-nav-link" href="dashboard">Irányítópult</NavLink>
-                <NavLink class="lm-nav-link" href="vendor/orders">Rendelések</NavLink>
-                <NavLink class="lm-nav-link" href="vendor/products">Termékeim</NavLink>
-                <NavLink class="lm-nav-link" href="vendor/slots">Átvételi időpontok</NavLink>
-            </AuthorizeView>
-            <AuthorizeView Roles="Admin">
-                <NavLink class="lm-nav-link" href="dashboard">Irányítópult</NavLink>
-                <NavLink class="lm-nav-link" href="admin/producers">Árusok</NavLink>
-                <NavLink class="lm-nav-link" href="admin/markets">Piacok</NavLink>
-                <NavLink class="lm-nav-link" href="admin/categories">Kategóriák</NavLink>
-                <NavLink class="lm-nav-link" href="admin/disputes">Viták</NavLink>
-                <NavLink class="lm-nav-link" href="admin/reports">Riportok</NavLink>
-                <NavLink class="lm-nav-link" href="admin/audit">Napló</NavLink>
-            </AuthorizeView>
+            <nav class="lm-side-nav" aria-label="Főmenü">
+                <div class="lm-side-group">
+                    <NavLink class="lm-side-link" href="dashboard" Match="NavLinkMatch.All"><Icon Name="home" /><span>Áttekintés</span></NavLink>
+                </div>
 
-            <span class="lm-nav-spacer"></span>
+                @switch (Auth.Role)
+                {
+                    case "Customer":
+                        <div class="lm-side-group" role="group" aria-labelledby="ng-shop">
+                            <div class="lm-side-group-title" id="ng-shop">Vásárlás</div>
+                            <NavLink class="lm-side-link" href="products"><Icon Name="bag" /><span>Termékek</span></NavLink>
+                            <NavLink class="lm-side-link" href="cart" Match="NavLinkMatch.All">
+                                <Icon Name="cart" /><span>Kosár</span>
+                                @if (Cart.ItemCount > 0) { <span class="lm-count"><span class="visually-hidden">tételek száma: </span>@Cart.ItemCount</span> }
+                            </NavLink>
+                            <NavLink class="lm-side-link" href="orders"><Icon Name="receipt" /><span>Rendeléseim</span></NavLink>
+                        </div>
+                        break;
 
-            <AuthorizeView>
-                <Authorized>
-                    <UserMenu />
-                </Authorized>
-                <NotAuthorized>
-                    <NavLink class="lm-nav-link" href="login">Bejelentkezés</NavLink>
-                    <a class="btn btn-primary btn-sm" href="register">Regisztráció</a>
-                </NotAuthorized>
-            </AuthorizeView>
-        </nav>
-    </div>
-</header>
+                    case "Producer":
+                        <div class="lm-side-group" role="group" aria-labelledby="ng-orders">
+                            <div class="lm-side-group-title" id="ng-orders">Rendelések</div>
+                            <NavLink class="lm-side-link" href="vendor/orders"><Icon Name="inbox" /><span>Beérkező rendelések</span></NavLink>
+                            <NavLink class="lm-side-link" href="vendor/picking-list"><Icon Name="clipboard" /><span>Átvételi lista</span></NavLink>
+                        </div>
+                        <div class="lm-side-group" role="group" aria-labelledby="ng-offer">
+                            <div class="lm-side-group-title" id="ng-offer">Kínálat</div>
+                            <NavLink class="lm-side-link" href="vendor/products"><Icon Name="sprout" /><span>Termékeim</span></NavLink>
+                            <NavLink class="lm-side-link" href="vendor/slots"><Icon Name="clock" /><span>Átvételi időpontok</span></NavLink>
+                            <NavLink class="lm-side-link" href="products" Match="NavLinkMatch.All"><Icon Name="store" /><span>A piac kínálata</span></NavLink>
+                        </div>
+                        break;
+
+                    case "Admin":
+                        <div class="lm-side-group" role="group" aria-labelledby="ng-market">
+                            <div class="lm-side-group-title" id="ng-market">Piac</div>
+                            <NavLink class="lm-side-link" href="admin/producers"><Icon Name="users" /><span>Árusok</span></NavLink>
+                            <NavLink class="lm-side-link" href="admin/markets"><Icon Name="pin" /><span>Piacok</span></NavLink>
+                            <NavLink class="lm-side-link" href="admin/categories"><Icon Name="tag" /><span>Kategóriák</span></NavLink>
+                            <NavLink class="lm-side-link" href="products" Match="NavLinkMatch.All"><Icon Name="store" /><span>Termékek</span></NavLink>
+                        </div>
+                        <div class="lm-side-group" role="group" aria-labelledby="ng-oversight">
+                            <div class="lm-side-group-title" id="ng-oversight">Felügyelet</div>
+                            <NavLink class="lm-side-link" href="admin/disputes"><Icon Name="scale" /><span>Viták</span></NavLink>
+                            <NavLink class="lm-side-link" href="admin/reports"><Icon Name="chart" /><span>Riportok</span></NavLink>
+                            <NavLink class="lm-side-link" href="admin/audit"><Icon Name="history" /><span>Napló</span></NavLink>
+                        </div>
+                        break;
+                }
+            </nav>
+
+            <div class="lm-sidebar-foot">
+                <UserMenu />
+            </div>
+        </aside>
+    </Authorized>
+
+    <NotAuthorized>
+        <header class="lm-topbar">
+            <div class="lm-container">
+                <a class="lm-brand" href="" aria-label="LocalMarket kezdőlap">
+                    <span class="lm-brand-mark"><Icon Name="leaf" /></span>
+                    <span class="lm-brand-text">LocalMarket</span>
+                </a>
+                <nav class="lm-topbar-nav" aria-label="Főmenü">
+                    <NavLink class="lm-toplink" href="products" aria-label="Termékek"><Icon Name="bag" /><span>Termékek</span></NavLink>
+                </nav>
+                <div class="lm-topbar-actions">
+                    <ThemeToggle />
+                    <NavLink class="lm-toplink lm-toplink-login" href="login" aria-label="Bejelentkezés"><Icon Name="login" /><span>Bejelentkezés</span></NavLink>
+                    <a class="btn btn-primary" href="register">Regisztráció</a>
+                </div>
+            </div>
+        </header>
+    </NotAuthorized>
+</AuthorizeView>
 
 @code {
     private bool _open;
+
+    private string CartLabel => Cart.ItemCount > 0 ? $"Kosár, {Cart.ItemCount} tétel" : "Kosár";
 
     protected override async Task OnInitializedAsync()
     {
         Auth.AuthenticationStateChanged += OnAuthChanged;
         Cart.Changed += OnCartChanged;
+        Navigation.LocationChanged += OnLocationChanged;
         await RefreshCartCountAsync();
     }
 
@@ -76,6 +138,42 @@
     });
 
     private void OnCartChanged() => _ = InvokeAsync(StateHasChanged);
+
+    // navigáció után a mobil fiók magától bezárul
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e) => _ = InvokeAsync(() =>
+    {
+        if (!_open) return;
+        _open = false;
+        StateHasChanged();
+    });
+
+    private async Task OpenAsync()
+    {
+        _open = true;
+        StateHasChanged();
+        await Task.Yield();
+        await FocusAsync("#lm-sidebar-close");
+    }
+
+    private async Task CloseAsync()
+    {
+        if (!_open) return;
+        _open = false;
+        StateHasChanged();
+        await FocusAsync("#lm-menu-button");
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") await CloseAsync();
+    }
+
+    private async Task FocusAsync(string selector)
+    {
+        try { await JS.InvokeVoidAsync("lmFocus", selector); }
+        catch (JSException) { }
+        catch (InvalidOperationException) { }
+    }
 
     // a navbar-számláló a kosár tényleges (szerver oldali) tartalmából jön, nem kliensoldali számolásból
     private async Task RefreshCartCountAsync()
@@ -89,5 +187,6 @@
     {
         Auth.AuthenticationStateChanged -= OnAuthChanged;
         Cart.Changed -= OnCartChanged;
+        Navigation.LocationChanged -= OnLocationChanged;
     }
 }

@@ -8,8 +8,7 @@
 
 <PageTitle>@(_product?.Name ?? "Termék") – LocalMarket</PageTitle>
 
-<PageContainer Title="@(_product?.Name ?? "Termék")" Subtitle="@_product?.ProducerName">
-    <Actions><a class="btn btn-outline-secondary" href="products">← Vissza a termékekhez</a></Actions>
+<PageContainer Title="@(_product?.Name ?? "Termék")" Subtitle="@_product?.ProducerName" BackHref="products" BackText="A heti kínálat">
     <ChildContent>
 
     @if (_loading)
@@ -22,84 +21,85 @@
     }
     else if (_product is not null)
     {
-        <div class="row g-4">
-            <div class="col-md-5">
-                <div class="lm-product-img rounded @Look.Css" style="height:260px;font-size:5rem;overflow:hidden">
+        <div class="row g-4 align-items-stretch">
+            <div class="col-md-6 col-lg-7">
+                <div class="lm-detail-cover @Look.Css">
                     @if (Urls.Image(_product.ImageUrl) is { } img)
                     {
                         <img class="lm-product-photo" src="@img" alt="@_product.Name" />
                     }
                     else
                     {
-                        <span aria-hidden="true">@Look.Emoji</span>
+                        <span class="lm-emoji" aria-hidden="true">@Look.Emoji</span>
+                    }
+                    @if (_product.NextStock is { } tagStock)
+                    {
+                        <PriceTag Price="tagStock.UnitPrice" Unit="@tagStock.Unit" Hang="true" Large="true" CssClass="@(Available ? null : "muted")" />
                     }
                 </div>
             </div>
-            <div class="col-md-7">
-                <div class="lm-card">
-                    <div class="mb-2">
+            <div class="col-md-6 col-lg-5">
+                <div class="lm-card raised lm-buy h-100">
+                    <div>
                         @foreach (var c in _product.Categories) { <span class="lm-chip">@c.Name</span> }
+                        @foreach (var a in _product.Allergies) { <span class="lm-chip lm-chip-warn" title="Allergén">@Labels.Allergy(a)</span> }
                     </div>
                     @if (!string.IsNullOrWhiteSpace(_product.Description))
                     {
-                        <p>@_product.Description</p>
-                    }
-
-                    @if (_product.Allergies.Count > 0)
-                    {
-                        <div class="mb-3">
-                            <span class="fw-semibold">Allergének:</span>
-                            @foreach (var a in _product.Allergies) { <span class="lm-chip lm-chip-warn">@Labels.Allergy(a)</span> }
-                        </div>
+                        <p class="mb-0">@_product.Description</p>
                     }
 
                     @if (_product.NextStock is { } stock)
                     {
-                        <div class="lm-price fs-4">@Labels.Money(stock.UnitPrice) <span class="text-muted fw-normal fs-6">/ @Labels.Unit(stock.Unit)</span></div>
-                        <div class="mb-3 @(Available ? "text-success" : "text-danger")">
-                            @(Available ? $"Elérhető: {Labels.Qty(stock.AvailableQuantity)} {Labels.Unit(stock.Unit)} (hét: {Labels.Date(stock.WeekStartDate)})" : "Erre a hétre elfogyott.")
+                        <div>
+                            <div class="d-flex justify-content-between small mb-1">
+                                <span class="fw-bold @(Available ? "" : "text-danger")">@(Available ? $"Még {Labels.Qty(stock.AvailableQuantity)} {Labels.Unit(stock.Unit)} rendelhető" : "Erre a hétre elfogyott")</span>
+                                <span class="text-muted">@Labels.DateShort(stock.WeekStartDate) hete</span>
+                            </div>
+                            <div class="lm-meter @(AvailableShare <= 20 ? "low" : "")" role="img" aria-label="A heti készlet @(AvailableShare) százaléka elérhető">
+                                <span style="width:@(AvailableShare)%"></span>
+                            </div>
                         </div>
 
                         @if (!Auth.IsAuthenticated)
                         {
-                            <a class="btn btn-primary" href="login?returnUrl=products/@Id">Jelentkezz be a rendeléshez</a>
+                            <a class="btn btn-primary btn-lg" href="login?returnUrl=products/@Id"><Icon Name="login" />Jelentkezz be a rendeléshez</a>
                         }
                         else if (Auth.Role == "Customer")
                         {
-                            <EditForm Model="this" OnSubmit="AddToCartAsync" FormName="add-to-cart">
-                                <div class="d-flex flex-wrap align-items-end gap-2">
-                                    <div>
-                                        <label class="form-label mb-1" for="qty">Mennyiség (@Labels.Unit(stock.Unit))</label>
-                                        <input id="qty" type="number" class="form-control" style="width:140px"
-                                               min="@MinQty(stock)" step="@Step(stock)" @bind="_quantity" @bind:event="oninput" disabled="@(!Available)" />
-                                    </div>
-                                    <SubmitButton Busy="_adding" Disabled="!Available">Kosárba</SubmitButton>
+                            <form @onsubmit="AddToCartAsync" @onsubmit:preventDefault="true">
+                                <label class="form-label" for="qty">Mennyiség (@Labels.Unit(stock.Unit))</label>
+                                <div class="d-flex flex-wrap align-items-center gap-3">
+                                    <QuantityStepper Id="qty" @bind-Value="_quantity" Min="@MinQty(stock)" Step="@Step(stock)"
+                                                     Max="@(stock.AvailableQuantity > 0 ? stock.AvailableQuantity : null)" Disabled="!Available" Label="@($"Mennyiség ({Labels.Unit(stock.Unit)})")" />
+                                    <span class="text-muted small">összesen <strong class="text-body">@Labels.Money(_quantity * stock.UnitPrice)</strong></span>
                                 </div>
+                                <SubmitButton Busy="_adding" Disabled="!Available" CssClass="btn-primary btn-lg w-100 mt-3"><Icon Name="cart" />Kosárba teszem</SubmitButton>
                                 @if (_addProblem is not null)
                                 {
                                     <div class="mt-3"><ErrorMessage Problem="_addProblem" /></div>
                                 }
-                            </EditForm>
+                            </form>
                         }
                         else
                         {
-                            <p class="text-muted mb-0">Rendelni csak vásárlói fiókkal lehet.</p>
+                            <div class="lm-callout info mb-0"><Icon Name="info" /><div class="lm-callout-body">Rendelni vásárlói fiókkal lehet.</div></div>
                         }
                     }
                     else
                     {
-                        <p class="text-muted mb-0">Ehhez a termékhez még nincs meghirdetett kínálat, ezért nem rendelhető.</p>
+                        <div class="lm-callout info mb-0"><Icon Name="info" /><div class="lm-callout-body">Ehhez a termékhez még nincs meghirdetett heti kínálat, ezért most nem rendelhető.</div></div>
                     }
                 </div>
             </div>
         </div>
 
         <div class="row g-4 mt-1">
-            <div class="col-lg-4">
+            <div class="col-lg-5">
                 <div class="lm-card h-100">
-                    <h2 class="h6">Az árusról</h2>
+                    <div class="lm-card-title"><h2><Icon Name="store" />Az árusról</h2></div>
                     <dl class="lm-facts">
-                        <dt>Árus</dt><dd>@_product.ProducerName</dd>
+                        <dt>Árus</dt><dd class="fw-bold">@_product.ProducerName</dd>
                         @if (_producer is not null) { <dt>Stand</dt><dd>@_producer.StallNumber. számú stand</dd> }
                         @if (_market is not null)
                         {
@@ -109,42 +109,48 @@
                     </dl>
                     @if (_weather is { ForecastAvailable: true } w)
                     {
-                        <div class="lm-weather mt-3">
-                            <span class="lm-weather-icon" aria-hidden="true">🌤️</span>
+                        <div class="lm-weather">
+                            <span class="lm-weather-icon" aria-hidden="true"><Icon Name="@Labels.WeatherIcon(w)" /></span>
                             <div>
-                                <div class="fw-semibold">Következő piacnap: @Labels.Date(w.Date)</div>
-                                <div class="small">@w.Description · @Labels.Qty((decimal)(w.TemperatureMinC ?? 0)) – @Labels.Qty((decimal)(w.TemperatureMaxC ?? 0)) °C · csapadék: @Labels.Qty((decimal)(w.PrecipitationMm ?? 0)) mm</div>
+                                <div class="small text-muted">Időjárás a következő piacnapon, @Labels.DateLong(w.Date)</div>
+                                <div class="lm-weather-temp">@Labels.Qty((decimal)(w.TemperatureMinC ?? 0))–@Labels.Qty((decimal)(w.TemperatureMaxC ?? 0)) °C</div>
+                                <div class="small">@w.Description, csapadék: @Labels.Qty((decimal)(w.PrecipitationMm ?? 0)) mm</div>
                             </div>
                         </div>
                     }
                 </div>
             </div>
-            <div class="col-lg-8">
-                <div class="lm-card mb-3">
-                    <h2 class="h6">Heti kínálat</h2>
+            <div class="col-lg-7">
+                <div class="lm-card mb-4">
+                    <div class="lm-card-title"><h2><Icon Name="clock" />Szabad átvételi időpontok</h2></div>
+                    @if (_slots.Count == 0) { <p class="text-muted mb-0">Az árus még nem hirdetett meg szabad átvételi időpontot.</p> }
+                    else
+                    {
+                        <div>
+                            @foreach (var sl in _slots)
+                            {
+                                <span class="lm-slot-chip">
+                                    <strong>@Labels.DateShort(sl.Date), @Labels.Day(sl.Date.DayOfWeek.ToString())</strong>
+                                    <span>@Labels.Time(sl.StartTime)–@Labels.Time(sl.EndTime), @sl.FreeCapacity szabad hely</span>
+                                </span>
+                            }
+                        </div>
+                    }
+                </div>
+                <div class="lm-card">
+                    <div class="lm-card-title"><h2><Icon Name="calendar" />Heti kínálat</h2></div>
                     @if (_product.WeeklyStocks.Count == 0) { <p class="text-muted mb-0">Még nincs meghirdetett készlet.</p> }
                     else
                     {
                         <table class="table lm-table mb-0">
-                            <thead><tr><th>Hét kezdete</th><th class="text-end">Elérhető</th><th class="text-end">Ár</th></tr></thead>
+                            <thead><tr><th>Hét</th><th class="text-end">Elérhető</th><th class="text-end">Ár</th></tr></thead>
                             <tbody>
                             @foreach (var ws in _product.WeeklyStocks)
                             {
-                                <tr><td>@Labels.Date(ws.WeekStartDate)</td><td class="text-end">@Labels.Qty(ws.AvailableQuantity) / @Labels.Qty(ws.Quantity) @Labels.Unit(ws.Unit)</td><td class="text-end">@Labels.Money(ws.UnitPrice) / @Labels.Unit(ws.Unit)</td></tr>
+                                <tr><td>@Labels.DateShort(ws.WeekStartDate) hete</td><td class="text-end">@Labels.Qty(ws.AvailableQuantity) / @Labels.Qty(ws.Quantity) @Labels.Unit(ws.Unit)</td><td class="text-end">@Labels.Money(ws.UnitPrice) / @Labels.Unit(ws.Unit)</td></tr>
                             }
                             </tbody>
                         </table>
-                    }
-                </div>
-                <div class="lm-card">
-                    <h2 class="h6">Szabad átvételi időpontok</h2>
-                    @if (_slots.Count == 0) { <p class="text-muted mb-0">Az árus még nem hirdetett meg átvételi időpontot.</p> }
-                    else
-                    {
-                        @foreach (var sl in _slots)
-                        {
-                            <span class="lm-slot-chip">@Labels.Date(sl.Date) · @Labels.Time(sl.StartTime)–@Labels.Time(sl.EndTime) · @sl.FreeCapacity szabad hely</span>
-                        }
                     }
                 </div>
             </div>
@@ -170,6 +176,10 @@
 
     private bool Available => _product?.NextStock is { AvailableQuantity: > 0 };
 
+    private int AvailableShare => _product?.NextStock is { Quantity: > 0 } s
+        ? (int)Math.Clamp(Math.Round(s.AvailableQuantity / s.Quantity * 100), 0, 100)
+        : 0;
+
     protected override async Task OnParametersSetAsync() => await LoadAsync();
 
     private async Task LoadAsync()
@@ -179,6 +189,7 @@
         var result = await Catalog.ProductAsync(Id);
         if (result.IsSuccess) _product = result.Value; else { _product = null; _problem = result.Problem; }
         _loading = false;
+        if (_product?.NextStock is { } st) _quantity = Math.Max(MinQty(st), st.Unit is "Gram" or "Millilitre" or "Decagram" ? Step(st) : 1m);
         if (_product is not null) await LoadExtrasAsync(_product);
     }
 
@@ -212,9 +223,17 @@
         return null;
     }
 
-    // csak beviteli segítség: darab-egységnél egész lépés; a szabályt a backend kényszeríti
-    private static string Step(ProductStockInfo s) => s.Unit == "Piece" ? "1" : "0.1";
-    private static string MinQty(ProductStockInfo s) => s.Unit == "Piece" ? "1" : "0.1";
+    // darabos egység (Domain: UnitsExtensions.IsCountable): csak egész mennyiség
+    // a léptetés csak kényelmi; beírni bármilyen pozitív mennyiséget lehet, a szabályt a backend kényszeríti
+    private static decimal Step(ProductStockInfo s) => s.Unit switch
+    {
+        "Kilogram" or "Litre" => 0.5m,
+        "Decagram" => 10m,
+        "Gram" or "Millilitre" => 100m,
+        _ => 1m
+    };
+    private static decimal MinQty(ProductStockInfo s) => IsCountable(s.Unit) ? 1m : s.Unit is "Kilogram" or "Litre" ? 0.1m : 1m;
+    private static bool IsCountable(string unit) => unit is "Piece" or "Bundle" or "Box" or "Pack" or "Bottle" or "Jar" or "Bunch" or "Tray";
 
     private async Task AddToCartAsync()
     {

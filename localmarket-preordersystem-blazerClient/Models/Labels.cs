@@ -81,6 +81,16 @@ public static class Labels
         _ => p
     };
 
+    public static string PaymentStatus(string s) => s switch
+    {
+        "Pending" => "fizetésre vár",
+        "Completed" => "kifizetve",
+        "Cancelled" => "törölve",
+        "Error" => "hiba",
+        "Refunded" => "visszatérítve",
+        _ => s
+    };
+
     public static string Role(string r) => r switch
     {
         "Customer" => "Vásárló",
@@ -143,6 +153,52 @@ public static class Labels
         NumberDecimalSeparator = ",",
         NumberGroupSeparator = "\u00A0",
         NumberGroupSizes = [3]
+    };
+
+    private static readonly string[] Months =
+        ["január", "február", "március", "április", "május", "június", "július", "augusztus", "szeptember", "október", "november", "december"];
+
+    /// <summary>Emberi dátum: "november 28., szombat" (kultúra-adatoktól függetlenül).</summary>
+    public static string DateLong(DateTime d) => $"{Months[d.Month - 1]} {d.Day}., {Day(d.DayOfWeek.ToString())}";
+
+    /// <summary>Rövid dátum: "nov. 28." – kártyákon, chipeken.</summary>
+    public static string DateShort(DateTime d) => $"{Months[d.Month - 1][..3]}. {d.Day}.";
+
+    /// <summary>Relatív napnév, ha közel van: "ma", "holnap", különben a hét napja.</summary>
+    public static string DayRelative(DateTime d)
+    {
+        var diff = (d.Date - DateTime.Today).Days;
+        return diff switch { 0 => "ma", 1 => "holnap", _ => Day(d.DayOfWeek.ToString()) };
+    }
+
+    /// <summary>A hét napjának egybetűs/kétbetűs rövidítése a nyitvatartás-sávhoz.</summary>
+    public static string DayAbbr(string d) => d switch
+    {
+        "Monday" => "H", "Tuesday" => "K", "Wednesday" => "Sze", "Thursday" => "Cs",
+        "Friday" => "P", "Saturday" => "Szo", "Sunday" => "V", _ => d
+    };
+
+    /// <summary>Időjárás-ikon a leírás és a csapadék alapján (csak megjelenítés).</summary>
+    public static string WeatherIcon(MarketWeatherInfo? w)
+    {
+        if (w is null) return "cloud";
+        var text = (w.Description ?? "").ToLowerInvariant();
+        if (text.Contains("hó") || text.Contains("havas")) return "snow";
+        if (text.Contains("eső") || text.Contains("zápor") || text.Contains("zivatar") || w.PrecipitationMm is > 1) return "cloud-rain";
+        if (text.Contains("részben") || text.Contains("változó")) return "cloud-sun";
+        if (text.Contains("derült") || text.Contains("napos") || text.Contains("tiszta")) return "sun";
+        if (text.Contains("felhős") || text.Contains("borult") || text.Contains("köd")) return "cloud";
+        return "cloud-sun";
+    }
+
+    public static string PaymentIcon(string p) => p switch { "Cash" => "cash", "Card" => "card", "BankTransfer" => "bank", _ => "cash" };
+
+    public static string PaymentHint(string p) => p switch
+    {
+        "Cash" => "A standnál fizetsz, átvételkor.",
+        "Card" => "Bankkártyával fizetsz átvételkor.",
+        "BankTransfer" => "Átutalással rendezed; az oldalon nincs online fizetés.",
+        _ => ""
     };
 
     public static string Date(DateTime d) => d.ToString("yyyy. MM. dd.", System.Globalization.CultureInfo.InvariantCulture);

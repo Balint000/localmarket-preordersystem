@@ -9,9 +9,17 @@
 
 <PageTitle>@(Id is null ? "Új termék" : "Termék szerkesztése") – LocalMarket</PageTitle>
 
-<PageContainer Title="@(Id is null ? "Új termék meghirdetése" : _name)" Subtitle="@(Id is null ? "A mentés után add meg a heti készletet." : "Termékadatok és heti készlet")">
-    <Actions><a class="btn btn-outline-secondary" href="vendor/products">← Termékeim</a></Actions>
+<PageContainer Title="@(Id is null ? "Új termék meghirdetése" : (string.IsNullOrWhiteSpace(_name) ? "Termék szerkesztése" : _name))"
+               Subtitle="@(Id is null ? "Először a termék adatai, a mentés után jön a heti készlet és az ár." : "Termékadatok, kép és heti készlet")"
+               BackHref="vendor/products" BackText="Termékeim">
     <ChildContent>
+        @if (Id is null)
+        {
+            <ol class="lm-steps-bar" aria-label="A meghirdetés lépései">
+                <li class="current" aria-current="step"><span>Termékadatok</span></li>
+                <li><span>Heti készlet és ár</span></li>
+            </ol>
+        }
         @if (_loading) { <LoadingIndicator /> }
         else if (_problem is not null) { <ErrorMessage Problem="_problem" OnRetry="LoadAsync" /> }
         else
@@ -19,7 +27,7 @@
             <div class="row g-4">
                 <div class="col-lg-6">
                     <div class="lm-card">
-                        <h2 class="h6">Termékadatok</h2>
+                        <div class="lm-card-title"><h2><Icon Name="sprout" />Termékadatok</h2></div>
                         <div class="mb-2">
                             <label class="form-label" for="p-name">Név</label>
                             <input id="p-name" class="form-control" maxlength="100" @bind="_name" @bind:event="oninput" />
@@ -52,13 +60,13 @@
                             }
                         </fieldset>
                         <FormProblem Problem="_saveProblem" />
-                        <SubmitButton Busy="_busy" Disabled="string.IsNullOrWhiteSpace(_name) || _selectedCategories.Count == 0" CssClass="btn-primary" OnClick="SaveAsync">@(Id is null ? "Meghirdetés" : "Mentés")</SubmitButton>
+                        <SubmitButton Busy="_busy" Disabled="string.IsNullOrWhiteSpace(_name) || _selectedCategories.Count == 0" CssClass="btn-primary" OnClick="SaveAsync">@(Id is null ? "Mentés és tovább a készlethez" : "Változások mentése")</SubmitButton>
                     </div>
 
                     @if (Id is not null)
                     {
                         <div class="lm-card mt-3">
-                            <h2 class="h6">Termékkép</h2>
+                            <div class="lm-card-title"><h2><Icon Name="image" />Termékkép</h2></div>
                             @if (Urls.Image(_imageUrl) is { } preview)
                             {
                                 <img class="lm-image-preview mb-2" src="@preview" alt="A termék jelenlegi képe" />
@@ -71,7 +79,7 @@
                             <InputFile id="p-image" class="form-control mb-2" accept="image/jpeg,image/png,image/webp" OnChange="UploadImageAsync" disabled="@_imageBusy" />
                             @if (_imageUrl is not null)
                             {
-                                <button type="button" class="btn btn-outline-danger btn-sm" disabled="@_imageBusy" @onclick="DeleteImageAsync">Kép törlése</button>
+                                <button type="button" class="btn btn-outline-danger btn-sm" disabled="@_imageBusy" @onclick="DeleteImageAsync"><Icon Name="trash" Size="16" />Kép törlése</button>
                             }
                             <FormProblem Problem="_imageProblem" />
                         </div>
@@ -82,7 +90,7 @@
                 {
                     <div class="col-lg-6">
                         <div class="lm-card">
-                            <h2 class="h6">Heti készlet és elérhetőség</h2>
+                            <div class="lm-card-title"><h2><Icon Name="package" />Heti készlet és ár</h2></div>
                             <p class="small text-muted">Add meg, mennyi áll rendelkezésre az adott héten és milyen áron. A vásárlók csak a meghirdetett, elérhető készletből rendelhetnek.</p>
                             <div class="row g-2 mb-2">
                                 <div class="col-sm-6"><label class="form-label" for="s-week">Hét (bármely napja)</label><input id="s-week" type="date" class="form-control" @bind="_week" /></div>
@@ -98,7 +106,7 @@
                         </div>
 
                         <div class="lm-card mt-3">
-                            <h2 class="h6">Meghirdetett hetek</h2>
+                            <div class="lm-card-title"><h2><Icon Name="calendar" />Meghirdetett hetek</h2></div>
                             @if (_stocks.Count == 0) { <p class="text-muted mb-0">Még nincs meghirdetett készlet.</p> }
                             else
                             {
@@ -108,7 +116,7 @@
                                     @foreach (var s in _stocks)
                                     {
                                         <tr>
-                                            <td>@Labels.Date(s.WeekStartDate)</td>
+                                            <td>@Labels.DateShort(s.WeekStartDate) hete</td>
                                             <td class="text-end">@Labels.Qty(s.Quantity) @Labels.Unit(s.Unit)</td>
                                             <td class="text-end">@Labels.Qty(s.ReservedQuantity)</td>
                                             <td class="text-end">@Labels.Qty(s.AvailableQuantity)</td>

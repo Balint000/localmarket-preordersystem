@@ -2,15 +2,15 @@
     <Found Context="routeData">
         <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
             <Authorizing>
-                <LoadingIndicator Text="Betöltés..." />
+                <LoadingIndicator Text="Betöltés…" />
             </Authorizing>
             <NotAuthorized>
                 @if (context.User.Identity?.IsAuthenticated == true)
                 {
                     <PageContainer Title="Nincs jogosultságod">
-                        <EmptyState Title="Ehhez az oldalhoz nincs hozzáférésed"
-                                           Text="A fiókod szerepköre nem teszi lehetővé az oldal megnyitását.">
-                            <a class="btn btn-primary" href="dashboard">Vissza a kezdőlapra</a>
+                        <EmptyState Title="Ehhez az oldalhoz nincs hozzáférésed" IconName="lock"
+                                    Text="Ezt az oldalt más szerepkörű fiók használhatja. Ha szerinted ez hiba, jelentkezz be a megfelelő fiókkal.">
+                            <a class="btn btn-primary" href="dashboard">Vissza az áttekintéshez</a>
                         </EmptyState>
                     </PageContainer>
                 }

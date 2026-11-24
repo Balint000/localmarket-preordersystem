@@ -7,25 +7,33 @@
 <PageTitle>Piacok – LocalMarket</PageTitle>
 
 <PageContainer Title="Piacok" Subtitle="Piacok felvétele, nyitvatartás és elhelyezkedés szerkesztése">
-    <Actions><button class="btn btn-primary" @onclick="OpenNew">Új piac</button></Actions>
+    <Actions><button class="btn btn-primary" @onclick="OpenNew"><Icon Name="plus" />Új piac</button></Actions>
     <ChildContent>
         @if (_loading) { <LoadingIndicator /> }
         else if (_problem is not null) { <ErrorMessage Problem="_problem" OnRetry="LoadAsync" /> }
-        else if (_markets.Count == 0) { <EmptyState Title="Még nincs piac" Text="Vegyél fel egy piacot, hogy az árusok regisztrálhassanak." /> }
+        else if (_markets.Count == 0) { <EmptyState Title="Még nincs piac" IconName="pin" Text="Vegyél fel egy piacot, hogy az árusok regisztrálhassanak." /> }
         else
         {
-            <div class="lm-grid">
+            <div class="lm-grid wide">
                 @foreach (var m in _markets)
                 {
-                    <article class="lm-card">
+                    <article class="lm-card d-flex flex-column">
                         <div class="d-flex justify-content-between align-items-start gap-2">
                             <h2 class="h6 mb-1">@m.Name</h2>
                             <span class="lm-badge @(m.IsActive ? "badge-ok" : "badge-muted")">@(m.IsActive ? "Aktív" : "Inaktív")</span>
                         </div>
                         <div class="text-muted small">@m.Address</div>
-                        <div class="mt-2 small">Nyitva: @(m.OpeningDays.Count == 0 ? "–" : string.Join(", ", m.OpeningDays.Select(Labels.Day)))</div>
-                        <div class="small text-muted">@(m.Latitude is null ? "Nincs koordináta (időjárás nem kérdezhető le)" : $"Koordináta: {m.Latitude:0.0000}, {m.Longitude:0.0000}")</div>
-                        <button class="btn btn-outline-primary btn-sm mt-3" @onclick="() => OpenEdit(m)">Szerkesztés</button>
+                        <div class="lm-days" role="img" aria-label="Nyitvatartás: @(m.OpeningDays.Count == 0 ? "nincs megadva" : string.Join(", ", m.OpeningDays.Select(Labels.Day)))">
+                            @foreach (var d in Labels.DayKeys)
+                            {
+                                <span class="lm-day @(m.OpeningDays.Contains(d) ? "on" : "")" aria-hidden="true">@Labels.DayAbbr(d)</span>
+                            }
+                        </div>
+                        <div class="small mt-2 @(m.Latitude is null ? "text-danger" : "text-muted")">
+                            <Icon Name="@(m.Latitude is null ? "warning" : "pin")" Size="14" />
+                            @(m.Latitude is null ? "Nincs koordináta, ezért időjárás sem kérhető le" : $"{m.Latitude:0.0000}, {m.Longitude:0.0000}")
+                        </div>
+                        <div class="mt-auto pt-3"><button class="btn btn-outline-primary btn-sm" @onclick="() => OpenEdit(m)"><Icon Name="pencil" Size="16" />Szerkesztés</button></div>
                     </article>
                 }
             </div>

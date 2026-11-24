@@ -5,10 +5,10 @@
 
 <PageTitle>Kosár – LocalMarket</PageTitle>
 
-<PageContainer Title="Kosár" Subtitle="A rendelés árusonként külön kerül leadásra">
+<PageContainer Title="Kosár" Subtitle="Termelőnként külön rendelés készül, mindegyikhez saját átvételi időponttal.">
     @if (_loading)
     {
-        <LoadingIndicator Text="Kosár betöltése..." />
+        <LoadingIndicator Text="Kosár betöltése…" />
     }
     else if (_problem is not null && _cart is null)
     {
@@ -16,57 +16,63 @@
     }
     else if (_cart is null || _cart.Groups.Count == 0)
     {
-        <EmptyState Title="A kosarad üres" Text="Nézz körül a termelők kínálatában.">
-            <a class="btn btn-primary" href="products">Termékek böngészése</a>
+        <EmptyState Title="A kosarad üres" Text="Nézz körül a heti kínálatban; amit kosárba teszel, itt találod." IconName="cart">
+            <a class="btn btn-primary" href="products"><Icon Name="bag" />A heti kínálat</a>
         </EmptyState>
     }
     else
     {
+        <CheckoutSteps Current="1" />
+
         @if (_problem is not null)
         {
             <ErrorMessage Problem="_problem" />
         }
 
-        @foreach (var group in _cart.Groups)
-        {
-            <section class="lm-card mb-3" aria-label="@(group.ProducerName ?? "Termelő")">
-                <h2 class="h5">@(group.ProducerName ?? $"Termelő #{group.ProducerId}")</h2>
-                <table class="lm-table lm-stack">
-                    <thead>
-                        <tr><th>Termék</th><th class="num">Egységár</th><th>Mennyiség</th><th class="num">Részösszeg</th><th><span class="visually-hidden">Műveletek</span></th></tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var item in group.Items)
-                        {
-                            <tr>
-                                <td data-label="Termék"><a href="products/@item.ProductId">@item.ProductName</a></td>
-                                <td data-label="Egységár" class="num">@Labels.Money(item.UnitPriceSnapshot)</td>
-                                <td data-label="Mennyiség">
-                                    <div class="d-flex align-items-center gap-1">
-                                        <button type="button" class="btn btn-outline-secondary btn-sm" aria-label="Mennyiség csökkentése" disabled="@(_busyProduct == item.ProductId || item.Quantity <= 1)" @onclick="() => ChangeAsync(item, item.Quantity - 1)">−</button>
-                                        <input type="number" class="form-control form-control-sm" style="width:90px" min="0.01" step="any"
-                                               aria-label="@item.ProductName mennyisége" value="@item.Quantity.ToString(System.Globalization.CultureInfo.InvariantCulture)"
-                                               disabled="@(_busyProduct == item.ProductId)" @onchange="e => OnQuantityTypedAsync(item, e)" />
-                                        <button type="button" class="btn btn-outline-secondary btn-sm" aria-label="Mennyiség növelése" disabled="@(_busyProduct == item.ProductId)" @onclick="() => ChangeAsync(item, item.Quantity + 1)">+</button>
+        <div class="lm-split">
+            <div>
+                @foreach (var group in _cart.Groups)
+                {
+                    <section class="lm-card mb-3" aria-labelledby="grp-@group.ProducerId">
+                        <div class="lm-card-title">
+                            <h2 id="grp-@group.ProducerId"><Icon Name="store" />@(group.ProducerName ?? $"Termelő #{group.ProducerId}")</h2>
+                            <span class="text-muted small">@group.Items.Count tétel</span>
+                        </div>
+                        <div class="lm-lines">
+                            @foreach (var item in group.Items)
+                            {
+                                var busy = _busyProduct == item.ProductId;
+                                <div class="lm-line @(busy ? "lm-busy" : "")">
+                                    <div>
+                                        <a class="lm-line-name" href="products/@item.ProductId">@item.ProductName</a>
+                                        <div class="lm-line-sub">@Labels.Money(item.UnitPriceSnapshot) egységár</div>
                                     </div>
-                                </td>
-                                <td data-label="Részösszeg" class="num">@Labels.Money(item.LineTotal)</td>
-                                <td class="num"><button type="button" class="btn btn-link text-danger btn-sm" disabled="@(_busyProduct == item.ProductId)" @onclick="() => RemoveAsync(item)">Eltávolítás</button></td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-                <div class="text-end text-muted">Részösszeg: <strong>@Labels.Money(group.Subtotal)</strong></div>
-            </section>
-        }
-
-        <div class="lm-card">
-            <div class="lm-summary"><span>Becsült végösszeg</span><span>@Labels.Money(_cart.EstimatedTotal)</span></div>
-            <p class="text-muted small mb-3">Az árakat és a készletet a szerver a rendelés leadásakor, az átvételi hét kínálata alapján véglegesíti.</p>
-            <div class="d-flex justify-content-end gap-2">
-                <a class="btn btn-outline-secondary" href="products">Vásárlás folytatása</a>
-                <a class="btn btn-primary" href="checkout">Tovább a rendeléshez</a>
+                                    <QuantityStepper Small="true" Value="item.Quantity" Min="0.01m" Step="1" Disabled="busy"
+                                                     Label="@($"{item.ProductName} mennyisége")" ValueChanged="v => ChangeAsync(item, v)" />
+                                    <div class="d-flex align-items-center gap-1 justify-content-end">
+                                        <span class="lm-line-total">@Labels.Money(item.LineTotal)</span>
+                                        <button type="button" class="lm-icon-btn lm-line-actions" aria-label="@item.ProductName eltávolítása a kosárból" title="Eltávolítás"
+                                                disabled="@busy" @onclick="() => RemoveAsync(item)"><Icon Name="trash" Size="18" /></button>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                        <div class="lm-kv mt-2 pt-2 border-top"><span>Részösszeg</span><strong>@Labels.Money(group.Subtotal)</strong></div>
+                    </section>
+                }
             </div>
+
+            <aside class="lm-card raised lm-sticky" aria-label="Összesítő">
+                <h2 class="h5 mb-3">Összesítő</h2>
+                @foreach (var group in _cart.Groups)
+                {
+                    <div class="lm-kv"><span>@(group.ProducerName ?? $"Termelő #{group.ProducerId}")</span><span>@Labels.Money(group.Subtotal)</span></div>
+                }
+                <div class="lm-summary"><span>Becsült végösszeg</span><span>@Labels.Money(_cart.EstimatedTotal)</span></div>
+                <p class="text-muted small mt-2">A végleges árat és a készletet a rendelés leadásakor, az átvételi hét kínálata alapján rögzítjük.</p>
+                <a class="btn btn-primary btn-lg w-100" href="checkout">Tovább az átvételhez<Icon Name="arrow-right" /></a>
+                <a class="btn btn-link w-100 mt-1" href="products">Vásárlás folytatása</a>
+            </aside>
         </div>
     }
 </PageContainer>
@@ -86,17 +92,6 @@
         var result = await CartSvc.GetAsync();
         if (result.IsSuccess) _cart = result.Value; else _problem = result.Problem;
         _loading = false;
-    }
-
-    private async Task OnQuantityTypedAsync(CartItemInfo item, ChangeEventArgs e)
-    {
-        if (!decimal.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var value) || value <= 0)
-        {
-            Toasts.Error("A mennyiségnek pozitív számnak kell lennie.");
-            await LoadAsync(); // visszaállítjuk a szerver szerinti értéket
-            return;
-        }
-        await ChangeAsync(item, value);
     }
 
     private async Task ChangeAsync(CartItemInfo item, decimal quantity)

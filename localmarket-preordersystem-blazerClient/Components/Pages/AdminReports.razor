@@ -4,13 +4,19 @@
 
 <PageTitle>Riportok – LocalMarket</PageTitle>
 
-<PageContainer Title="Riportok" Subtitle="Összesítések a kiválasztott időszakra">
+<PageContainer Title="Riportok" Subtitle="Összesítések a kiválasztott időszakra.">
     <ChildContent>
-        <div class="lm-toolbar">
-            <div><label class="form-label small mb-0" for="r-from">Ettől</label><input id="r-from" type="date" class="form-control form-control-sm" @bind="_from" /></div>
-            <div><label class="form-label small mb-0" for="r-to">Eddig</label><input id="r-to" type="date" class="form-control form-control-sm" @bind="_to" /></div>
-            <button class="btn btn-primary btn-sm align-self-end" disabled="@_loading" @onclick="LoadAsync">Frissítés</button>
-        </div>
+        <form class="lm-filterbar" @onsubmit="LoadAsync" @onsubmit:preventDefault="true" aria-label="Időszak">
+            <div class="lm-filterbar-row">
+                <div><label class="form-label" for="r-from">Ettől</label><input id="r-from" type="date" class="form-control" @bind="_from" /></div>
+                <div><label class="form-label" for="r-to">Eddig</label><input id="r-to" type="date" class="form-control" @bind="_to" /></div>
+                <div class="d-flex gap-2 align-self-end flex-wrap">
+                    <button type="submit" class="btn btn-primary" disabled="@_loading"><Icon Name="refresh" />Frissítés</button>
+                    <button type="button" class="lm-pill" @onclick="() => PresetAsync(7)">Utolsó 7 nap</button>
+                    <button type="button" class="lm-pill" @onclick="() => PresetAsync(30)">Utolsó 30 nap</button>
+                </div>
+            </div>
+        </form>
 
         @if (_loading) { <LoadingIndicator /> }
         else if (_problem is not null) { <ErrorMessage Problem="_problem" OnRetry="LoadAsync" /> }
@@ -18,44 +24,62 @@
         {
             @if (_rate is not null)
             {
-                <div class="lm-stats mb-4">
-                    <StatCard Label="Összes rendelés" Value="@_rate.TotalOrders.ToString()" />
-                    <StatCard Label="Lemondott" Value="@_rate.CancelledOrders.ToString()" />
-                    <StatCard Label="Elutasított" Value="@_rate.RejectedOrders.ToString()" />
-                    <StatCard Label="Lemondási arány" Value="@($"{Labels.Qty(_rate.Rate * (_rate.Rate <= 1 ? 100 : 1))}%")" />
+                <div class="lm-stats">
+                    <StatCard Label="Összes rendelés" Value="@_rate.TotalOrders.ToString()" IconName="receipt" CssClass="tone-info" />
+                    <StatCard Label="Lemondott" Value="@_rate.CancelledOrders.ToString()" IconName="x-circle" CssClass="tone-bad" />
+                    <StatCard Label="Elutasított" Value="@_rate.RejectedOrders.ToString()" IconName="x-circle" CssClass="tone-bad" />
+                    <StatCard Label="Lemondási arány" Value="@($"{Labels.Qty(RatePercent)}%")" IconName="chart" CssClass="@(RatePercent >= 15 ? "attention" : "tone-ok")" />
                 </div>
             }
             <div class="row g-4">
                 <div class="col-lg-6">
-                    <div class="lm-card">
-                        <h2 class="h6">Legnépszerűbb termékek</h2>
-                        @if (_top.Count == 0) { <p class="text-muted mb-0">Nincs adat.</p> }
+                    <div class="lm-card h-100">
+                        <div class="lm-card-title"><h2><Icon Name="bag" />Legnépszerűbb termékek</h2><span class="small text-muted">bevétel szerint</span></div>
+                        @if (_top.Count == 0) { <p class="text-muted mb-0">Ebben az időszakban nem volt rendelés.</p> }
                         else
                         {
-                            <table class="table lm-table"><thead><tr><th>Termék</th><th class="text-end">Mennyiség</th><th class="text-end">Bevétel</th></tr></thead>
-                            <tbody>@foreach (var t in _top) { <tr><td>@t.ProductName</td><td class="text-end">@Labels.Qty(t.TotalQuantity)</td><td class="text-end">@Labels.Money(t.TotalRevenue)</td></tr> }</tbody></table>
+                            var max = _top.Max(t => t.TotalRevenue);
+                            <ol class="lm-rank">
+                                @foreach (var t in _top)
+                                {
+                                    <li>
+                                        <div class="lm-rank-head"><strong>@t.ProductName</strong><span>@Labels.Money(t.TotalRevenue)</span></div>
+                                        <div class="lm-meter" aria-hidden="true"><span style="width:@Pct(t.TotalRevenue, max)%"></span></div>
+                                        <div class="small text-muted">@Labels.Qty(t.TotalQuantity) egység, @t.OrderCount rendelésben</div>
+                                    </li>
+                                }
+                            </ol>
                         }
                     </div>
                 </div>
                 <div class="col-lg-6">
-                    <div class="lm-card">
-                        <h2 class="h6">Árusok bevétele</h2>
-                        @if (_revenue.Count == 0) { <p class="text-muted mb-0">Nincs adat.</p> }
+                    <div class="lm-card h-100">
+                        <div class="lm-card-title"><h2><Icon Name="store" />Árusok bevétele</h2></div>
+                        @if (_revenue.Count == 0) { <p class="text-muted mb-0">Ebben az időszakban nem volt bevétel.</p> }
                         else
                         {
-                            <table class="table lm-table"><thead><tr><th>Árus</th><th class="text-end">Rendelés</th><th class="text-end">Bevétel</th></tr></thead>
-                            <tbody>@foreach (var v in _revenue) { <tr><td>@v.ProducerName</td><td class="text-end">@v.OrderCount</td><td class="text-end">@Labels.Money(v.Revenue)</td></tr> }</tbody></table>
+                            var max = _revenue.Max(v => v.Revenue);
+                            <ol class="lm-rank">
+                                @foreach (var v in _revenue.OrderByDescending(v => v.Revenue))
+                                {
+                                    <li>
+                                        <div class="lm-rank-head"><strong>@v.ProducerName</strong><span>@Labels.Money(v.Revenue)</span></div>
+                                        <div class="lm-meter" aria-hidden="true"><span style="width:@Pct(v.Revenue, max)%"></span></div>
+                                        <div class="small text-muted">@v.OrderCount rendelés</div>
+                                    </li>
+                                }
+                            </ol>
                         }
                     </div>
                 </div>
                 <div class="col-12">
                     <div class="lm-card">
-                        <h2 class="h6">Át nem vett rendelések</h2>
-                        @if (_unclaimed.Count == 0) { <p class="text-muted mb-0">Nincs át nem vett rendelés.</p> }
+                        <div class="lm-card-title"><h2><Icon Name="x-circle" />Át nem vett rendelések</h2></div>
+                        @if (_unclaimed.Count == 0) { <p class="text-muted mb-0">Ebben az időszakban minden rendelést átvettek.</p> }
                         else
                         {
-                            <div class="lm-table-wrap"><table class="table lm-table"><thead><tr><th>Rendelés</th><th>Árus</th><th>Vevő</th><th>Átvétel</th><th class="text-end">Összeg</th><th>Állapot</th></tr></thead>
-                            <tbody>@foreach (var u in _unclaimed) { <tr><td>#@u.OrderId</td><td>@u.ProducerName</td><td>@u.CustomerName</td><td>@Labels.Date(u.PickupDate)</td><td class="text-end">@Labels.Money(u.TotalAmount)</td><td><StatusBadge Status="@u.Status" /></td></tr> }</tbody></table></div>
+                            <div class="table-responsive border-0"><table class="table lm-table mb-0"><thead><tr><th>Rendelés</th><th>Árus</th><th>Vásárló</th><th>Átvétel napja</th><th class="text-end">Összeg</th><th>Állapot</th></tr></thead>
+                            <tbody>@foreach (var u in _unclaimed) { <tr><td>#@u.OrderId</td><td>@u.ProducerName</td><td>@u.CustomerName</td><td>@Labels.DateShort(u.PickupDate)</td><td class="text-end">@Labels.Money(u.TotalAmount)</td><td><StatusBadge Status="@u.Status" /></td></tr> }</tbody></table></div>
                         }
                     </div>
                 </div>
@@ -72,6 +96,18 @@
     private IReadOnlyList<UnclaimedOrderInfo> _unclaimed = [];
     private ApiProblem? _problem;
     private bool _loading = true;
+
+    // az API arányt (0–1) vagy már százalékot is adhat; a megjelenítés mindkettőt kezeli
+    private decimal RatePercent => _rate is null ? 0 : Math.Round(_rate.Rate <= 1 ? _rate.Rate * 100 : _rate.Rate, 1);
+
+    private static int Pct(decimal value, decimal max) => max > 0 ? (int)Math.Clamp(value / max * 100, 0, 100) : 0;
+
+    private async Task PresetAsync(int days)
+    {
+        _from = DateTime.Today.AddDays(-days);
+        _to = DateTime.Today;
+        await LoadAsync();
+    }
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
