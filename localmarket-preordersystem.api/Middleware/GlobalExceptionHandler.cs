@@ -33,10 +33,10 @@ public sealed class GlobalExceptionHandler(
             DbUpdateException { InnerException: PostgresException { SqlState: "23505" } } => (409, "Már létező adat"),
             DbUpdateException { InnerException: PostgresException { SqlState: "23514" or "23503" or "22001" or "22003" or "23502" } } => (400, "Érvénytelen adat"),
             DbUpdateException { InnerException: PostgresException { SqlState: "40001" or "40P01" } } => (409, "Párhuzamos módosítás"),
+            // az EF a tranziens adatbázis-hibát InvalidOperationException-be csomagolja (belül NpgsqlException), ez valóban 503
             DbUpdateException or NpgsqlException or TimeoutException or InvalidOperationException { InnerException: NpgsqlException }
                 => (503, "Az adatbázis átmenetileg nem elérhető"),
             JsonException or BadHttpRequestException => (400, "Hibás kérés"),
-            KeyNotFoundException => (409, "Az adat időközben megváltozott"),
             HttpRequestException => (502, "Külső szolgáltatás hiba"),
             _ => (500, "Váratlan hiba")
         };
@@ -46,7 +46,7 @@ public sealed class GlobalExceptionHandler(
         else
             logger.LogWarning("Kezelt hiba {Status} {Type}: {Message}. TraceId: {TraceId}", status, ex.GetType().Name, ex.Message, ctx.TraceIdentifier);
 
-        var exposeDetail = status < 500 && ex is not DbUpdateException && ex is not KeyNotFoundException;
+        var exposeDetail = status < 500 && ex is not DbUpdateException;
         var problem = new ProblemDetails
         {
             Status = status,

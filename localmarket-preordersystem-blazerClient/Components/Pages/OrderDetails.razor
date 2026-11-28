@@ -3,6 +3,7 @@
 @inject OrdersApi Api
 @inject FileDownloader Downloader
 @inject ToastService Toasts
+@inject CatalogApi Catalog
 
 <PageTitle>Rendelés #@Id – LocalMarket</PageTitle>
 
@@ -41,6 +42,31 @@
 
         <div class="mb-4"><OrderProgress Status="@_order.Status" /></div>
 
+        @if (_order.IsUpcoming)
+        {
+            <section class="lm-card lm-pickup mb-4" aria-labelledby="pickup-title">
+                <div class="lm-pickup-head">
+                    <div>
+                        <h2 id="pickup-title" class="h5 mb-1">Itt veheted át</h2>
+                        <p class="mb-0">
+                            <strong class="@(_order.ProducerId > 0 ? ProducerColor.Css(_order.ProducerId) : "") lm-producer-name">@_order.ProducerName</strong>
+                            @if (_order.StallNumber is int st) { <span>, @st. stand</span> }
+                            <span class="text-muted d-block small">@(_order.MarketName ?? "A piacon"), @Labels.DateLong(_order.PickupDate), @Labels.Time(_order.PickupStart)–@Labels.Time(_order.PickupEnd)</span>
+                        </p>
+                    </div>
+                    @if (_order.StallNumber is int big) { <div class="lm-stall-badge" aria-hidden="true">@big</div> }
+                </div>
+                @if (_order.StallNumber is null)
+                {
+                    <p class="small text-muted mb-0">Az árus standját a piacvezető még nem osztotta ki; a piacon a termelő nevét keresd.</p>
+                }
+                else if (_layout is { Stalls.Count: > 0 })
+                {
+                    <MarketMap Layout="_layout" Highlight="_order.StallNumber" OnlyHighlightedInLegend="true" Compact="true" />
+                }
+            </section>
+        }
+
         <div class="row g-4">
             <div class="col-lg-7">
                 <div class="lm-card">
@@ -57,6 +83,13 @@
                     {
                         <hr class="my-3" />
                         <button type="button" class="btn btn-outline-danger w-100" @onclick="() => _confirmCancel = true"><Icon Name="x-circle" />Rendelés lemondása</button>
+                        <p class="small text-muted mt-2 mb-0">Elfogadott rendelést legkésőbb 12 órával az átvételi időpont előtt mondhatsz le; utána jelezd az árusnak.</p>
+                    }
+                    @* Vita csak lezárt átadás után nyitható (átvéve / nem átvett); a piacvezető dönt. *@
+                    @if (CanDispute)
+                    {
+                        <hr class="my-3" />
+                        <button type="button" class="btn btn-outline-danger w-100" @onclick="() => { _disputeNote = string.Empty; _confirmDispute = true; }"><Icon Name="scale" />Probléma jelzése (vita)</button>
                     }
                 </div>
             </div>
@@ -66,6 +99,14 @@
                        Message="A lefoglalt készlet és az átvételi időpont felszabadul. Ezt nem lehet visszavonni."
                        ConfirmText="Igen, lemondom" CancelText="Megtartom"
                        OnConfirm="CancelAsync" OnCancel="() => _confirmCancel = false" />
+
+        <ConfirmDialog Visible="_confirmDispute" Title="Probléma jelzése" Danger="true" Busy="_busy" IconName="scale"
+                       Message="Írd le, mi nem stimmelt (pl. hiányzó tétel, nem adták ki a rendelést). A vitát a piacvezető dönti el."
+                       ConfirmText="Vitát nyitok" CancelText="Mégse" ConfirmDisabled="string.IsNullOrWhiteSpace(_disputeNote)"
+                       OnConfirm="DisputeAsync" OnCancel="() => _confirmDispute = false">
+            <label class="form-label" for="dispute-note">Indoklás (kötelező, max. 1000 karakter)</label>
+            <textarea id="dispute-note" class="form-control" rows="3" maxlength="1000" @bind="_disputeNote" @bind:event="oninput"></textarea>
+        </ConfirmDialog>
     }
 </ChildContent>
 </PageContainer>
@@ -75,7 +116,14 @@
 
     private OrderInfo? _order;
     private ApiProblem? _problem;
-    private bool _loading = true, _busy, _confirmCancel, _exporting;
+    private bool _loading = true, _busy, _confirmCancel, _confirmDispute, _exporting;
+    private string _disputeNote = string.Empty;
+    private MarketLayoutInfo? _layout;
+
+    // Vita: átvétel / „nem jött el” után, vagy ha az átvételi idősáv lejárt, de az árus nem zárta le az átadást
+    // (pl. nem adta ki a rendelést). A piac helyi ideje számít; a végső döntést a backend hozza.
+    private bool CanDispute => _order is { } o && (o.Status is "PickedUp" or "NotPickedUp"
+        || (o.Status is "Accepted" or "PartiallyFulfilled" or "Ready" && MarketClock.Now >= o.PickupDate.Date.Add(o.PickupEnd.ToTimeSpan())));
 
     protected override async Task OnParametersSetAsync() => await LoadAsync();
 
@@ -86,6 +134,12 @@
         var result = await Api.GetAsync(Id);
         if (result.IsSuccess) _order = result.Value; else { _order = null; _problem = result.Problem; }
         _loading = false;
+        // a térkép kiegészítő: ha nem tölthető be, a stand száma akkor is látszik
+        if (_order is { IsUpcoming: true, MarketId: int marketId, StallNumber: not null } && _layout?.MarketId != marketId)
+        {
+            var layout = await Catalog.MarketLayoutAsync(marketId);
+            _layout = layout.IsSuccess ? layout.Value : null;
+        }
     }
 
     private async Task CancelAsync()
@@ -95,6 +149,17 @@
         var result = await Api.CancelAsync(Id);
         _confirmCancel = false;
         if (result.IsSuccess) { _order = result.Value; _problem = null; Toasts.Success("Rendelés lemondva."); }
+        else { Toasts.Error(result.Problem!.Message); await LoadAsync(); }
+        _busy = false;
+    }
+
+    private async Task DisputeAsync()
+    {
+        if (_busy || string.IsNullOrWhiteSpace(_disputeNote)) return;
+        _busy = true;
+        var result = await Api.DisputeAsync(Id, _disputeNote.Trim());
+        _confirmDispute = false;
+        if (result.IsSuccess) { _order = result.Value; _problem = null; Toasts.Success("A vitát rögzítettük, a piacvezető dönt."); }
         else { Toasts.Error(result.Problem!.Message); await LoadAsync(); }
         _busy = false;
     }

@@ -38,9 +38,10 @@ namespace localmarket_preordersystem.Application.PickupSlots.CreatePickupSlot
                 ?? throw new NotFoundException("Az árus-profil nem található.");
 
             var slot = PickupSlot.Create(producer, command.Date, command.StartTime, command.EndTime, command.Capacity);
+            await PickupSlotSupport.EnsureNoOverlapAsync(slots, producerId, command.Date, command.StartTime, command.EndTime, null, ct);
             await slots.AddAsync(slot, ct);
             await uow.SaveChangesAsync(ct);
-            return PickupSlotDto.From(slot);
+            return PickupSlotDto.From(slot, now);
         }
     }
 }

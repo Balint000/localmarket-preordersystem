@@ -1,6 +1,10 @@
 @page "/admin/reports"
 @attribute [Authorize(Roles = "Admin")]
 @inject AdminApi Admin
+@inject OrdersApi Orders
+@inject CatalogApi Catalog
+@inject FileDownloader Downloader
+@inject ToastService Toasts
 
 <PageTitle>Riportok – LocalMarket</PageTitle>
 
@@ -28,6 +32,7 @@
                     <StatCard Label="Összes rendelés" Value="@_rate.TotalOrders.ToString()" IconName="receipt" CssClass="tone-info" />
                     <StatCard Label="Lemondott" Value="@_rate.CancelledOrders.ToString()" IconName="x-circle" CssClass="tone-bad" />
                     <StatCard Label="Elutasított" Value="@_rate.RejectedOrders.ToString()" IconName="x-circle" CssClass="tone-bad" />
+                    <StatCard Label="Lejárt (nem igazolt)" Value="@_rate.ExpiredOrders.ToString()" IconName="clock" CssClass="tone-bad" />
                     <StatCard Label="Lemondási arány" Value="@($"{Labels.Qty(RatePercent)}%")" IconName="chart" CssClass="@(RatePercent >= 15 ? "attention" : "tone-ok")" />
                 </div>
             }
@@ -83,6 +88,25 @@
                         }
                     </div>
                 </div>
+                <div class="col-12">
+                    <div class="lm-card">
+                        <div class="lm-card-title"><h2><Icon Name="clipboard" />Piacnapi szedési lista</h2><span class="small text-muted">elfogadott rendelések, árusonként</span></div>
+                        <div class="row g-2 align-items-end">
+                            <div class="col-sm-4"><label class="form-label" for="pl-day">Átvétel napja</label><input id="pl-day" type="date" class="form-control" @bind="_pickDate" /></div>
+                            <div class="col-sm-4">
+                                <label class="form-label" for="pl-producer">Árus</label>
+                                <select id="pl-producer" class="form-select" @bind="_pickProducer">
+                                    <option value="">Minden árus</option>
+                                    @foreach (var p in _producers) { <option value="@p.Id">@p.Name</option> }
+                                </select>
+                            </div>
+                            <div class="col-sm-4 d-flex gap-2">
+                                <button type="button" class="btn btn-primary" disabled="@_exporting" @onclick='() => ExportPickingAsync("Csv")'><Icon Name="download" />CSV</button>
+                                <button type="button" class="btn btn-outline-primary" disabled="@_exporting" @onclick='() => ExportPickingAsync("Json")'><Icon Name="download" />JSON</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         }
     </ChildContent>
@@ -95,7 +119,10 @@
     private IReadOnlyList<VendorRevenueInfo> _revenue = [];
     private IReadOnlyList<UnclaimedOrderInfo> _unclaimed = [];
     private ApiProblem? _problem;
-    private bool _loading = true;
+    private bool _loading = true, _exporting;
+    private IReadOnlyList<ProducerInfo> _producers = [];
+    private DateTime _pickDate = DateTime.Today;
+    private string _pickProducer = "";
 
     // az API arányt (0–1) vagy már százalékot is adhat; a megjelenítés mindkettőt kezeli
     private decimal RatePercent => _rate is null ? 0 : Math.Round(_rate.Rate <= 1 ? _rate.Rate * 100 : _rate.Rate, 1);
@@ -109,7 +136,23 @@
         await LoadAsync();
     }
 
-    protected override async Task OnInitializedAsync() => await LoadAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        var producers = await Catalog.ProducersAsync("Approved");
+        if (producers.IsSuccess) _producers = producers.Value!;
+        await LoadAsync();
+    }
+
+    private async Task ExportPickingAsync(string format)
+    {
+        if (_exporting) return;
+        _exporting = true;
+        int? producerId = int.TryParse(_pickProducer, out var id) ? id : null;
+        var result = await Orders.ExportPickingListAsync(_pickDate, format, producerId);
+        if (result.IsSuccess) await Downloader.SaveAsync(result.Value!);
+        else Toasts.Error(result.Problem!.Message);
+        _exporting = false;
+    }
 
     private async Task LoadAsync()
     {

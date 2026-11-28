@@ -7,5 +7,6 @@ namespace localmarket_preordersystem.Application.Common.Models
         string? Text = null,
         int? CategoryId = null,
         int? ProducerId = null,
-        IReadOnlyCollection<Allergy>? ExcludeAllergies = null);
+        IReadOnlyCollection<Allergy>? ExcludeAllergies = null,
+        int? MarketId = null);
 }

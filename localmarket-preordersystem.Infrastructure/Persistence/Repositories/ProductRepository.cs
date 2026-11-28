@@ -9,8 +9,9 @@ namespace localmarket_preordersystem.Infrastructure.Persistence.Repositories;
 
 internal sealed class ProductRepository(MarketDbContext context) : IProductRepository
 {
+    // a piac a heti kínálat rendelhetőségéhez kell (van-e még nyitvatartás a héten)
     private IQueryable<Product> WithDetails() => context.Products
-        .Include(p => p.Producer)
+        .Include(p => p.Producer).ThenInclude(pr => pr.Market)
         .Include(p => p.Categories)
         .Include(p => p.WeeklyStocks)
         .AsSplitQuery();
@@ -30,7 +31,7 @@ internal sealed class ProductRepository(MarketDbContext context) : IProductRepos
     {
         // Only products of approved producers are publicly searchable.
         var query = WithDetails().AsNoTracking()
-            .Where(p => p.Producer.Status == ProducerStatus.Approved);
+            .Where(p => p.Producer.Status == ProducerStatus.Approved && !p.IsArchived);
 
         if (!string.IsNullOrWhiteSpace(criteria.Text))
         {
@@ -43,6 +44,8 @@ internal sealed class ProductRepository(MarketDbContext context) : IProductRepos
 
         if (criteria.ProducerId.HasValue)
             query = query.Where(p => p.ProducerId == criteria.ProducerId.Value);
+        if (criteria.MarketId.HasValue)
+            query = query.Where(p => p.Producer.MarketId == criteria.MarketId.Value);
 
         var result = await query.OrderBy(p => p.Name).ThenBy(p => p.Id).ToListAsync(cancellationToken);
 

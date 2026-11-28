@@ -47,7 +47,7 @@
                                         <a class="lm-line-name" href="products/@item.ProductId">@item.ProductName</a>
                                         <div class="lm-line-sub">@Labels.Money(item.UnitPriceSnapshot) egységár</div>
                                     </div>
-                                    <QuantityStepper Small="true" Value="item.Quantity" Min="0.01m" Step="1" Disabled="busy"
+                                    <QuantityStepper Small="true" Value="item.Quantity" Min="@item.OrderStep" Step="@item.OrderStep" Disabled="busy"
                                                      Label="@($"{item.ProductName} mennyisége")" ValueChanged="v => ChangeAsync(item, v)" />
                                     <div class="d-flex align-items-center gap-1 justify-content-end">
                                         <span class="lm-line-total">@Labels.Money(item.LineTotal)</span>

@@ -10,6 +10,36 @@
 <PageContainer Title="Termékeim" Subtitle="Hirdesd meg termékeidet, és add meg a heti készletet">
     <Actions><a class="btn btn-primary" href="vendor/products/new"><Icon Name="plus" />Új termék</a></Actions>
     <ChildContent>
+        @if (_review.Count > 0)
+        {
+            <div class="lm-card mb-4" aria-labelledby="rv-title">
+                <div class="lm-card-title"><h2 id="rv-title"><Icon Name="chart" />Visszajelzés a lezárt hetekről</h2><span class="small text-muted">meghirdetett / rendelt / maradt</span></div>
+                @if (_review.Any(r => r.Verdict != "Balanced"))
+                {
+                    <p class="small mb-2">@_review.Count(r => r.Verdict is "HighLeftover" or "NoOrders") terméknél sok maradt, @_review.Count(r => r.Verdict == "SoldOut") termék elfogyott. Érdemes ehhez igazítani a következő heti mennyiséget.</p>
+                }
+                <div class="table-responsive border-0">
+                    <table class="table lm-table mb-0">
+                        <thead><tr><th>Hét</th><th>Termék</th><th class="text-end">Meghirdetve</th><th class="text-end">Rendelve</th><th class="text-end">Maradt</th><th>Javaslat</th></tr></thead>
+                        <tbody>
+                        @foreach (var r in _review.Take(12))
+                        {
+                            <tr>
+                                <td class="text-nowrap">@Labels.DateShort(r.WeekStartDate) hete</td>
+                                <td>@r.ProductName</td>
+                                <td class="text-end">@Labels.Qty(r.Offered) @Labels.Unit(r.Unit)</td>
+                                <td class="text-end">@Labels.Qty(r.Ordered)</td>
+                                <td class="text-end">@Labels.Qty(r.Leftover)</td>
+                                <td><span class="lm-badge @(r.Verdict switch { "SoldOut" => "badge-ok", "HighLeftover" or "NoOrders" => "badge-warn", _ => "badge-muted" })">@(r.Verdict switch { "SoldOut" => "Elfogyott", "HighLeftover" => "Sok maradt", "NoOrders" => "Nem rendeltek", _ => "Rendben" })</span>
+                                    <div class="small text-muted">@r.Hint</div></td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
         @if (_loading) { <LoadingIndicator /> }
         else if (_problem is not null) { <ErrorMessage Problem="_problem" OnRetry="LoadAsync" /> }
         else if (_products.Count == 0)
@@ -61,7 +91,7 @@
         }
 
         <ConfirmDialog Visible="_deleting is not null" Title="@($"Törlöd a(z) {_deleting?.Name} terméket?")" Danger="true" Busy="_busy"
-                       Message="A termék eltűnik a kínálatból. Ha már vannak hozzá rendelések, a törlés nem engedélyezett."
+                       Message="A termék eltűnik a kínálatból. Ha volt rá rendelés, archiválódik (az előzmény megmarad). Függő vagy elfogadott rendelés esetén előbb azokat kell lezárni."
                        ConfirmText="Igen, törlöm" CancelText="Mégsem"
                        OnConfirm="DeleteAsync" OnCancel="() => _deleting = null" />
     </ChildContent>
@@ -72,6 +102,7 @@
     private ApiProblem? _problem;
     private bool _loading = true, _busy;
     private ProductInfo? _deleting;
+    private IReadOnlyList<StockReviewLine> _review = [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -90,6 +121,9 @@
         {
             var r = await Catalog.ProductsOfProducerAsync(pid);
             if (r.IsSuccess) _products = r.Value!; else _problem = r.Problem;
+            // a visszajelzés kiegészítő: hiba esetén egyszerűen nem jelenik meg
+            var review = await Vendor.StockReviewAsync();
+            _review = review.IsSuccess ? review.Value! : [];
         }
         _loading = false;
     }
@@ -99,7 +133,7 @@
         if (_busy || _deleting is null) return;
         _busy = true;
         var r = await Vendor.DeleteProductAsync(_deleting.Id);
-        if (r.IsSuccess) { Toasts.Success("Termék törölve."); _deleting = null; await LoadAsync(); }
+        if (r.IsSuccess) { Toasts.Success(r.Value is { Archived: true } ? "Termék archiválva (a rendelési előzmény megmaradt)." : "Termék törölve."); _deleting = null; await LoadAsync(); }
         else { Toasts.Error(r.Problem!.Message); _deleting = null; }
         _busy = false;
     }

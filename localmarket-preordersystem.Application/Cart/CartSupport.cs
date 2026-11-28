@@ -10,6 +10,16 @@ namespace localmarket_preordersystem.Application.Cart
 {
     internal static class CartSupport
     {
+        /// <summary>A mennyiség a mértékegység rendelési léptékének többszöröse kell legyen (kg/l: 0,5-ösével stb.).</summary>
+        public static void ValidateQuantity(Units unit, decimal quantity)
+        {
+            var step = unit.OrderStep();
+            new ValidationBuilder()
+                .Must("Quantity", unit.IsValidOrderQuantity(quantity),
+                    $"Ennél a terméknél a mennyiség {step:0.###}-es lépésekben adható meg (pl. {step:0.###}, {step * 2:0.###}, {step * 3:0.###}).")
+                .ThrowIfInvalid();
+        }
+
         public static async Task<Domain.Entity.Cart> GetOrCreateAsync(ICartRepository carts, IUserRepository users, int userId, CancellationToken ct)
         {
             var cart = await carts.GetByUserIdAsync(userId, ct);

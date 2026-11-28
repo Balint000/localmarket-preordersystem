@@ -74,7 +74,8 @@ namespace localmarket_preordersystem.Application.Orders.PlaceOrder
             foreach (var group in cart.Items.GroupBy(i => i.Product.ProducerId))
             {
                 var choice = command.Pickups.Single(p => p.ProducerId == group.Key);
-                var slot = await slots.GetByIdAsync(choice.PickupSlotId, ct)
+                // az árus és a piac is betöltődik: foglaláskor újraellenőrizzük a nyitvatartást és a piac állapotát
+                var slot = await slots.GetForUpdateAsync(choice.PickupSlotId, ct)
                     ?? throw new NotFoundException($"Nem található átvételi időpont: {choice.PickupSlotId}.");
                 if (slot.ProducerId != group.Key)
                     throw new ValidationException(new Dictionary<string, string[]>

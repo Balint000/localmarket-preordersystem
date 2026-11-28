@@ -11,7 +11,7 @@ namespace localmarket_preordersystem.Application.Orders.MarkOrderPickedUp
     public sealed record MarkOrderPickedUpCommand(int OrderId);
 
     /// <summary>Az árus rögzíti az átvételt (a függő fizetés teljesítettnek számít).</summary>
-    public sealed class MarkOrderPickedUpHandler(IOrderRepository orders, IAuditLogRepository audit, IUnitOfWork uow, ICurrentUserService currentUser)
+    public sealed class MarkOrderPickedUpHandler(IOrderRepository orders, IAuditLogRepository audit, IUnitOfWork uow, ICurrentUserService currentUser, TimeProvider time)
     {
         public async Task<OrderDto> HandleAsync(MarkOrderPickedUpCommand command, CancellationToken ct = default)
         {
@@ -19,7 +19,7 @@ namespace localmarket_preordersystem.Application.Orders.MarkOrderPickedUp
             OrderSupport.RequireProducerOwns(order, currentUser);
 
             var before = order.Status;
-            order.MarkPickedUp();
+            order.MarkPickedUp(time.GetLocalNow().DateTime);
             await OrderSupport.AuditStatusAsync(audit, currentUser, "OrderPickedUp", order, before, ct);
             await uow.SaveChangesAsync(ct);
             return OrderDto.From(order);

@@ -9,7 +9,8 @@ using localmarket_preordersystem.Domain.ValueObject;
 namespace localmarket_preordersystem.Application.Reports.CancellationRate
 {
     /// <summary>Lemondási arány: Rate = lemondott / összes rendelés (0..1), az elutasítás külön számolt.</summary>
-    public sealed record CancellationRateDto(int TotalOrders, int CancelledOrders, int RejectedOrders, decimal Rate);
+    /// <param name="ExpiredOrders">Függő rendelések, amelyekre az árus az idősáv végéig nem válaszolt (automatikusan lezárva).</param>
+    public sealed record CancellationRateDto(int TotalOrders, int CancelledOrders, int RejectedOrders, decimal Rate, int ExpiredOrders = 0);
     public sealed record CancellationRateQuery(DateTime? From = null, DateTime? To = null);
 
     public sealed class CancellationRateHandler(IReportQueries reports, ICurrentUserService currentUser, TimeProvider time)

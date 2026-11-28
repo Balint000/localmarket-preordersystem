@@ -11,7 +11,7 @@ namespace localmarket_preordersystem.Application.Orders.AcceptOrder
     public sealed record AcceptOrderCommand(int OrderId);
 
     /// <summary>Az árus teljes egészében elfogadja a saját rendelését.</summary>
-    public sealed class AcceptOrderHandler(IOrderRepository orders, IAuditLogRepository audit, IUnitOfWork uow, ICurrentUserService currentUser)
+    public sealed class AcceptOrderHandler(IOrderRepository orders, IAuditLogRepository audit, IUnitOfWork uow, ICurrentUserService currentUser, TimeProvider time)
     {
         public async Task<OrderDto> HandleAsync(AcceptOrderCommand command, CancellationToken ct = default)
         {
@@ -19,7 +19,7 @@ namespace localmarket_preordersystem.Application.Orders.AcceptOrder
             OrderSupport.RequireProducerOwns(order, currentUser);
 
             var before = order.Status;
-            order.Accept();
+            order.Accept(time.GetLocalNow().DateTime);
             await OrderSupport.AuditStatusAsync(audit, currentUser, "OrderAccepted", order, before, ct);
             await uow.SaveChangesAsync(ct);
             return OrderDto.From(order);

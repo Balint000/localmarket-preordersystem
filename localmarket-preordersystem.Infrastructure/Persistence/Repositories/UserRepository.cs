@@ -1,4 +1,5 @@
 using localmarket_preordersystem.Application.Common.Interfaces;
+using localmarket_preordersystem.Application.Common.Models;
 using localmarket_preordersystem.Domain.Entity;
 using localmarket_preordersystem.Domain.ValueObject;
 using localmarket_preordersystem.Infrastructure.Persistence.Context;
@@ -11,6 +12,15 @@ internal sealed class UserRepository(MarketDbContext context) : IUserRepository
     public Task<User?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
         => context.Users.Include(u => u.Producer)
             .FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
+
+    public Task<UserAccessInfo?> GetAccessInfoAsync(int id, CancellationToken cancellationToken = default)
+        => context.Users.AsNoTracking()
+            .Where(u => u.Id == id)
+            .Select(u => new UserAccessInfo(u.IsActive, u.Role, u.ProducerId))
+            .FirstOrDefaultAsync(cancellationToken);
+
+    public Task<int> CountActiveAdminsAsync(CancellationToken cancellationToken = default)
+        => context.Users.CountAsync(u => u.Role == Role.Admin && u.IsActive, cancellationToken);
 
     // A User.Register az e-mailt mindig kisbetűsre normalizálja, ezért itt elég az egyenlőség-vizsgálat;
     // a korábbi `Email.ToLower() == ...` nem tudta használni az Email egyedi indexét (teljes táblaolvasás).

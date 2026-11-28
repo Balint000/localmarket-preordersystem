@@ -13,6 +13,7 @@ namespace localmarket_preordersystem.Application
         public static IServiceCollection AddApplication(this IServiceCollection services)
         {
             services.TryAddSingleton(TimeProvider.System);
+            services.TryAddSingleton(Orders.OrderPolicy.Default);
 
             var handlerTypes = typeof(DependencyInjection).Assembly
                 .GetTypes()

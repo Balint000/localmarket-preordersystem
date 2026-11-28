@@ -8,9 +8,9 @@ előrendelhetnek a helyi termelőktől, a termelők kezelik a kínálatukat és 
 
 | Szerepkör | Mit tud |
 |---|---|
-| **Vásárló** | regisztráció, terméklista keresés/szűrés (kategória, allergén), kosár (több árusból), rendelés leadása árusonként egy átvételi időpontra, rendelések követése, lemondás, vitatás, rendelés exportja (JSON/CSV), időjárás-előrejelzés a piacnapra |
-| **Termelő (árus)** | regisztráció (jóváhagyásra vár), termékek felvétele képpel, heti készlet és ár megadása, átvételi időpontok kezelése, beérkező rendelések elfogadása / részleges teljesítése / elutasítása, „kész” és „átvéve” jelölés, szedési lista export |
-| **Piacvezető (admin)** | árusok jóváhagyása/elutasítása, piacok és kategóriák kezelése, vitás rendelések eldöntése, riportok (top termékek, lemondási arány, árusi bevétel, át nem vett rendelések), auditnapló |
+| **Vásárló** | regisztráció, terméklista keresés/szűrés (kategória, allergén, piac, árus), a piac térképe az árus standjával, „Piacok” oldal (nyitvatartás, következő piacnap, időjárás, standok árusonként színezve), a rendeléseknél az átvételi stand kiemelve a térképen, kosár (több árusból), rendelés leadása árusonként egy átvételi időpontra, rendelések követése, lemondás, vitatás, rendelés exportja (JSON/CSV), időjárás-előrejelzés a piacnapra |
+| **Termelő (árus)** | regisztráció (jóváhagyásra vár), termékek felvétele képpel, heti készlet és ár megadása, a piac nyitvatartásának megtekintése, átvételi időpontok kezelése (a nyitvatartáson belül), visszajelzés a lezárt hetek maradékáról, beérkező rendelések elfogadása / részleges teljesítése / elutasítása, indokolt lemondás, „kész”, „átvéve” és „nem jött el” jelölés, vitatás, szedési lista export |
+| **Piacvezető (admin)** | árusok jóváhagyása/elutasítása, a piac felülnézeti elrendezése (standok húzással) és fix stand kiosztása az árusoknak, termékek törlése (az aktív rendelések indokolt lemondásával), felhasználói fiókok letiltása/engedélyezése, piacok (napok és nyitvatartási órák) és kategóriák kezelése, vitás rendelések eldöntése, rendelés lemondása indoklással, piacnapi szedési lista, riportok (top termékek, lemondási és lejárati arány, árusi bevétel, át nem vett rendelések), auditnapló |
 
 ## Architektúra
 
@@ -31,7 +31,7 @@ Domain  <-  Application  <-  Infrastructure  <-  API (ASP.NET Core)        Blazo
 
 Fontosabb tervezési döntések:
 
-* **Rendelés-állapotgép** a `Domain/Entity/Order.cs`-ben: `Pending → Accepted/PartiallyFulfilled/Rejected/Cancelled → Ready → PickedUp/NotPickedUp → Disputed`. Érvénytelen átmenet `DomainException` (HTTP 400). A vitatott rendelést kizárólag a piacvezető zárhatja le.
+* **Rendelés-állapotgép** a `Domain/Entity/Order.cs`-ben: `Pending → Accepted/PartiallyFulfilled/Rejected/Cancelled/Expired → Ready → PickedUp/NotPickedUp → Disputed`. Érvénytelen átmenet `DomainException` (HTTP 400). A vitatott rendelést kizárólag a piacvezető zárhatja le. Az időkorlátok (lemondási határidő, „átvéve” csak az átvétel napján, „nem jött el” csak az idősáv után, automatikus lejárat) a [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md)-ben.
 * **Foglalás**: leadáskor a rendelés egyszerre foglalja a készletet és az idősáv egy helyét (mindent vagy semmit). Lemondás/elutasítás felszabadítja.
 * **Optimista konkurencia**: a heti készlet (`xmin`) és az idősáv (`BookedCount`) konkurens módosításánál HTTP 409 jön.
 * **Idő**: az idősávok dátuma és időpontja a piac helyi idejében értendő (`App:TimeZone`, alapból `Europe/Budapest`), az adatbázisba UTC kerül. A konténer UTC-ben fut, ezért az alkalmazás egy zónás `TimeProvider`-t használ.
@@ -90,13 +90,16 @@ dotnet ef migrations add <Nev> -p localmarket-preordersystem.Infrastructure -s l
 |---|---|---|
 | `ConnectionStrings:DefaultConnection` | PostgreSQL kapcsolat | – (kötelező) |
 | `Jwt:Secret` | JWT aláíró kulcs, min. 32 karakter | – (kötelező) |
-| `Jwt:ExpiryMinutes` | token érvényessége | 60 |
+| `Orders:CustomerCancellationCutoffHours` | elfogadott rendelés vevői lemondási határideje az idősáv kezdete előtt (óra) | 12 |
+| `Orders:ExpiryEnabled` / `ExpiryCheckMinutes` | függő rendelések automatikus lejárata / ellenőrzés gyakorisága (perc) | `true` / 15 |
+| `Jwt:ExpiryMinutes` | token érvényessége (a letiltott fiók tokenje ettől függetlenül azonnal érvénytelen) | 60 |
 | `Database:MigrateOnStartup` | migráció + kezdő adatok induláskor | `true` fejlesztésben |
 | `Cors:Origins` | engedélyezett kliens-eredetek | `http://localhost:5219` |
 | `App:TimeZone` | a piac helyi időzónája | `Europe/Budapest` |
 | `ImageStorage:RootPath` | feltöltött képek mappája | lásd `appsettings` |
 | `Seed:AdminPassword` | az admin kezdő jelszava (nem fejlesztői módban kötelező) | `Admin123!` fejlesztésben |
-| `RateLimit:GeneralPerMinute` / `AuthPerMinute` | kérések/perc IP-nként / bejelentkezés-regisztráció | 1200 / 60 |
+| `RateLimit:GeneralPerMinute` / `AuthPerMinute` | kérések/perc felhasználónként (vendégnél IP-nként) / bejelentkezés-regisztráció IP-nként | 1200 / 60 |
+| `ASPNETCORE_ENVIRONMENT` (Docker: `.env`) | `Development`: demó adatok, OpenAPI; `Production`: ezek nélkül | `Development` |
 | `Api:BaseUrl` (kliens) | az API címe a kliens szerverének | – (kötelező) |
 | `Api:PublicBaseUrl` (kliens) | az API böngészőből elérhető címe (képekhez) | `Api:BaseUrl` |
 
@@ -107,12 +110,12 @@ Minden végpont `/api` alatt van; a védettek `Authorization: Bearer <token>` fe
 | Terület | Végpontok |
 |---|---|
 | Auth | `POST /auth/login`, `/auth/register-customer`, `/auth/register-producer` |
-| Katalógus | `GET /products` (lapozott), `/products/{id}`, `/categories`, `/markets`, `/producers`, `/pickup-slots`, `/weather/markets/{id}` |
-| Termelő | `POST/PUT/DELETE /products`, `PUT /products/{id}/stock`, `PUT/DELETE /products/{id}/image`, `POST/PUT/DELETE /pickup-slots`, `PUT /producers/me` |
+| Katalógus | `GET /products` (lapozott; `marketId`, `producerId`, `categoryId`, `text`, `excludeAllergies` szűrők), `GET /markets/{id}/layout`, `/products/{id}`, `/categories`, `/markets`, `/producers`, `/pickup-slots`, `/weather/markets/{id}` |
+| Termelő | `POST/PUT/DELETE /products` (DELETE adminnak is, `?reason=`), `GET /producers/me/stock-review`, `PUT /products/{id}/stock`, `PUT/DELETE /products/{id}/image`, `POST/PUT/DELETE /pickup-slots`, `PUT /producers/me` |
 | Kosár | `GET /cart`, `POST /cart/items`, `PUT/DELETE /cart/items/{productId}` |
 | Rendelések | `POST /orders`, `GET /orders/my`, `/orders/producer`, `/orders/disputed`, `/orders/{id}`, `POST /orders/{id}/{cancel,accept,accept-partially,reject,ready,picked-up,not-picked-up,dispute,resolve-dispute}` |
 | Export | `GET /export/orders/{id}?format=Json|Csv`, `/export/picking-list?date=…&format=…` |
-| Admin | `/reports/*`, `GET /audit`, `POST /producers/{id}/{approve,reject}`, `/markets`, `/categories` |
+| Admin | `PUT /markets/{id}/layout`, `PUT /producers/{id}/stall`, `/reports/*`, `GET /audit`, `GET /users`, `POST /users/{id}/{activate,deactivate}`, `POST /producers/{id}/{approve,reject}`, `/markets`, `/categories` |
 
 ## Tesztek és CI
 
@@ -126,8 +129,11 @@ A GitHub Actions workflow (`.github/workflows/ci.yml`) minden push-nál és pull
 
 ## Ismert korlátok
 
-* A Blazor Server kliens szerver oldalról hívja az API-t, ezért az API számára minden kérés ugyanarról az IP-ről érkezik: az IP-alapú rate limit gyakorlatilag globális, ezért a limitek bőkezűek és konfigurálhatók.
-* A vitatott vagy át nem vett (`NotPickedUp`) rendelés már nem tart foglalást, ezért a készlet és az idősáv-hely ilyenkor nem szabadul fel külön. Mivel ezek az állapotok az átvételi nap után jellemzőek, ennek gyakorlati hatása kicsi; az állapotgép továbbfejlesztési pontja.
+* A Blazor Server kliens szerver oldalról hívja az API-t, ezért az API számára minden kérés ugyanarról az IP-ről érkezik. A bejelentkezett kéréseket ezért felhasználónként korlátozzuk; a bejelentkezés/regisztráció (`auth`) és a vendégforgalom limitje viszont továbbra is IP-alapú, vagyis a Blazor kliensen keresztül gyakorlatilag közös. Emiatt ezek a limitek bőkezűek és konfigurálhatók.
+* A token-ellenőrzés minden hitelesített kérésnél egy könnyű adatbázis-lekérdezéssel megnézi a fiók állapotát (aktív-e, egyezik-e a szerepkör). Nagy forgalomnál ez rövid idejű gyorsítótárral kiváltható.
+* A lapozás az auditnaplónál adatbázis-szinten történik; a termék- és rendelési listák (felhasználónként/árusonként korlátos méretűek) memóriában lapoznak.
+* Vita csak az átadás lezárása (átvéve / nem jött el) után nyitható, ezért a vita lezárása nem hagyhat lefoglalva készletet vagy idősáv-helyet. Átadás előtti probléma esetén a vevő lemond, az árus indoklással lemond.
+* A piac inaktiválása vagy egy nyitvatartási nap törlése a már leadott rendeléseket nem mondja le automatikusan (azokat a piacvezető indoklással lemondhatja), csak az új foglalásokat tiltja.
 * A termékképek helyi lemezen tárolódnak (Dockerben volume-on); felhős tárhely nincs bekötve.
 * Fizetés csak nyilvántartás (készpénz/kártya/átutalás jelölése), tényleges fizetési szolgáltató nincs integrálva.
 

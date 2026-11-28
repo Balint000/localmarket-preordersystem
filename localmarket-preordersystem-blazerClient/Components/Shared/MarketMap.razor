@@ -1,0 +1,87 @@
+@* A piac felülnézeti térképe (csak megjelenítés). Minden árus saját színt kap (ProducerColor), a neve a
+   standon és a jelmagyarázatban is ezzel a színnel jelenik meg, így a vevő gyorsan megtalálja.
+   A kiemelt standok (pl. ahonnan a vevő rendelt) keretet és rövid pulzálást kapnak, hogy azonnal látszódjanak. *@
+@if (Layout is null || Layout.Stalls.Count == 0)
+{
+    <p class="small text-muted mb-0">A piac elrendezése még nincs megadva.</p>
+}
+else
+{
+    <div class="lm-map @(Compact ? "compact" : "")" role="img" aria-label="@AriaText"
+         style="grid-template-columns: repeat(@Layout.Columns, var(--lm-map-cell)); grid-template-rows: repeat(@Layout.Rows, auto);">
+        @for (var y = 0; y < Layout.Rows; y++)
+        {
+            for (var x = 0; x < Layout.Columns; x++)
+            {
+                <div class="lm-map-cell" style="grid-column:@(x + 1); grid-row:@(y + 1)" aria-hidden="true"></div>
+            }
+        }
+        @foreach (var s in Layout.Stalls)
+        {
+            var on = IsHighlighted(s);
+            <div class="lm-map-stall @Css(s, on)" aria-hidden="true"
+                 style="grid-column:@(s.X + 1) / span @s.Width; grid-row:@(s.Y + 1) / span @s.Height"
+                 title="@Title(s)">
+                <span class="num">@s.Number</span>
+                @if (ShowNames && (s.ProducerName ?? s.Label) is { } text) { <span class="who">@text</span> }
+            </div>
+        }
+    </div>
+    @if (ShowLegend)
+    {
+        <ul class="lm-map-key" aria-label="Árusok a térképen">
+            @foreach (var s in Layout.Stalls.Where(s => s.ProducerId is not null && (Highlights.Count == 0 || IsHighlighted(s) || !OnlyHighlightedInLegend)))
+            {
+                <li class="@ProducerColor.Css(s.ProducerId!.Value) @(IsHighlighted(s) ? "on" : "")">
+                    <span class="sw" aria-hidden="true"></span>
+                    @if (LinkProducers)
+                    {
+                        <a href="products?producerId=@s.ProducerId">@s.ProducerName</a>
+                    }
+                    else
+                    {
+                        <span>@s.ProducerName</span>
+                    }
+                    <span class="n">@s.Number. stand</span>
+                </li>
+            }
+        </ul>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public MarketLayoutInfo? Layout { get; set; }
+    /// <summary>Egy kiemelt stand (pl. a termék árusáé).</summary>
+    [Parameter] public int? Highlight { get; set; }
+    /// <summary>Több kiemelt stand (pl. a vevő összes közelgő átvétele).</summary>
+    [Parameter] public IReadOnlyCollection<int>? HighlightMany { get; set; }
+    [Parameter] public bool ShowNames { get; set; } = true;
+    [Parameter] public bool ShowLegend { get; set; } = true;
+    /// <summary>Kiemelés esetén a jelmagyarázatban csak a kiemelt árusok legyenek.</summary>
+    [Parameter] public bool OnlyHighlightedInLegend { get; set; }
+    /// <summary>A jelmagyarázatban az árus neve a kínálatára mutasson.</summary>
+    [Parameter] public bool LinkProducers { get; set; } = true;
+    [Parameter] public bool Compact { get; set; }
+
+    private IReadOnlyCollection<int> Highlights =>
+        HighlightMany is { Count: > 0 } many ? many : Highlight is int h ? [h] : [];
+
+    private bool IsHighlighted(StallInfo s) => Highlights.Contains(s.Number);
+
+    private string Css(StallInfo s, bool on)
+    {
+        var css = s.ProducerId is int pid ? ProducerColor.Css(pid) + " taken" : "free";
+        if (s.ProducerStatus == "Pending") css += " pending";
+        if (Highlights.Count > 0) css += on ? " highlight" : " dim";
+        return css;
+    }
+
+    private static string Title(StallInfo s) =>
+        $"{s.Number}. stand" + (s.ProducerName is { } n ? $" – {n}" : " – szabad") + (s.Label is { } l ? $" ({l})" : "");
+
+    private string AriaText => Layout is null ? "" :
+        $"A piac térképe: {Layout.Stalls.Count} stand, ebből {Layout.Stalls.Count(s => s.ProducerId is not null)} kiosztva."
+        + (Highlights.Count > 0
+            ? " Kiemelve: " + string.Join(", ", Layout.Stalls.Where(IsHighlighted).Select(s => $"{s.Number}. stand{(s.ProducerName is { } n ? $" ({n})" : "")}")) + "."
+            : "");
+}

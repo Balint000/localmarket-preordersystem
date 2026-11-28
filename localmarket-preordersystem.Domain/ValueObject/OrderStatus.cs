@@ -14,7 +14,8 @@ namespace localmarket_preordersystem.Domain.ValueObject
         Disputed = 6, // felülvizsgálás alatt; vitás rendeléshez status
         Rejected = 7, // árus elutasította
 
-        Ready = 8, // ha akarunk olyat, hogy értesíti, ha kész a rendelés/átvehető
-        NotPickedUp = 9, // ha túl sokáig nem vette át, szintén ha akarunk ilyet
+        Ready = 8, // összekészítve, átvehető
+        NotPickedUp = 9, // az idősáv lejárt, a vevő nem vette át (az árus jelöli)
+        Expired = 10, // az árus az idősáv végéig nem válaszolt a függő rendelésre (automatikus lezárás)
     }
 }

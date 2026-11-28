@@ -29,21 +29,22 @@ namespace localmarket_preordersystem.Application.Cart.AddToCart
 
             var product = await products.GetByIdAsync(command.ProductId, ct)
                 ?? throw new NotFoundException($"Nem található termék: {command.ProductId}.");
-            var stock = product.GetNextAvailableStock(time.GetLocalNow().Date)
-                ?? throw new ConflictException($"A(z) '{product.Name}' termékhez jelenleg nincs meghirdetett kínálat.");
+            if (product.IsArchived)
+                throw new ConflictException($"A(z) '{product.Name}' termék már nem rendelhető.");
+            var now = time.GetLocalNow().DateTime;
+            // a hét utolsó piacnapja után az aktuális heti kínálat már nem számít: a következő meghirdetett hét jön
+            var stock = product.GetNextAvailableStock(now)
+                ?? throw new ConflictException($"A(z) '{product.Name}' termékhez jelenleg nincs rendelhető kínálat (erre a hétre már nincs piacnap, a következő hétre még nincs meghirdetve).");
 
-            new ValidationBuilder()
-                .Must(nameof(command.Quantity), !stock.Unit.IsCountable() || command.Quantity == decimal.Truncate(command.Quantity),
-                    "Ennél a terméknél csak egész mennyiség rendelhető.")
-                .Must(nameof(command.Quantity), decimal.Round(command.Quantity, 3) == command.Quantity,
-                    "A mennyiség legfeljebb három tizedesjegyet tartalmazhat.")
-                .ThrowIfInvalid();
+            var inCart = (await carts.GetByUserIdAsync(userId, ct))?.Items.FirstOrDefault(i => i.ProductId == product.Id)?.Quantity ?? 0m;
+            CartSupport.ValidateQuantity(stock.Unit, command.Quantity);
+            CartSupport.ValidateQuantity(stock.Unit, inCart + command.Quantity);
 
             var cart = await CartSupport.GetOrCreateAsync(carts, users, userId, ct);
             cart.AddItem(product, command.Quantity, stock.UnitPrice);
 
             await uow.SaveChangesAsync(ct);
-            return CartDto.From(cart);
+            return CartDto.From(cart, now);
         }
     }
 }

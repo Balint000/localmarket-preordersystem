@@ -33,7 +33,7 @@ namespace localmarket_preordersystem.Application.Products.UpdateProduct
 
             product.UpdateDetails(command.Name, command.Description ?? string.Empty, found, command.Allergies ?? Array.Empty<Allergy>());
             await uow.SaveChangesAsync(ct);
-            return ProductDto.From(product, time.GetLocalNow().Date);
+            return ProductDto.From(product, time.GetLocalNow().DateTime);
         }
     }
 }

@@ -11,7 +11,7 @@ namespace localmarket_preordersystem.Application.Orders.MarkOrderReady
     public sealed record MarkOrderReadyCommand(int OrderId);
 
     /// <summary>Az árus jelzi, hogy a rendelés átvehető.</summary>
-    public sealed class MarkOrderReadyHandler(IOrderRepository orders, IAuditLogRepository audit, IUnitOfWork uow, ICurrentUserService currentUser)
+    public sealed class MarkOrderReadyHandler(IOrderRepository orders, IAuditLogRepository audit, IUnitOfWork uow, ICurrentUserService currentUser, TimeProvider time)
     {
         public async Task<OrderDto> HandleAsync(MarkOrderReadyCommand command, CancellationToken ct = default)
         {
@@ -19,7 +19,7 @@ namespace localmarket_preordersystem.Application.Orders.MarkOrderReady
             OrderSupport.RequireProducerOwns(order, currentUser);
 
             var before = order.Status;
-            order.MarkReady();
+            order.MarkReady(time.GetLocalNow().DateTime);
             await OrderSupport.AuditStatusAsync(audit, currentUser, "OrderReady", order, before, ct);
             await uow.SaveChangesAsync(ct);
             return OrderDto.From(order);

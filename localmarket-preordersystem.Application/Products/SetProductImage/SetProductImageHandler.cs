@@ -59,7 +59,7 @@ namespace localmarket_preordersystem.Application.Products.SetProductImage
             if (previous is not null)
                 await images.DeleteAsync(previous, ct);
 
-            return ProductDto.From(product, time.GetLocalNow().Date);
+            return ProductDto.From(product, time.GetLocalNow().DateTime);
         }
     }
 }

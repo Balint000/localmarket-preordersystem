@@ -22,7 +22,10 @@ namespace localmarket_preordersystem.Application.Orders
         string? DisputeNote,
         string? RejectionReason,
         PaymentDto? Payment,
-        IReadOnlyList<OrderItemDto> Items)
+        IReadOnlyList<OrderItemDto> Items,
+        int? MarketId = null,
+        string? MarketName = null,
+        int? StallNumber = null)
     {
         public static OrderDto From(Order o) => new(
             o.Id,
@@ -40,6 +43,10 @@ namespace localmarket_preordersystem.Application.Orders
             o.DisputeNote,
             o.RejectionReason,
             o.Payment is null ? null : new PaymentDto(o.Payment.Method.ToString(), o.Payment.Status.ToString(), o.Payment.Amount),
-            o.Items.Select(i => new OrderItemDto(i.ProductId, i.ProductName, i.Unit.ToString(), i.UnitPrice, i.Quantity, i.FulfilledQuantity, i.Total, i.Status.ToString())).ToList());
+            o.Items.Select(i => new OrderItemDto(i.ProductId, i.ProductName, i.Unit.ToString(), i.UnitPrice, i.Quantity, i.FulfilledQuantity, i.Total, i.Status.ToString())).ToList(),
+            o.PickupSlot?.Producer?.MarketId,
+            o.PickupSlot?.Producer?.Market?.Name,
+            // a jelenlegi fix stand (a piacvezető osztja ki); 0 = még nincs kiosztva
+            o.PickupSlot?.Producer is { StallNumber: > 0 } pr ? pr.StallNumber : null);
     }
 }

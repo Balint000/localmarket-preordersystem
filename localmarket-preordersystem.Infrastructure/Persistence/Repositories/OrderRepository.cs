@@ -11,7 +11,7 @@ internal sealed class OrderRepository(MarketDbContext context) : IOrderRepositor
     private IQueryable<Order> ForUpdate() => context.Orders
         .Include(o => o.Items).ThenInclude(i => i.Product).ThenInclude(p => p.WeeklyStocks)
         .Include(o => o.Payment)
-        .Include(o => o.PickupSlot).ThenInclude(s => s.Producer)
+        .Include(o => o.PickupSlot).ThenInclude(s => s.Producer).ThenInclude(p => p.Market)
         .Include(o => o.User)
         .AsSplitQuery();
 
@@ -19,7 +19,7 @@ internal sealed class OrderRepository(MarketDbContext context) : IOrderRepositor
     private IQueryable<Order> ForRead() => context.Orders.AsNoTracking()
         .Include(o => o.Items).ThenInclude(i => i.Product)
         .Include(o => o.Payment)
-        .Include(o => o.PickupSlot).ThenInclude(s => s.Producer)
+        .Include(o => o.PickupSlot).ThenInclude(s => s.Producer).ThenInclude(p => p.Market)
         .Include(o => o.User)
         .AsSplitQuery();
 
@@ -47,17 +47,41 @@ internal sealed class OrderRepository(MarketDbContext context) : IOrderRepositor
             .ThenByDescending(o => o.Id)
             .ToListAsync(cancellationToken);
 
-    public async Task<IReadOnlyList<Order>> ListForPickingAsync(int producerId, DateTime pickupDate, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<Order>> ListForPickingAsync(int? producerId, DateTime pickupDate, CancellationToken cancellationToken = default)
     {
         var day = pickupDate.Date;
-        return await ForRead()
-            .Where(o => o.ProducerId == producerId
-                        && o.PickupSlot.Date == day
+        var query = ForRead()
+            .Where(o => o.PickupSlot.Date == day
                         && o.Status != OrderStatus.Cancelled
-                        && o.Status != OrderStatus.Rejected)
-            .OrderBy(o => o.PickupSlot.StartTime)
+                        && o.Status != OrderStatus.Rejected
+                        && o.Status != OrderStatus.Expired);
+        if (producerId.HasValue)
+            query = query.Where(o => o.ProducerId == producerId.Value);
+        return await query
+            .OrderBy(o => o.ProducerId).ThenBy(o => o.PickupSlot.StartTime).ThenBy(o => o.Id)
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<Order>> ListPendingWithEndedSlotAsync(DateTime localNow, int take, CancellationToken cancellationToken = default)
+    {
+        var today = localNow.Date;
+        var nowTime = TimeOnly.FromDateTime(localNow);
+        return await ForUpdate()
+            .Where(o => o.Status == OrderStatus.Pending
+                        && (o.PickupSlot.Date < today
+                            || (o.PickupSlot.Date == today && o.PickupSlot.EndTime <= nowTime)))
+            .OrderBy(o => o.Id)
+            .Take(take)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Order>> ListActiveContainingProductAsync(int productId, CancellationToken cancellationToken = default)
+        => await ForUpdate()
+            .Where(o => (o.Status == OrderStatus.Pending || o.Status == OrderStatus.Accepted
+                         || o.Status == OrderStatus.PartiallyFulfilled || o.Status == OrderStatus.Ready)
+                        && o.Items.Any(i => i.ProductId == productId))
+            .OrderBy(o => o.Id)
+            .ToListAsync(cancellationToken);
 
     public Task<bool> AnyForPickupSlotAsync(int pickupSlotId, CancellationToken cancellationToken = default)
         => context.Orders.AnyAsync(o => o.PickupSlotId == pickupSlotId, cancellationToken);

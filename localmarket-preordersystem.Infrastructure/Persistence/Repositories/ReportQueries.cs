@@ -32,7 +32,8 @@ internal sealed class ReportQueries(MarketDbContext context, TimeProvider time) 
         var rows = await context.Orders.AsNoTracking()
             .Where(o => o.CreatedAt >= f && o.CreatedAt <= t
                         && o.Status != OrderStatus.Cancelled
-                        && o.Status != OrderStatus.Rejected)
+                        && o.Status != OrderStatus.Rejected
+                        && o.Status != OrderStatus.Expired)
             .SelectMany(o => o.Items)
             .GroupBy(i => new { i.ProductId, i.ProductName })
             .Select(g => new
@@ -66,7 +67,8 @@ internal sealed class ReportQueries(MarketDbContext context, TimeProvider time) 
             {
                 Total = g.Count(),
                 Cancelled = g.Count(o => o.Status == OrderStatus.Cancelled),
-                Rejected = g.Count(o => o.Status == OrderStatus.Rejected)
+                Rejected = g.Count(o => o.Status == OrderStatus.Rejected),
+                Expired = g.Count(o => o.Status == OrderStatus.Expired)
             })
             .FirstOrDefaultAsync(ct);
 
@@ -74,7 +76,7 @@ internal sealed class ReportQueries(MarketDbContext context, TimeProvider time) 
             return new CancellationRateDto(0, 0, 0, 0m);
 
         var rate = Math.Round((decimal)counts.Cancelled / counts.Total, 4);
-        return new CancellationRateDto(counts.Total, counts.Cancelled, counts.Rejected, rate);
+        return new CancellationRateDto(counts.Total, counts.Cancelled, counts.Rejected, rate, counts.Expired);
     }
 
     public async Task<IReadOnlyList<VendorRevenueDto>> GetVendorRevenueAsync(

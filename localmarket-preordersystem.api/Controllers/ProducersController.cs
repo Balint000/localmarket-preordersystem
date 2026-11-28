@@ -1,9 +1,12 @@
 using localmarket_preordersystem.api.Contracts.Orders;
 using localmarket_preordersystem.api.Extensions;
 using localmarket_preordersystem.Application.Producers.ApproveProducer;
+using localmarket_preordersystem.Application.Producers.AssignStall;
+using localmarket_preordersystem.api.Contracts.Producers;
 using localmarket_preordersystem.Application.Producers.GetMyProducer;
 using localmarket_preordersystem.Application.Producers.ListProducers;
 using localmarket_preordersystem.Application.Producers.RejectProducer;
+using localmarket_preordersystem.Application.Producers.StockReview;
 using localmarket_preordersystem.Application.Producers.UpdateMyProducer;
 using localmarket_preordersystem.Domain.ValueObject;
 using Microsoft.AspNetCore.Authorization;
@@ -27,6 +30,12 @@ public class ProducersController : ControllerBase
     public async Task<IActionResult> GetMine(GetMyProducerHandler handler, CancellationToken ct)
         => Ok(await handler.HandleAsync(ct));
 
+    // A lezárt hetek kínálatának visszajelzése: meghirdetett / rendelt / maradt, javaslattal (alapból az utolsó 4 hét).
+    [HttpGet("me/stock-review")]
+    [Authorize(Policy = Policies.Producer)]
+    public async Task<IActionResult> StockReview([FromQuery] int? weeks, GetMyStockReviewHandler handler, CancellationToken ct)
+        => Ok(await handler.HandleAsync(weeks ?? 4, ct));
+
     [HttpPut("me")]
     [Authorize(Policy = Policies.Producer)]
     public async Task<IActionResult> UpdateMine(UpdateMyProducerCommand command, UpdateMyProducerHandler handler, CancellationToken ct)
@@ -41,4 +50,10 @@ public class ProducersController : ControllerBase
     [Authorize(Policy = Policies.Manager)]
     public async Task<IActionResult> Reject(int id, ReasonRequest body, RejectProducerHandler handler, CancellationToken ct)
         => Ok(await handler.HandleAsync(new RejectProducerCommand(id, body.Reason), ct));
+
+    // Fix stand kiosztása (0 = törlés); foglalt standnál swap=true esetén csere.
+    [HttpPut("{id:int}/stall")]
+    [Authorize(Policy = Policies.Manager)]
+    public async Task<IActionResult> AssignStall(int id, AssignStallRequest body, AssignStallHandler handler, CancellationToken ct)
+        => Ok(await handler.HandleAsync(new AssignStallCommand(id, body.StallNumber, body.Swap), ct));
 }

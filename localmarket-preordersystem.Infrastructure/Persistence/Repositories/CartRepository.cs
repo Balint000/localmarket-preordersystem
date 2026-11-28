@@ -9,7 +9,9 @@ internal sealed class CartRepository(MarketDbContext context) : ICartRepository
 {
     public Task<Cart?> GetByUserIdAsync(int userId, CancellationToken cancellationToken = default)
         => context.Carts
-            .Include(c => c.Items).ThenInclude(i => i.Product).ThenInclude(p => p.Producer)
+            .Include(c => c.Items).ThenInclude(i => i.Product).ThenInclude(p => p.Producer).ThenInclude(pr => pr.Market)
+            .Include(c => c.Items).ThenInclude(i => i.Product).ThenInclude(p => p.WeeklyStocks)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(c => c.UserId == userId, cancellationToken);
 
     public async Task AddAsync(Cart cart, CancellationToken cancellationToken = default)

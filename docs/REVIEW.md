@@ -61,7 +61,7 @@ Súlyosság: **Magas** = hibás működés vagy összeomlás, **Közepes** = ros
 
 | # | Hiba | Javítás |
 |---|---|---|
-| 31 | A `docker-compose.override.yml` Windows-specifikus (`APPDATA`) mountokat és HTTPS-portot adott a szolgáltatáshoz, és `docker compose up` automatikusan beolvasta, így Linuxon/macOS-en az API nem indult | Törölve (a `.dcproj`-ból is) |
+| 31 | A `docker-compose.override.yml` Windows-specifikus (`APPDATA`) mountokat és HTTPS-portot adott a szolgáltatáshoz, és `docker compose up` automatikusan beolvasta, így Linuxon/macOS-en az API nem indult | A Windows-specifikus mountok és a HTTPS-port kikerültek; a fájl semleges tartalommal (csak `ASPNETCORE_HTTP_PORTS=8080`) megmaradt, mert a Visual Studio `docker-compose.dcproj` hivatkozik rá |
 | 32 | A compose nem adta át a kezdő jelszavakat, az időzónát és az API nyilvános címét | Környezeti változók felvéve |
 | 33 | Nem volt `.env.example`, a README kevés információt adott | `.env.example`, teljes README |
 | 34 | Nem voltak tesztek és CI | `localmarket-preordersystem.Tests` (49 teszteset), GitHub Actions workflow, valódi PostgreSQL-lel futó integrációs füstteszt (`scripts/smoke-test.sh`) |

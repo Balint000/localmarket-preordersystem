@@ -51,6 +51,16 @@ namespace localmarket_preordersystem.Application.Users.RegisterProducer
                 Role.Producer,
                 command.PhoneNumber);
 
+            // A standot a piacvezető osztja ki. Megadni csak akkor lehet, ha a stand létezik és szabad.
+            if (command.StallNumber > 0)
+            {
+                if (!market.Layout.HasStall(command.StallNumber))
+                    throw new ConflictException($"A(z) {command.StallNumber}. stand nem szerepel a piac elrendezésében; hagyd üresen, a piacvezető kiosztja.");
+                var taken = (await _producerRepository.ListAsync(null, market.Id, cancellationToken))
+                    .Any(p => p.StallNumber == command.StallNumber && p.Status != ProducerStatus.Rejected);
+                if (taken)
+                    throw new ConflictException($"A(z) {command.StallNumber}. stand már foglalt; hagyd üresen, a piacvezető kiosztja.");
+            }
             var producer = Producer.Register(market, command.ProducerName, command.StallNumber);
             user.AttachProducerProfile(producer);
 

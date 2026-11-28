@@ -4,7 +4,7 @@ namespace localmarket_preordersystem.Models;
 public static class Labels
 {
     public static readonly string[] OrderStatuses =
-        ["Pending", "Accepted", "PartiallyFulfilled", "Ready", "PickedUp", "NotPickedUp", "Disputed", "Cancelled", "Rejected"];
+        ["Pending", "Accepted", "PartiallyFulfilled", "Ready", "PickedUp", "NotPickedUp", "Disputed", "Cancelled", "Rejected", "Expired"];
 
     public static readonly string[] Allergies =
         ["Gluten", "Crustaceans", "Eggs", "Fish", "Peanuts", "Soybeans", "Milk", "Nuts", "Celery", "Mustard", "Sesame", "Sulphites", "Lupin", "Molluscs"];
@@ -22,6 +22,7 @@ public static class Labels
         "Disputed" => "Vitatott",
         "Cancelled" => "Lemondva",
         "Rejected" => "Elutasítva",
+        "Expired" => "Lejárt (nem igazolták vissza)",
         _ => s
     };
 
@@ -31,7 +32,7 @@ public static class Labels
         "Pending" => "badge-warn",
         "Accepted" or "PartiallyFulfilled" or "Ready" => "badge-info",
         "PickedUp" => "badge-ok",
-        "Cancelled" or "Rejected" or "NotPickedUp" => "badge-bad",
+        "Cancelled" or "Rejected" or "NotPickedUp" or "Expired" => "badge-bad",
         "Disputed" => "badge-alert",
         _ => "badge-muted"
     };

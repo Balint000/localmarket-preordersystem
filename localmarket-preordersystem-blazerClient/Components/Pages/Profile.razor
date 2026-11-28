@@ -81,7 +81,9 @@
                                 <p class="small text-muted">Piac: <strong>@_market.Name</strong> (@_market.Address)</p>
                             }
                             <div class="mb-2"><label class="form-label" for="pr-name">Gazdaság neve</label><input id="pr-name" class="form-control" maxlength="100" @bind="_name" @bind:event="oninput" /></div>
-                            <div class="mb-3"><label class="form-label" for="pr-stall">Standszám</label><input id="pr-stall" type="number" min="0" class="form-control" @bind="_stall" /></div>
+                            <div class="mb-3"><span class="form-label d-block">Stand</span>
+                                <div class="form-control-plaintext">@(_stall > 0 ? $"{_stall}. stand" : "még nincs kiosztva")</div>
+                                <div class="form-text">A fix standot a piacvezető osztja ki a piac elrendezése alapján.</div></div>
                             <FormProblem Problem="_problem" />
                             <SubmitButton Busy="_busy" Disabled="string.IsNullOrWhiteSpace(_name)" CssClass="btn-primary" OnClick="SaveAsync">Mentés</SubmitButton>
                         </div>
@@ -192,7 +194,7 @@
     {
         if (_busy) return;
         _busy = true; _problem = null;
-        var r = await Vendor.UpdateMineAsync(new UpdateMyProducerRequest(_name.Trim(), _stall));
+        var r = await Vendor.UpdateMineAsync(new UpdateMyProducerRequest(_name.Trim()));
         if (r.IsSuccess) { Toasts.Success("Adatok elmentve."); } else _problem = r.Problem;
         _busy = false;
     }

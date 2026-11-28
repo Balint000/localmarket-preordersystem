@@ -15,7 +15,7 @@ namespace localmarket_preordersystem.Application.Products.GetProduct
         {
             var product = await products.GetByIdAsync(productId, ct)
                 ?? throw new NotFoundException($"Nem található termék: {productId}.");
-            return ProductDto.From(product, time.GetLocalNow().Date);
+            return ProductDto.From(product, time.GetLocalNow().DateTime);
         }
     }
 }

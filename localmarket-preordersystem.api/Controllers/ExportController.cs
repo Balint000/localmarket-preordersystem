@@ -24,12 +24,12 @@ public class ExportController : ControllerBase
 
     [HttpGet("picking-list")]
     [Authorize(Policy = Policies.ProducerOrManager)]
-    public async Task<IActionResult> PickingList([FromQuery] DateTime? date, [FromQuery] ExportFormat? format, ExportPickingListHandler handler, CancellationToken ct)
+    public async Task<IActionResult> PickingList([FromQuery] DateTime? date, [FromQuery] ExportFormat? format, [FromQuery] int? producerId, ExportPickingListHandler handler, CancellationToken ct)
     {
         if (date is null) return Problem(statusCode: 400, title: "Hiányzó dátum", detail: "A 'date' paraméter kötelező.");
         var chosen = format ?? ExportFormat.Json;
         if (!Enum.IsDefined(chosen)) return InvalidFormat();
-        var file = await handler.HandleAsync(new ExportPickingListQuery(date.Value, chosen), ct);
+        var file = await handler.HandleAsync(new ExportPickingListQuery(date.Value, chosen, producerId), ct);
         return File(file.Content, file.ContentType, file.FileName);
     }
 

@@ -67,14 +67,14 @@
                                         @foreach (var slot in slots)
                                         {
                                             var slotId = slot.Id;
-                                            var full = slot.FreeCapacity <= 0;
+                                            var full = slot.FreeCapacity <= 0 || !slot.IsBookable;
                                             <label class="lm-choice">
                                                 <input type="radio" name="slot-@producerId" value="@slotId" disabled="@full"
                                                        checked="@(_selected.GetValueOrDefault(producerId) == slotId)" @onchange="() => _selected[producerId] = slotId" />
                                                 <span class="lm-choice-body">
                                                     <span class="lm-choice-title">@Labels.DateShort(slot.Date), @Labels.DayRelative(slot.Date)</span>
                                                     <span>@Labels.Time(slot.StartTime)–@Labels.Time(slot.EndTime)</span>
-                                                    <span class="lm-choice-sub">@(full ? "Betelt" : $"{slot.FreeCapacity} szabad hely")</span>
+                                                    <span class="lm-choice-sub">@(!slot.IsBookable && slot.FreeCapacity > 0 ? "Nem foglalható (a piac zárva)" : full ? "Betelt" : $"{slot.FreeCapacity} szabad hely")</span>
                                                 </span>
                                                 <span class="lm-choice-check" aria-hidden="true"><Icon Name="check" /></span>
                                             </label>

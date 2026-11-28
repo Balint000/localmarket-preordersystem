@@ -1,0 +1,119 @@
+@page "/admin/users"
+@attribute [Authorize(Roles = "Admin")]
+@inject AdminApi Admin
+@inject AuthStateService Auth
+@inject ToastService Toasts
+
+<PageTitle>Felhasználók – LocalMarket</PageTitle>
+
+<PageContainer Title="Felhasználók" Subtitle="Fiókok keresése, letiltása és újraengedélyezése. A letiltás azonnal hat, a felhasználót a rendszer kijelentkezteti.">
+    <ChildContent>
+        <form class="lm-filterbar" role="search" aria-label="Felhasználók szűrése" @onsubmit="LoadAsync" @onsubmit:preventDefault="true">
+            <div class="row g-2 align-items-end">
+                <div class="col-sm-12 col-md-5">
+                    <label class="form-label" for="user-search">Keresés</label>
+                    <input id="user-search" type="search" class="form-control" placeholder="Név vagy e-mail" @bind="_search" />
+                </div>
+                <div class="col-sm-6 col-md-3">
+                    <label class="form-label" for="user-role">Szerepkör</label>
+                    <select id="user-role" class="form-select" @bind="_role">
+                        <option value="">Mind</option>
+                        <option value="Customer">@Labels.Role("Customer")</option>
+                        <option value="Producer">@Labels.Role("Producer")</option>
+                        <option value="Admin">@Labels.Role("Admin")</option>
+                    </select>
+                </div>
+                <div class="col-sm-6 col-md-2">
+                    <label class="form-label" for="user-active">Állapot</label>
+                    <select id="user-active" class="form-select" @bind="_active">
+                        <option value="">Mind</option>
+                        <option value="true">Aktív</option>
+                        <option value="false">Letiltott</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100" disabled="@_loading"><Icon Name="search" />Szűrés</button>
+                </div>
+            </div>
+        </form>
+
+        @if (_loading) { <LoadingIndicator /> }
+        else if (_problem is not null) { <ErrorMessage Problem="_problem" OnRetry="LoadAsync" /> }
+        else if (_users.Count == 0) { <EmptyState Title="Nincs találat" IconName="users" Text="Ehhez a szűréshez nem tartozik felhasználó." /> }
+        else
+        {
+            <div class="lm-table-wrap">
+                <table class="table lm-table align-middle">
+                    <thead><tr><th>Név</th><th>E-mail</th><th>Szerepkör</th><th>Regisztrált</th><th>Állapot</th><th class="text-end"><span class="visually-hidden">Műveletek</span></th></tr></thead>
+                    <tbody>
+                    @foreach (var u in _users)
+                    {
+                        <tr>
+                            <td><strong>@($"{u.LastName} {u.FirstName}")</strong>@if (!string.IsNullOrWhiteSpace(u.ProducerName)) { <div class="small text-muted">@u.ProducerName</div> }</td>
+                            <td class="text-break">@u.Email</td>
+                            <td>@Labels.Role(u.Role)</td>
+                            <td>@Labels.Date(u.CreatedAt)</td>
+                            <td><span class="lm-badge @(u.IsActive ? "badge-ok" : "badge-bad")">@(u.IsActive ? "Aktív" : "Letiltott")</span></td>
+                            <td class="text-end text-nowrap">
+                                @if (u.Id == Auth.UserId)
+                                {
+                                    <span class="small text-muted">Saját fiók</span>
+                                }
+                                else if (u.IsActive)
+                                {
+                                    <button class="btn btn-outline-danger btn-sm" disabled="@_busy" @onclick="() => _confirming = u">Letiltom</button>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-outline-primary btn-sm" disabled="@_busy" @onclick="() => SetActiveAsync(u, true)"><Icon Name="check" Size="16" />Engedélyezem</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        <ConfirmDialog Visible="_confirming is not null" Title="@($"Fiók letiltása: {_confirming?.Email}")" Danger="true" Busy="_busy"
+                       Message="A felhasználó azonnal kijelentkezik, és amíg újra nem engedélyezed, nem tud belépni. A rendelései és adatai megmaradnak."
+                       ConfirmText="Letiltom" OnConfirm="ConfirmDeactivateAsync" OnCancel="() => _confirming = null" />
+    </ChildContent>
+</PageContainer>
+
+@code {
+    private IReadOnlyList<UserInfo> _users = [];
+    private ApiProblem? _problem;
+    private bool _loading = true, _busy;
+    private string _search = "", _role = "", _active = "";
+    private UserInfo? _confirming;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true; _problem = null;
+        bool? active = _active switch { "true" => true, "false" => false, _ => null };
+        var r = await Admin.UsersAsync(string.IsNullOrEmpty(_role) ? null : _role, active, _search);
+        if (r.IsSuccess) _users = r.Value!; else _problem = r.Problem;
+        _loading = false;
+    }
+
+    private async Task ConfirmDeactivateAsync()
+    {
+        if (_confirming is null) return;
+        var user = _confirming;
+        await SetActiveAsync(user, false);
+        _confirming = null;
+    }
+
+    private async Task SetActiveAsync(UserInfo u, bool active)
+    {
+        if (_busy) return;
+        _busy = true;
+        var r = await Admin.SetUserActiveAsync(u.Id, active);
+        if (r.IsSuccess) { Toasts.Success(active ? $"{u.Email} újra engedélyezve." : $"{u.Email} letiltva."); await LoadAsync(); }
+        else Toasts.Error(r.Problem!.Message);
+        _busy = false;
+    }
+}

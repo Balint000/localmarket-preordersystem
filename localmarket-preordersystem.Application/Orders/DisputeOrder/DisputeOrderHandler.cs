@@ -11,7 +11,7 @@ namespace localmarket_preordersystem.Application.Orders.DisputeOrder
     public sealed record DisputeOrderCommand(int OrderId, string Note);
 
     /// <summary>Vitatás: a rendelés vevője vagy az érintett árus jelezheti; a piacvezető dönt róla.</summary>
-    public sealed class DisputeOrderHandler(IOrderRepository orders, IAuditLogRepository audit, IUnitOfWork uow, ICurrentUserService currentUser)
+    public sealed class DisputeOrderHandler(IOrderRepository orders, IAuditLogRepository audit, IUnitOfWork uow, ICurrentUserService currentUser, TimeProvider time)
     {
         public async Task<OrderDto> HandleAsync(DisputeOrderCommand command, CancellationToken ct = default)
         {
@@ -25,7 +25,7 @@ namespace localmarket_preordersystem.Application.Orders.DisputeOrder
                 .ThrowIfInvalid();
 
             var before = order.Status;
-            order.Dispute(command.Note);
+            order.Dispute(command.Note, time.GetLocalNow().DateTime);
             await OrderSupport.AuditStatusAsync(audit, currentUser, "OrderDisputed", order, before, ct);
             await uow.SaveChangesAsync(ct);
             return OrderDto.From(order);

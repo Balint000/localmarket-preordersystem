@@ -11,7 +11,7 @@ namespace localmarket_preordersystem.Application.Orders.MarkOrderNotPickedUp
     public sealed record MarkOrderNotPickedUpCommand(int OrderId);
 
     /// <summary>Az árus jelzi, hogy a rendelést nem vették át.</summary>
-    public sealed class MarkOrderNotPickedUpHandler(IOrderRepository orders, IAuditLogRepository audit, IUnitOfWork uow, ICurrentUserService currentUser)
+    public sealed class MarkOrderNotPickedUpHandler(IOrderRepository orders, IAuditLogRepository audit, IUnitOfWork uow, ICurrentUserService currentUser, TimeProvider time)
     {
         public async Task<OrderDto> HandleAsync(MarkOrderNotPickedUpCommand command, CancellationToken ct = default)
         {
@@ -19,7 +19,7 @@ namespace localmarket_preordersystem.Application.Orders.MarkOrderNotPickedUp
             OrderSupport.RequireProducerOwns(order, currentUser);
 
             var before = order.Status;
-            order.MarkNotPickedUp();
+            order.MarkNotPickedUp(time.GetLocalNow().DateTime);
             await OrderSupport.AuditStatusAsync(audit, currentUser, "OrderNotPickedUp", order, before, ct);
             await uow.SaveChangesAsync(ct);
             return OrderDto.From(order);

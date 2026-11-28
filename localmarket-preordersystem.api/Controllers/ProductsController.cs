@@ -27,10 +27,11 @@ public class ProductsController : ControllerBase
         [FromQuery] int? categoryId,
         [FromQuery] int? producerId,
         [FromQuery] Allergy[]? excludeAllergies,
+        [FromQuery] int? marketId,
         [FromQuery] PageRequest paging,
         SearchProductsHandler handler,
         CancellationToken ct)
-        => Ok((await handler.HandleAsync(new SearchProductsQuery(text, categoryId, producerId, excludeAllergies), ct)).ToPaged(paging));
+        => Ok((await handler.HandleAsync(new SearchProductsQuery(text, categoryId, producerId, excludeAllergies, marketId), ct)).ToPaged(paging));
 
     [HttpGet("{id:int}")]
     [AllowAnonymous]
@@ -49,13 +50,12 @@ public class ProductsController : ControllerBase
             new UpdateProductCommand(id, body.Name, body.Description, body.CategoryIds, body.Allergies), ct));
 
     // 409 if the product was ever ordered: set the weekly stock to 0 instead.
+    // Árus: saját, aktív rendelés nélkül. Piacvezető: bármelyik; az aktív rendeléseket a ?reason= indoklással lemondja.
+    // Rendelési előzmény esetén archivál (soft delete). Válasz: { productId, archived, cancelledOrderIds, untouchedOrderIds }.
     [HttpDelete("{id:int}")]
-    [Authorize(Policy = Policies.Producer)]
-    public async Task<IActionResult> Delete(int id, DeleteProductHandler handler, CancellationToken ct)
-    {
-        await handler.HandleAsync(new DeleteProductCommand(id), ct);
-        return NoContent();
-    }
+    [Authorize(Policy = Policies.ProducerOrManager)]
+    public async Task<IActionResult> Delete(int id, [FromQuery] string? reason, DeleteProductHandler handler, CancellationToken ct)
+        => Ok(await handler.HandleAsync(new DeleteProductCommand(id, reason), ct));
 
     // FE: multipart/form-data, field "file" (JPEG/PNG/WebP, max 2 MB). Response ImageUrl is relative to the API base URL.
     [HttpPut("{id:int}/image")]
