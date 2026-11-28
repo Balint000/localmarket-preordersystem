@@ -1,17 +1,20 @@
 ﻿<div class="alert alert-danger lm-error" role="alert">
-    <strong>@(Problem?.Title ?? "Hiba történt.")</strong>
-    @if (!string.IsNullOrWhiteSpace(Problem?.Detail))
-    {
-        <div>@Problem!.Detail</div>
-    }
-    @if (Problem is { Errors.Count: > 0 })
-    {
-        <ProblemList Problem="Problem" />
-    }
-    @if (OnRetry.HasDelegate && Problem?.Kind is not (ApiFailure.Forbidden or ApiFailure.NotFound))
-    {
-        <button type="button" class="btn btn-outline-danger btn-sm mt-2" @onclick="OnRetry">Újrapróbálás</button>
-    }
+    <Icon Name="alert" />
+    <div class="flex-grow-1">
+        <strong>@(Problem?.Title ?? "Hiba történt.")</strong>
+        @if (!string.IsNullOrWhiteSpace(Problem?.Detail))
+        {
+            <div>@Problem!.Detail</div>
+        }
+        @if (Problem is { Errors.Count: > 0 })
+        {
+            <ProblemList Problem="Problem" />
+        }
+        @if (OnRetry.HasDelegate && Problem?.Kind is not (ApiFailure.Forbidden or ApiFailure.NotFound))
+        {
+            <button type="button" class="btn btn-outline-danger btn-sm mt-2" @onclick="OnRetry"><Icon Name="refresh" />Újrapróbálás</button>
+        }
+    </div>
 </div>
 
 @code {

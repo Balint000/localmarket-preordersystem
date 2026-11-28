@@ -1,0 +1,20 @@
+@* A bejelentkezés/regisztráció bal oldali panelje: röviden, mit kap a felhasználó. *@
+<aside class="lm-auth-aside">
+    <a class="lm-brand" href="" style="color:inherit">
+        <span class="lm-brand-mark" style="background:var(--lm-surface);color:var(--lm-leaf)"><Icon Name="leaf" /></span>
+        <span>LocalMarket</span>
+    </a>
+    <h2>@Heading</h2>
+    <p>@Text</p>
+    <ul class="lm-auth-points">
+        <li><Icon Name="calendar" /><span>Te választod ki, mikor veszed át a standnál.</span></li>
+        <li><Icon Name="package" /><span>A rendelés lefoglalja a készletet, nem fogy el előled.</span></li>
+        <li><Icon Name="store" /><span>Egy kosárból több termelőtől is rendelhetsz.</span></li>
+    </ul>
+    <span class="lm-tag lm-tag-hang" aria-hidden="true">helyi<small>termék</small></span>
+</aside>
+
+@code {
+    [Parameter, EditorRequired] public string Heading { get; set; } = "";
+    [Parameter, EditorRequired] public string Text { get; set; } = "";
+}

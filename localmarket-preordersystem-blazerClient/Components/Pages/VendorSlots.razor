@@ -12,7 +12,7 @@
         <div class="row g-4">
             <div class="col-lg-4">
                 <div class="lm-card">
-                    <h2 class="h6">@(_editId is null ? "Új időpont" : "Időpont szerkesztése")</h2>
+                    <div class="lm-card-title"><h2><Icon Name="@(_editId is null ? "plus" : "pencil")" />@(_editId is null ? "Új időpont" : "Időpont szerkesztése")</h2></div>
                     <div class="mb-2"><label class="form-label" for="sl-date">Nap</label><input id="sl-date" type="date" class="form-control" @bind="_date" /></div>
                     <div class="row g-2 mb-2">
                         <div class="col"><label class="form-label" for="sl-from">Kezdés</label><input id="sl-from" type="time" class="form-control" @bind="_from" /></div>
@@ -27,19 +27,23 @@
             <div class="col-lg-8">
                 @if (_loading) { <LoadingIndicator /> }
                 else if (_problem is not null) { <ErrorMessage Problem="_problem" OnRetry="LoadAsync" /> }
-                else if (_slots.Count == 0) { <EmptyState Title="Még nincs időpont" Text="Hirdess meg legalább egy átvételi időpontot, különben a vásárlók nem tudnak tőled rendelni." /> }
+                else if (_slots.Count == 0) { <EmptyState Title="Még nincs átvételi időpont" IconName="clock" Text="Hirdess meg legalább egyet: időpont nélkül a vásárlók nem tudnak tőled rendelni." /> }
                 else
                 {
                     <div class="lm-table-wrap">
                         <table class="table lm-table">
-                            <thead><tr><th>Nap</th><th>Időszak</th><th class="text-end">Foglalt</th><th class="text-end">Szabad</th><th class="text-end">Művelet</th></tr></thead>
+                            <thead><tr><th>Nap</th><th>Időszak</th><th>Foglaltság</th><th class="text-end"><span class="visually-hidden">Műveletek</span></th></tr></thead>
                             <tbody>
                             @foreach (var s in _slots.OrderBy(s => s.Date).ThenBy(s => s.StartTime))
                             {
-                                <tr><td>@Labels.Date(s.Date)</td><td>@Labels.Time(s.StartTime) – @Labels.Time(s.EndTime)</td><td class="text-end">@s.BookedCount / @s.Capacity</td><td class="text-end">@s.FreeCapacity</td>
+                                <tr class="@(_editId == s.Id ? "table-active" : "")"><td><strong>@Labels.DateShort(s.Date)</strong><div class="small text-muted">@Labels.DayRelative(s.Date)</div></td><td>@Labels.Time(s.StartTime)–@Labels.Time(s.EndTime)</td>
+                                    <td class="lm-bar-cell">
+                                        <div class="small mb-1">@s.BookedCount / @s.Capacity foglalt, @s.FreeCapacity szabad</div>
+                                        <div class="lm-meter @(s.FreeCapacity == 0 ? "bad" : "")" aria-hidden="true"><span style="width:@(s.Capacity > 0 ? s.BookedCount * 100 / s.Capacity : 0)%"></span></div>
+                                    </td>
                                     <td class="text-end text-nowrap">
-                                        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => StartEdit(s)">Szerkesztés</button>
-                                        <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => _deleting = s">Törlés</button>
+                                        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => StartEdit(s)"><Icon Name="pencil" Size="16" />Szerkesztés</button>
+                                        <button type="button" class="lm-icon-btn" aria-label="@Labels.DateShort(s.Date) @Labels.Time(s.StartTime) időpont törlése" title="Törlés" @onclick="() => _deleting = s"><Icon Name="trash" Size="18" /></button>
                                     </td></tr>
                             }
                             </tbody>

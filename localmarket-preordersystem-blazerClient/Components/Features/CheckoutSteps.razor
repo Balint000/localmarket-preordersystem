@@ -1,0 +1,11 @@
+@* A rendelés leadásának lépései: valódi sorrend, ezért számozott. *@
+<ol class="lm-steps-bar" aria-label="A rendelés lépései">
+    <li class="@Css(1)" aria-current="@(Current == 1 ? "step" : null)"><span>Kosár</span></li>
+    <li class="@Css(2)" aria-current="@(Current == 2 ? "step" : null)"><span>Átvétel és fizetés</span></li>
+    <li class="@Css(3)" aria-current="@(Current == 3 ? "step" : null)"><span>Visszaigazolás</span></li>
+</ol>
+
+@code {
+    [Parameter] public int Current { get; set; } = 1;
+    private string Css(int step) => step < Current ? "done" : step == Current ? "current" : "";
+}

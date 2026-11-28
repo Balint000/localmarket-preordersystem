@@ -5,7 +5,7 @@
 <PageTitle>Rendeléseim – LocalMarket</PageTitle>
 
 <PageContainer Title="Rendeléseim" Subtitle="Korábbi és aktív előrendeléseid">
-    <OrderListView Loader="s => Api.MineAsync(s)" DetailsBase="orders" EmptyText="Még nem adtál le rendelést.">
-        <EmptyContent><a class="btn btn-primary" href="products">Termékek böngészése</a></EmptyContent>
+    <OrderListView Loader="s => Api.MineAsync(s)" DetailsBase="orders" EmptyText="A leadott rendeléseid itt követheted: mikor fogadta el a termelő, és mikor vehető át.">
+        <EmptyContent><a class="btn btn-primary" href="products"><Icon Name="bag" />A heti kínálat</a></EmptyContent>
     </OrderListView>
 </PageContainer>

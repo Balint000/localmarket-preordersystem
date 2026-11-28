@@ -1,29 +1,28 @@
 ﻿@* Közös rendeléslista: állapot szerinti szűrés (a szerveren), dátum szerinti rendezés (a letöltött listán). *@
-<div class="lm-card mb-3">
-    <div class="row g-3 align-items-end">
-        <div class="col-sm-5 col-md-4">
-            <label class="form-label" for="status-filter">Állapot</label>
-            <select id="status-filter" class="form-select" value="@_status" @onchange="OnStatusChangedAsync">
-                <option value="">Összes</option>
-                @foreach (var s in Labels.OrderStatuses)
-                {
-                    <option value="@s">@Labels.OrderStatus(s)</option>
-                }
-            </select>
+<div class="lm-filterbar">
+    <div>
+        <div class="lm-filter-label" id="status-filter-label">Állapot</div>
+        <div class="lm-pills scroll" role="group" aria-labelledby="status-filter-label">
+            <button type="button" class="lm-pill" aria-pressed="@(_status == "" ? "true" : "false")" @onclick='() => SetStatusAsync("")'>Összes</button>
+            @foreach (var s in Labels.OrderStatuses)
+            {
+                var status = s;
+                <button type="button" class="lm-pill" aria-pressed="@(_status == status ? "true" : "false")" @onclick="() => SetStatusAsync(status)">@Labels.OrderStatus(status)</button>
+            }
         </div>
-        <div class="col-sm-5 col-md-4">
-            <label class="form-label" for="order-sort">Rendezés</label>
-            <select id="order-sort" class="form-select" @bind="_newestFirst">
-                <option value="true">Legújabb elöl</option>
-                <option value="false">Legrégebbi elöl</option>
-            </select>
-        </div>
+    </div>
+    <div class="lm-filterbar-row">
+        <label class="form-label mb-0" for="order-sort">Rendezés</label>
+        <select id="order-sort" class="form-select" @bind="_newestFirst">
+            <option value="true">Legújabb elöl</option>
+            <option value="false">Legrégebbi elöl</option>
+        </select>
     </div>
 </div>
 
 @if (_loading)
 {
-    <LoadingIndicator Text="Rendelések betöltése..." />
+    <LoadingIndicator Text="Rendelések betöltése…" />
 }
 else if (_problem is not null)
 {
@@ -31,10 +30,15 @@ else if (_problem is not null)
 }
 else if (_orders.Count == 0)
 {
-    <EmptyState Title="Nincs megjeleníthető rendelés" Text="@EmptyText">@EmptyContent</EmptyState>
+    <EmptyState Title="@(_status == "" ? "Még nincs rendelés" : $"Nincs {Labels.OrderStatus(_status).ToLowerInvariant()} állapotú rendelés")"
+                Text="@(_status == "" ? EmptyText : "Válassz másik állapotot, vagy nézd meg az összes rendelést.")" IconName="receipt">
+        @if (_status == "") { @EmptyContent }
+        else { <button type="button" class="btn btn-outline-primary" @onclick='() => SetStatusAsync("")'>Összes rendelés</button> }
+    </EmptyState>
 }
 else
 {
+    <p class="lm-results-meta" aria-live="polite">@_orders.Count rendelés</p>
     <div class="lm-order-list">
         @foreach (var order in (_newestFirst ? _orders.OrderByDescending(o => o.CreatedAt) : _orders.OrderBy(o => o.CreatedAt)))
         {
@@ -58,9 +62,10 @@ else
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
-    private async Task OnStatusChangedAsync(ChangeEventArgs e)
+    private async Task SetStatusAsync(string status)
     {
-        _status = e.Value?.ToString() ?? "";
+        if (_status == status) return;
+        _status = status;
         await LoadAsync();
     }
 

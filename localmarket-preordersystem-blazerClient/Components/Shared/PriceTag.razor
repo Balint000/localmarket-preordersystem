@@ -1,0 +1,12 @@
+@* Árcédula: a termék ára "kilyukasztott" cédulán – a felület egyetlen hangos eleme. *@
+<span class="lm-tag @(Hang ? "lm-tag-hang" : "") @(Large ? "lg" : "") @CssClass">
+    @Labels.Money(Price)<small>/ @Labels.Unit(Unit)</small>
+</span>
+
+@code {
+    [Parameter, EditorRequired] public decimal Price { get; set; }
+    [Parameter, EditorRequired] public string Unit { get; set; } = "";
+    [Parameter] public bool Hang { get; set; }
+    [Parameter] public bool Large { get; set; }
+    [Parameter] public string? CssClass { get; set; }
+}

@@ -477,9 +477,11 @@ namespace localmarket_preordersystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer");
 
                     b.Property<decimal>("Quantity")
+                        .HasPrecision(12, 3)
                         .HasColumnType("numeric(12,3)");
 
                     b.Property<decimal>("ReservedQuantity")
+                        .HasPrecision(12, 3)
                         .HasColumnType("numeric(12,3)");
 
                     b.Property<string>("Unit")
@@ -488,6 +490,7 @@ namespace localmarket_preordersystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(30)");
 
                     b.Property<decimal>("UnitPrice")
+                        .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
 
                     b.Property<DateTime>("WeekStartDate")

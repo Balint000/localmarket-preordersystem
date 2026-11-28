@@ -5,42 +5,70 @@
 
 <PageTitle>LocalMarket – helyi termelői piac</PageTitle>
 
-<section class="lm-hero">
-    <h1 tabindex="-1">Friss helyi termékek, előrendelve</h1>
-    <p class="lead">Rendelj a környékbeli termelőktől, válaszd ki az átvételi időpontot, és vedd át a piacon.</p>
-    <div class="d-flex flex-wrap gap-2">
-        <a class="btn btn-primary btn-lg" href="products">Termékek böngészése</a>
-        <a class="btn btn-outline-primary btn-lg" href="register">Regisztráció</a>
-    </div>
-</section>
-
-<section class="lm-steps" aria-label="Hogyan működik">
-    <div><span class="lm-step-no">1</span><h2 class="h6">Válogass</h2><p>Böngészd a termelők heti kínálatát, szűrj kategória és allergén szerint.</p></div>
-    <div><span class="lm-step-no">2</span><h2 class="h6">Rendelj elő</h2><p>Tedd kosárba, és válassz átvételi időpontot minden termelőnél.</p></div>
-    <div><span class="lm-step-no">3</span><h2 class="h6">Vedd át</h2><p>A termelő visszaigazolja, jelzi ha kész, te pedig átveszed a piacon.</p></div>
-</section>
-
-@if (_featured.Count > 0)
-{
-    <div class="lm-section-title"><h2>Kiemelt termékek</h2><a href="products">Összes termék →</a></div>
-    <div class="lm-grid">
-        @foreach (var p in _featured)
+<section class="lm-hero" aria-labelledby="hero-title">
+    <div>
+        @if (_nextMarket is not null)
         {
-            <ProductCard Product="p" />
+            <div class="lm-hero-next">
+                <span class="dot" aria-hidden="true"><Icon Name="calendar" /></span>
+                <span>Következő piacnap: @Labels.DayRelative(_nextDay), @Labels.DateShort(_nextDay) – @_nextMarket.Name</span>
+            </div>
         }
+        <h1 id="hero-title" tabindex="-1">Friss helyi termékek, előrendelve.</h1>
+        <p class="lead">Foglald le a környékbeli termelők heti kínálatából, amire szükséged van, válassz átvételi időpontot, és a piacon már csak érte kell menned.</p>
+        <div class="lm-hero-actions">
+            <a class="btn btn-primary btn-lg" href="products"><Icon Name="bag" />A heti kínálat</a>
+            <a class="btn btn-outline-primary btn-lg" href="register">Fiók létrehozása</a>
+        </div>
     </div>
-}
+
+    <section class="lm-stall" aria-label="Kiemelt termékek a heti kínálatból">
+        <div class="lm-stall-awning" aria-hidden="true"></div>
+        @if (_featured.Count > 0)
+        {
+            <div class="lm-stall-items">
+                @foreach (var p in _featured)
+                {
+                    var look = Labels.CategoryLook(p.Categories.FirstOrDefault()?.Name);
+                    <a class="lm-stall-item" href="products/@p.Id">
+                        <span class="em" aria-hidden="true">@look.Emoji</span>
+                        <span class="nm">@p.Name</span>
+                        @if (p.NextStock is { } s) { <PriceTag Price="s.UnitPrice" Unit="@s.Unit" /> }
+                    </a>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="lm-stall-empty" aria-hidden="true">🥕 🍎 🧀</div>
+        }
+    </section>
+</section>
+
+<ol class="lm-steps" aria-label="Így működik">
+    <li><span class="lm-step-no" aria-hidden="true">1</span><h2>Válogass</h2><p>Nézd meg a termelők heti kínálatát, és szűrj kategóriára vagy allergénre.</p></li>
+    <li><span class="lm-step-no" aria-hidden="true">2</span><h2>Foglalj időpontot</h2><p>Termelőnként egy átvételi időpontot választasz; a készletet a rendelés lefoglalja.</p></li>
+    <li><span class="lm-step-no" aria-hidden="true">3</span><h2>Vedd át a standnál</h2><p>A termelő visszaigazol, jelzi, ha összekészítette, te pedig átveszed a piacon.</p></li>
+</ol>
 
 @if (_markets.Count > 0)
 {
     <div class="lm-section-title"><h2>Piacaink</h2></div>
-    <div class="lm-grid">
+    <div class="lm-grid wide">
         @foreach (var m in _markets)
         {
-            <article class="lm-card">
-                <h3 class="h6 mb-1">@m.Name</h3>
-                <div class="text-muted small">@m.Address</div>
-                <div class="small mt-2">Nyitva: @string.Join(", ", m.OpeningDays.Select(Labels.Day))</div>
+            <article class="lm-card lm-market-card">
+                <span class="pin" aria-hidden="true"><Icon Name="pin" /></span>
+                <div>
+                    <h3 class="h6 mb-1">@m.Name</h3>
+                    <div class="text-muted small">@m.Address</div>
+                    <div class="lm-days" role="img" aria-label="Nyitvatartás: @(m.OpeningDays.Count == 0 ? "nincs megadva" : string.Join(", ", m.OpeningDays.Select(Labels.Day)))">
+                        @foreach (var d in Labels.DayKeys)
+                        {
+                            <span class="lm-day @(m.OpeningDays.Contains(d) ? "on" : "")" aria-hidden="true">@Labels.DayAbbr(d)</span>
+                        }
+                    </div>
+                </div>
             </article>
         }
     </div>
@@ -49,6 +77,8 @@
 @code {
     private IReadOnlyList<ProductInfo> _featured = [];
     private IReadOnlyList<MarketInfo> _markets = [];
+    private MarketInfo? _nextMarket;
+    private DateTime _nextDay;
 
     protected override async Task OnInitializedAsync()
     {
@@ -61,5 +91,22 @@
         _featured = products.Value?.Where(p => p.NextStock is { AvailableQuantity: > 0 }).Take(4).ToList() ?? [];
         var markets = await Catalog.MarketsAsync();
         _markets = markets.Value?.Where(m => m.IsActive).ToList() ?? [];
+
+        var next = _markets
+            .Select(m => (Market: m, Day: NextOpeningDay(m, DateTime.Today)))
+            .Where(x => x.Day is not null)
+            .OrderBy(x => x.Day)
+            .FirstOrDefault();
+        if (next.Market is not null) { _nextMarket = next.Market; _nextDay = next.Day!.Value; }
+    }
+
+    private static DateTime? NextOpeningDay(MarketInfo market, DateTime today)
+    {
+        for (var i = 0; i < 7; i++)
+        {
+            var day = today.AddDays(i);
+            if (market.OpeningDays.Contains(day.DayOfWeek.ToString())) return day;
+        }
+        return null;
     }
 }

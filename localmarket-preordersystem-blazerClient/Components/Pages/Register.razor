@@ -6,17 +6,38 @@
 
 <PageTitle>Regisztráció – LocalMarket</PageTitle>
 
-<div class="lm-auth">
-    <PageContainer Title="Regisztráció">
-        <div class="btn-group w-100 mb-3" role="group" aria-label="Fióktípus">
-            <button type="button" class="btn @(!_producer ? "btn-primary" : "btn-outline-primary")" aria-pressed="@(!_producer)" @onclick="() => SetProducer(false)">Vásárló vagyok</button>
-            <button type="button" class="btn @(_producer ? "btn-primary" : "btn-outline-primary")" aria-pressed="@_producer" @onclick="() => SetProducer(true)">Árus vagyok</button>
-        </div>
+<div class="lm-auth-wrap">
+    <AuthAside Heading="Csatlakozz a piachoz." Text="Vásárlóként előrendelhetsz, árusként a heti kínálatodat hirdetheted meg." />
 
-        <div class="lm-card">
+    <div class="lm-auth-form">
+        <h1 tabindex="-1">Regisztráció</h1>
+        <p class="lm-sub">Pár adat, és már rendelhetsz is.</p>
+
+        <fieldset class="mb-4">
+            <legend class="form-label">Milyen fiókot hozol létre?</legend>
+            <div class="lm-choices lg">
+                <label class="lm-choice">
+                    <input type="radio" name="account-type" checked="@(!_producer)" @onchange="() => SetProducer(false)" />
+                    <span class="lm-choice-body">
+                        <span class="lm-choice-title"><Icon Name="bag" />Vásárló vagyok</span>
+                        <span class="lm-choice-sub">Előrendelek a termelőktől, és átveszem a piacon.</span>
+                    </span>
+                    <span class="lm-choice-check" aria-hidden="true"><Icon Name="check" /></span>
+                </label>
+                <label class="lm-choice">
+                    <input type="radio" name="account-type" checked="@_producer" @onchange="() => SetProducer(true)" />
+                    <span class="lm-choice-body">
+                        <span class="lm-choice-title"><Icon Name="sprout" />Árus vagyok</span>
+                        <span class="lm-choice-sub">Termékeket hirdetek, és kezelem a rendeléseket.</span>
+                    </span>
+                    <span class="lm-choice-check" aria-hidden="true"><Icon Name="check" /></span>
+                </label>
+            </div>
+        </fieldset>
+
             @if (_producer && _marketsLoading)
             {
-                <LoadingIndicator Text="Piacok betöltése..." />
+                <LoadingIndicator Text="Piacok betöltése…" />
             }
             else if (_producer && _marketsProblem is not null)
             {
@@ -54,8 +75,9 @@
                         </div>
                         <div class="col-sm-6">
                             <label class="form-label" for="password">Jelszó</label>
-                            <InputText id="password" type="password" class="form-control" @bind-Value="_form.Password" autocomplete="new-password" aria-describedby="pwHelp" />
-                            <div id="pwHelp" class="form-text">Legalább 8 karakter.</div>
+                            <InputText id="password" type="password" class="form-control" @bind-Value="_form.Password" @oninput="e => _pwPreview = e.Value?.ToString() ?? string.Empty" autocomplete="new-password" aria-describedby="pwHelp" />
+                            <div class="lm-pw-meter" data-level="@PasswordLevel" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+                            <div id="pwHelp" class="form-text">Legalább 8 karakter. Erősebb, ha kis- és nagybetűt, számot, jelet is tartalmaz.</div>
                             <ValidationMessage For="() => _form.Password" />
                         </div>
                         <div class="col-sm-6">
@@ -66,7 +88,7 @@
 
                         @if (_producer)
                         {
-                            <div class="col-12"><hr class="my-1" /><h2 class="h6 mb-0">Gazdaság adatai</h2></div>
+                            <div class="col-12"><hr class="my-1" /><h2 class="h6 mb-0 mt-2">A gazdaságod</h2></div>
                             <div class="col-12">
                                 <label class="form-label" for="producerName">Gazdaság / árus neve</label>
                                 <InputText id="producerName" class="form-control" @bind-Value="_form.ProducerName" />
@@ -93,16 +115,15 @@
                                 <label class="form-label" for="stall">Standszám</label>
                                 <InputNumber id="stall" class="form-control" @bind-Value="_form.StallNumber" min="0" />
                             </div>
-                            <div class="col-12 form-text">Az árus fiókot a piacvezetőnek jóvá kell hagynia, mielőtt termékeket hirdethetnél.</div>
+                            <div class="col-12"><div class="lm-callout info mb-0"><Icon Name="info" /><div class="lm-callout-body">Az árusfiókot a piacvezető hagyja jóvá. Addig is be tudsz jelentkezni, de terméket csak utána hirdethetsz.</div></div></div>
                         }
                     </div>
 
-                    <SubmitButton Busy="_busy" CssClass="btn-primary w-100 mt-3">Regisztráció</SubmitButton>
+                    <SubmitButton Busy="_busy" CssClass="btn-primary btn-lg w-100 mt-4">@(_producer ? "Árusfiók létrehozása" : "Fiók létrehozása")</SubmitButton>
                 </EditForm>
             }
-        </div>
-        <p class="mt-3 text-center">Már van fiókod? <a href="login">Bejelentkezés</a></p>
-    </PageContainer>
+        <p class="lm-auth-switch">Már van fiókod? <a href="login">Jelentkezz be</a></p>
+    </div>
 </div>
 
 @code {
@@ -112,6 +133,21 @@
     private ApiProblem? _marketsProblem;
     private readonly Dictionary<string, string> _producerFieldErrors = new();
     private bool _producer, _marketsLoading, _busy;
+
+    // egyszerű jelző (hossz + karakterfajták); nem biztonsági ellenőrzés, a szabályt a backend kényszeríti
+    private string _pwPreview = "";
+
+    private int PasswordLevel
+    {
+        get
+        {
+            var pw = _pwPreview.Length > 0 ? _pwPreview : _form.Password ?? "";
+            if (pw.Length == 0) return 0;
+            if (pw.Length < 8) return 1;
+            var kinds = (pw.Any(char.IsLower) ? 1 : 0) + (pw.Any(char.IsUpper) ? 1 : 0) + (pw.Any(char.IsDigit) ? 1 : 0) + (pw.Any(c => !char.IsLetterOrDigit(c)) ? 1 : 0);
+            return kinds >= 4 || (pw.Length >= 12 && kinds >= 3) ? 4 : kinds >= 3 ? 3 : 2;
+        }
+    }
 
     private async Task SetProducer(bool value)
     {

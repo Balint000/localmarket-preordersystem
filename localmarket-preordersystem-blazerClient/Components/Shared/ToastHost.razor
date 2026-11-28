@@ -4,9 +4,10 @@
 <div class="lm-toasts" aria-live="polite" aria-atomic="false">
     @foreach (var toast in Toasts.Items)
     {
-        <div class="lm-toast lm-toast-@toast.Kind.ToString().ToLowerInvariant()" role="@(toast.Kind == ToastKind.Error ? "alert" : "status")">
-            <span>@toast.Message</span>
-            <button type="button" class="btn-close" aria-label="Bezárás" @onclick="() => Toasts.Dismiss(toast.Id)"></button>
+        <div @key="toast.Id" class="lm-toast lm-toast-@toast.Kind.ToString().ToLowerInvariant()" role="@(toast.Kind == ToastKind.Error ? "alert" : "status")">
+            <Icon Name="@(toast.Kind switch { ToastKind.Success => "check-circle", ToastKind.Error => "alert", _ => "info" })" />
+            <span class="lm-toast-msg">@toast.Message</span>
+            <button type="button" class="lm-toast-close" aria-label="Értesítés bezárása" @onclick="() => Toasts.Dismiss(toast.Id)"><Icon Name="x" Size="16" /></button>
         </div>
     }
 </div>

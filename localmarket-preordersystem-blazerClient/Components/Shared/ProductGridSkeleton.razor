@@ -1,0 +1,20 @@
+@* Termékrács helyőrzője az első betöltéskor: a tartalom helye nem ugrik meg, amikor megérkezik. *@
+<div class="lm-grid" role="status" aria-live="polite">
+    <span class="visually-hidden">@Text</span>
+    @for (var i = 0; i < Count; i++)
+    {
+        <div class="lm-skeleton-card" aria-hidden="true">
+            <div class="lm-skeleton cover"></div>
+            <div class="body">
+                <div class="lm-skeleton line w-80"></div>
+                <div class="lm-skeleton line w-60"></div>
+                <div class="lm-skeleton line w-40"></div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public int Count { get; set; } = 8;
+    [Parameter] public string Text { get; set; } = "Termékek betöltése…";
+}

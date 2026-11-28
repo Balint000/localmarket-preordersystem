@@ -6,28 +6,60 @@
 
 <PageTitle>Viták – LocalMarket</PageTitle>
 
-<PageContainer Title="Vitatott rendelések">
+<PageContainer Title="Vitatott rendelések" Subtitle="A döntésed lezárja a rendelést; utána már nem módosítható.">
     @if (_loading) { <LoadingIndicator /> }
     else if (_problem is not null) { <ErrorMessage Problem="_problem" OnRetry="LoadAsync" /> }
-    else if (_orders.Count == 0) { <EmptyState Title="Nincs vitatott rendelés" /> }
+    else if (_orders.Count == 0)
+    {
+        <EmptyState Title="Nincs nyitott vita" IconName="scale" Text="Ha a vásárló vagy az árus vitatja egy rendelés lezárását, itt jelenik meg." />
+    }
     else
     {
-        @foreach (var o in _orders)
-        {
-            <div class="lm-card mb-3">
-                <div class="d-flex justify-content-between"><strong>Rendelés #@o.Id</strong><StatusBadge Status="@o.Status" /></div>
-                <p class="mb-2">@o.DisputeNote</p>
-                <button class="btn btn-primary btn-sm" disabled="@_busy" @onclick='() => ResolveAsync(o.Id, "PickedUp")'>Átvettnek tekint</button>
-                <button class="btn btn-outline-danger btn-sm" disabled="@_busy" @onclick='() => ResolveAsync(o.Id, "Cancelled")'>Lemondás</button>
-            </div>
-        }
+        <p class="lm-results-meta">@_orders.Count nyitott vita</p>
+        <div class="lm-grid wide">
+            @foreach (var o in _orders)
+            {
+                <article class="lm-card d-flex flex-column" aria-labelledby="dispute-@o.Id">
+                    <div class="lm-card-title">
+                        <h2 id="dispute-@o.Id">Rendelés #@o.Id</h2>
+                        <StatusBadge Status="@o.Status" />
+                    </div>
+                    <dl class="lm-facts">
+                        <dt>Vásárló</dt><dd>@(o.CustomerName ?? $"#{o.CustomerId}")</dd>
+                        <dt>Árus</dt><dd>@(o.ProducerName ?? $"#{o.ProducerId}")</dd>
+                        <dt>Átvétel</dt><dd>@Labels.DateLong(o.PickupDate)</dd>
+                        <dt>Összeg</dt><dd class="fw-bold">@Labels.Money(o.TotalAmount)</dd>
+                    </dl>
+                    @if (!string.IsNullOrWhiteSpace(o.DisputeNote))
+                    {
+                        <blockquote class="lm-quote">@o.DisputeNote</blockquote>
+                    }
+                    <div class="d-flex flex-wrap gap-2 mt-auto">
+                        <button class="btn btn-primary btn-sm" disabled="@_busy" @onclick='() => Open(o, "PickedUp")'><Icon Name="check" Size="16" />Átvettnek tekintem</button>
+                        <button class="btn btn-outline-danger btn-sm" disabled="@_busy" @onclick='() => Open(o, "Cancelled")'>Lemondottnak tekintem</button>
+                    </div>
+                </article>
+            }
+        </div>
     }
+
+    <ConfirmDialog Visible="_resolving is not null" Busy="_busy" Danger="@(_decision == "Cancelled")" IconName="scale"
+                   Title="@(_decision == "PickedUp" ? $"#{_resolving?.Id} lezárása átvettként" : $"#{_resolving?.Id} lezárása lemondottként")"
+                   Message="@(_decision == "PickedUp" ? "A rendelés átvettnek minősül, a fizetés teljesítettre vált." : "A rendelés lemondottnak minősül.")"
+                   ConfirmText="Döntés rögzítése" CancelText="Mégse" OnConfirm="ResolveAsync" OnCancel="Close">
+        <label class="form-label" for="resolve-note">Megjegyzés a döntéshez <span class="text-muted fw-normal">(nem kötelező)</span></label>
+        <textarea id="resolve-note" class="form-control" rows="3" maxlength="900" @bind="_note" @bind:event="oninput"></textarea>
+        <div class="form-text">@_note.Length / 900 karakter</div>
+    </ConfirmDialog>
 </PageContainer>
 
 @code {
     private IReadOnlyList<OrderInfo> _orders = [];
     private ApiProblem? _problem;
     private bool _loading = true, _busy;
+    private OrderInfo? _resolving;
+    private string _decision = "";
+    private string _note = "";
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
@@ -39,12 +71,16 @@
         _loading = false;
     }
 
-    private async Task ResolveAsync(int id, string decision)
+    private void Open(OrderInfo order, string decision) { _resolving = order; _decision = decision; _note = ""; }
+    private void Close() { _resolving = null; _note = ""; }
+
+    private async Task ResolveAsync()
     {
-        if (_busy) return;
+        if (_busy || _resolving is null) return;
         _busy = true;
-        var r = await Api.ResolveDisputeAsync(id, decision, null);
-        if (r.IsSuccess) { Toasts.Success("A vitát lezártad."); await LoadAsync(); }
+        var note = string.IsNullOrWhiteSpace(_note) ? null : _note.Trim();
+        var r = await Api.ResolveDisputeAsync(_resolving.Id, _decision, note);
+        if (r.IsSuccess) { Toasts.Success($"#{_resolving.Id} vitája lezárva."); Close(); await LoadAsync(); }
         else Toasts.Error(r.Problem!.Message);
         _busy = false;
     }

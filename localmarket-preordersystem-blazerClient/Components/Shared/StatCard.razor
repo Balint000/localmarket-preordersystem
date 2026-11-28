@@ -1,10 +1,18 @@
 ﻿<div class="lm-stat @CssClass">
-    <div class="lm-stat-value">@Value</div>
-    <div class="lm-stat-label">@Label</div>
+    @if (!string.IsNullOrEmpty(IconName))
+    {
+        <span class="lm-stat-icon" aria-hidden="true"><Icon Name="@IconName" /></span>
+    }
+    <div>
+        <div class="lm-stat-value">@Value</div>
+        <div class="lm-stat-label">@Label</div>
+    </div>
 </div>
 
 @code {
     [Parameter, EditorRequired] public string Label { get; set; } = "";
     [Parameter, EditorRequired] public string Value { get; set; } = "";
+    [Parameter] public string? IconName { get; set; }
+    /// <summary>"attention", "tone-ok", "tone-info", "tone-bad"</summary>
     [Parameter] public string? CssClass { get; set; }
 }

@@ -6,33 +6,45 @@
 
 <PageTitle>Bejelentkezés – LocalMarket</PageTitle>
 
-<div class="lm-auth">
-    <PageContainer Title="Bejelentkezés">
-        <div class="lm-card">
-            <EditForm Model="_form" OnValidSubmit="SubmitAsync" FormName="login">
-                <DataAnnotationsValidator />
+<div class="lm-auth-wrap">
+    <AuthAside Heading="Jó újra látni." Text="Jelentkezz be, és folytasd ott, ahol a heti bevásárlást abbahagytad." />
 
-                @if (_problem is not null)
-                {
-                    <ErrorMessage Problem="_problem" />
-                }
+    <div class="lm-auth-form">
+        <h1 tabindex="-1">Bejelentkezés</h1>
+        <p class="lm-sub">Add meg a fiókodhoz tartozó e-mail címet és jelszót.</p>
 
-                <div class="mb-3">
-                    <label class="form-label" for="email">E-mail cím</label>
+        <EditForm Model="_form" OnValidSubmit="SubmitAsync" FormName="login">
+            <DataAnnotationsValidator />
+
+            @if (_problem is not null)
+            {
+                <ErrorMessage Problem="_problem" />
+            }
+
+            <div class="mb-3">
+                <label class="form-label" for="email">E-mail cím</label>
+                <div class="lm-input-group">
+                    <Icon Name="mail" />
                     <InputText id="email" type="email" class="form-control" @bind-Value="_form.Email" autocomplete="username" />
-                    <ValidationMessage For="() => _form.Email" />
                 </div>
-                <div class="mb-3">
-                    <label class="form-label" for="password">Jelszó</label>
-                    <InputText id="password" type="password" class="form-control" @bind-Value="_form.Password" autocomplete="current-password" />
-                    <ValidationMessage For="() => _form.Password" />
+                <ValidationMessage For="() => _form.Email" />
+            </div>
+            <div class="mb-4">
+                <label class="form-label" for="password">Jelszó</label>
+                <div class="lm-input-group">
+                    <Icon Name="lock" />
+                    <InputText id="password" type="@(_showPassword ? "text" : "password")" class="form-control" style="padding-right:3rem" @bind-Value="_form.Password" autocomplete="current-password" />
+                    <button type="button" class="lm-icon-btn lm-input-addon" aria-label="Jelszó megjelenítése" aria-pressed="@(_showPassword ? "true" : "false")" @onclick="() => _showPassword = !_showPassword">
+                        <Icon Name="@(_showPassword ? "eye-off" : "eye")" />
+                    </button>
                 </div>
+                <ValidationMessage For="() => _form.Password" />
+            </div>
 
-                <SubmitButton Busy="_busy" CssClass="btn-primary w-100">Bejelentkezés</SubmitButton>
-            </EditForm>
-        </div>
-        <p class="mt-3 text-center">Még nincs fiókod? <a href="register">Regisztráció</a></p>
-    </PageContainer>
+            <SubmitButton Busy="_busy" CssClass="btn-primary btn-lg w-100">Bejelentkezés</SubmitButton>
+        </EditForm>
+        <p class="lm-auth-switch">Még nincs fiókod? <a href="register">Regisztrálj</a></p>
+    </div>
 </div>
 
 @code {
@@ -40,7 +52,7 @@
 
     private readonly LoginForm _form = new();
     private ApiProblem? _problem;
-    private bool _busy;
+    private bool _busy, _showPassword;
 
     protected override async Task OnInitializedAsync()
     {

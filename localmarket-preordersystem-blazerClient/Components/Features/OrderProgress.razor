@@ -1,0 +1,94 @@
+@* A rendelés útja az állapotgép mentén (Domain/Entity/Order.cs). Csak megjelenítés: az átmeneteket a backend dönti el. *@
+<div class="lm-card">
+    <ol class="lm-progress" aria-label="A rendelés állapota">
+        @foreach (var step in Steps)
+        {
+            <li class="@step.Css" aria-current="@(step.Css is "current" or "stop" or "alert" ? "step" : null)">
+                <span class="lm-progress-dot"><Icon Name="@step.Icon" /></span>
+                <span>@step.Label</span>
+                @if (step.Css == "done") { <span class="visually-hidden">(kész)</span> }
+            </li>
+        }
+    </ol>
+    @if (ShowHint && Hint is { } hint)
+    {
+        <p class="lm-progress-hint" aria-live="polite"><Icon Name="info" />@hint</p>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Status { get; set; } = "";
+    /// <summary>Az árus nézete más teendőt mutat, mint a vásárlóé.</summary>
+    [Parameter] public bool ForVendor { get; set; }
+    [Parameter] public bool ShowHint { get; set; } = true;
+
+    private sealed record Step(string Label, string Icon, string Css);
+
+    private IEnumerable<Step> Steps
+    {
+        get
+        {
+            // a "boldog út" lépései; a lezáró hibás állapotok a megfelelő helyen váltják ki a következőt
+            var accepted = Status == "PartiallyFulfilled" ? "Részben elfogadva" : "Elfogadva";
+            var index = Status switch
+            {
+                "Pending" => 0,
+                "Accepted" or "PartiallyFulfilled" => 1,
+                "Ready" => 2,
+                "PickedUp" => 3,
+                _ => -1
+            };
+
+            if (index >= 0)
+            {
+                // az "index"-edik lépés már megtörtént, az utána következőre várunk
+                string Css(int i) => i <= index ? "done" : i == index + 1 ? "current" : "";
+                yield return new("Leadva", "receipt", Css(0));
+                yield return new(accepted, "check", Css(1));
+                yield return new("Átvehető", "package", Css(2));
+                yield return new("Átvéve", "hand", Css(3));
+                yield break;
+            }
+
+            yield return new("Leadva", "receipt", "done");
+            switch (Status)
+            {
+                case "Cancelled":
+                    yield return new("Lemondva", "x", "stop");
+                    break;
+                case "Rejected":
+                    yield return new("Elutasítva", "x", "stop");
+                    break;
+                case "NotPickedUp":
+                    yield return new("Elfogadva", "check", "done");
+                    yield return new("Átvehető", "package", "done");
+                    yield return new("Nem vette át", "x", "stop");
+                    break;
+                case "Disputed":
+                    yield return new("Elfogadva", "check", "done");
+                    yield return new("Átvehető", "package", "done");
+                    yield return new("Vitatott", "scale", "alert");
+                    break;
+                default:
+                    yield return new(Labels.OrderStatus(Status), "info", "current");
+                    break;
+            }
+        }
+    }
+
+    private string? Hint => (Status, ForVendor) switch
+    {
+        ("Pending", false) => "A termelő még nem igazolta vissza a rendelést. Amíg ez nem történik meg, bármikor lemondhatod.",
+        ("Pending", true) => "Fogadd el, teljesítsd részben, vagy utasítsd el indoklással.",
+        ("Accepted" or "PartiallyFulfilled", false) => "A termelő elfogadta a rendelést, és összekészíti. Itt látod majd, amikor átvehető.",
+        ("Accepted" or "PartiallyFulfilled", true) => "Ha összekészítetted a tételeket, jelöld átvehetőnek.",
+        ("Ready", false) => "Átvehető! Gyere a standhoz a választott időpontban.",
+        ("Ready", true) => "Az átadás után jelöld átvettnek. Ha a vásárló nem jött el, jelöld meg azt is.",
+        ("PickedUp", _) => "A rendelés lezárult. Köszönjük, hogy helyben vásároltál!",
+        ("Disputed", _) => "A vitát a piacvezető dönti el; a döntésig a rendelés nem módosítható.",
+        ("Rejected", false) => "A termelő ezt a rendelést nem tudta vállalni. A lefoglalt időpont felszabadult.",
+        ("Cancelled", _) => "A rendelés le van mondva; a lefoglalt készlet és időpont felszabadult.",
+        ("NotPickedUp", _) => "A rendelést a megadott időpontban nem vették át.",
+        _ => null
+    };
+}

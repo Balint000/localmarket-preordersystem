@@ -1,0 +1,29 @@
+@inject IJSRuntime JS
+
+<button type="button" class="lm-icon-btn @CssClass" aria-pressed="@(_theme == "dark" ? "true" : "false")"
+        aria-label="Sötét mód" title="@(_theme == "dark" ? "Világos mód" : "Sötét mód")" @onclick="ToggleAsync">
+    <Icon Name="@(_theme == "dark" ? "sun" : "moon")" />
+</button>
+
+@code {
+    [Parameter] public string? CssClass { get; set; }
+
+    private string _theme = "light";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            _theme = await JS.InvokeAsync<string>("lmTheme.get");
+            StateHasChanged();
+        }
+        catch (JSException) { /* a szkript nem töltődött be: marad az alapértelmezés */ }
+    }
+
+    private async Task ToggleAsync()
+    {
+        try { _theme = await JS.InvokeAsync<string>("lmTheme.set", _theme == "dark" ? "light" : "dark"); }
+        catch (JSException) { }
+    }
+}

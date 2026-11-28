@@ -8,22 +8,22 @@
 
 <PageContainer Title="Árusok kezelése" Subtitle="Új regisztrációk jóváhagyása vagy elutasítása">
     <ChildContent>
-        <div class="lm-toolbar" role="group" aria-label="Szűrés állapot szerint">
+        <div class="lm-pills scroll mb-4" role="group" aria-label="Szűrés állapot szerint">
             @foreach (var (key, label) in Filters)
             {
                 var k = key;
-                <button type="button" class="btn btn-sm @(_status == k ? "btn-primary" : "btn-outline-secondary")" @onclick="() => SetStatusAsync(k)">@label</button>
+                <button type="button" class="lm-pill" aria-pressed="@(_status == k ? "true" : "false")" @onclick="() => SetStatusAsync(k)">@label</button>
             }
         </div>
 
         @if (_loading) { <LoadingIndicator /> }
         else if (_problem is not null) { <ErrorMessage Problem="_problem" OnRetry="LoadAsync" /> }
-        else if (_producers.Count == 0) { <EmptyState Title="Nincs találat" Text="Ebben az állapotban jelenleg nincs árus." /> }
+        else if (_producers.Count == 0) { <EmptyState Title="Itt most nincs teendő" IconName="users" Text="Ebben az állapotban jelenleg nincs árus." /> }
         else
         {
             <div class="lm-table-wrap">
                 <table class="table lm-table align-middle">
-                    <thead><tr><th>Árus</th><th>Piac</th><th>Stand</th><th>Regisztrált</th><th>Állapot</th><th class="text-end">Művelet</th></tr></thead>
+                    <thead><tr><th>Árus</th><th>Piac</th><th>Stand</th><th>Regisztrált</th><th>Állapot</th><th class="text-end"><span class="visually-hidden">Műveletek</span></th></tr></thead>
                     <tbody>
                     @foreach (var p in _producers)
                     {
@@ -36,11 +36,11 @@
                             <td class="text-end text-nowrap">
                                 @if (p.Status != "Approved")
                                 {
-                                    <button class="btn btn-primary btn-sm" disabled="@_busy" @onclick="() => ApproveAsync(p)">Jóváhagyás</button>
+                                    <button class="btn btn-primary btn-sm" disabled="@_busy" @onclick="() => ApproveAsync(p)"><Icon Name="check" Size="16" />Jóváhagyom</button>
                                 }
                                 @if (p.Status != "Rejected")
                                 {
-                                    <button class="btn btn-outline-danger btn-sm" disabled="@_busy" @onclick="() => OpenReject(p)">Elutasítás</button>
+                                    <button class="btn btn-outline-danger btn-sm" disabled="@_busy" @onclick="() => OpenReject(p)">Elutasítom</button>
                                 }
                             </td>
                         </tr>

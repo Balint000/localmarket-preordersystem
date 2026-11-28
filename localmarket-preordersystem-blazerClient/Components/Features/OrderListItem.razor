@@ -1,14 +1,19 @@
 ﻿<a class="lm-order-row" href="@Href">
     <div>
-        <div class="fw-semibold">#@Order.Id · @(ShowCustomer ? (Order.CustomerName ?? $"Vásárló #{Order.CustomerId}") : (Order.ProducerName ?? $"Termelő #{Order.ProducerId}"))</div>
-        <div class="text-muted small">
-            Leadva: @Labels.DateTimeText(Order.CreatedAt) · Átvétel: @Labels.Date(Order.PickupDate) @Labels.Time(Order.PickupStart) · @Order.Items.Count tétel
+        <div class="lm-order-title">
+            <span>@(ShowCustomer ? (Order.CustomerName ?? $"Vásárló #{Order.CustomerId}") : (Order.ProducerName ?? $"Termelő #{Order.ProducerId}"))</span>
+            <span class="lm-order-id">#@Order.Id</span>
+        </div>
+        <div class="lm-order-meta">
+            <span><Icon Name="calendar" />Átvétel: @Labels.DateShort(Order.PickupDate) @Labels.Time(Order.PickupStart)–@Labels.Time(Order.PickupEnd)</span>
+            <span><Icon Name="package" />@Order.Items.Count tétel</span>
         </div>
     </div>
-    <div class="text-end">
+    <div class="lm-order-side">
         <StatusBadge Status="@Order.Status" />
-        <div class="fw-semibold mt-1">@Labels.Money(Order.TotalAmount)</div>
+        <span class="lm-order-total">@Labels.Money(Order.TotalAmount)</span>
     </div>
+    <Icon Name="chevron-right" CssClass="lm-order-chevron" />
 </a>
 
 @code {

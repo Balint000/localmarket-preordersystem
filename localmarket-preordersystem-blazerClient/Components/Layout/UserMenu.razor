@@ -2,25 +2,23 @@
 @inject NavigationManager Navigation
 @inject CartService Cart
 
-<div class="lm-user-menu">
-    <button type="button" class="lm-user-button" aria-haspopup="true" aria-expanded="@_open" @onclick="() => _open = !_open">
-        <span class="lm-avatar" aria-hidden="true">@Initial</span>
-        <span class="lm-user-text">
-            <span class="lm-user-email">@Auth.Email</span>
-            <span class="lm-user-role">@Labels.Role(Auth.Role ?? "")</span>
-        </span>
+@* Az oldalsáv alja: ki van bejelentkezve, és a fiókkal kapcsolatos műveletek egy helyen, legördülő menü nélkül. *@
+<div class="lm-user-card">
+    <span class="lm-avatar" aria-hidden="true">@Initial</span>
+    <span class="lm-user-text">
+        <span class="lm-user-email" title="@Auth.Email">@Auth.Email</span>
+        <span class="lm-user-role">@Labels.Role(Auth.Role ?? "")</span>
+    </span>
+</div>
+<div class="lm-user-actions">
+    <NavLink class="lm-side-link flex-grow-1" href="profile"><Icon Name="user" /><span>Profilom</span></NavLink>
+    <ThemeToggle />
+    <button type="button" class="lm-icon-btn" aria-label="Kijelentkezés" title="Kijelentkezés" @onclick="SignOutAsync">
+        <Icon Name="logout" />
     </button>
-    @if (_open)
-    {
-        <div class="lm-user-dropdown" role="menu" @onclick="() => _open = false">
-            <a role="menuitem" href="profile">Profilom</a>
-            <button type="button" role="menuitem" @onclick="SignOutAsync">Kijelentkezés</button>
-        </div>
-    }
 </div>
 
 @code {
-    private bool _open;
     private string Initial => string.IsNullOrEmpty(Auth.Email) ? "?" : Auth.Email[..1].ToUpperInvariant();
 
     private async Task SignOutAsync()
