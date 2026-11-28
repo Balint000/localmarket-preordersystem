@@ -15,11 +15,8 @@ internal sealed class OpenMeteoWeatherService(HttpClient http, ILogger<OpenMeteo
         {
             return await FetchAsync(latitude, longitude, date, cancellationToken);
         }
-        catch (Exception ex) when (
-            ex is HttpRequestException or JsonException or KeyNotFoundException or InvalidOperationException or FormatException
-            || (ex is OperationCanceledException && !cancellationToken.IsCancellationRequested))
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
-            // Weather is auxiliary data: degrade gracefully instead of failing the request.
             logger.LogWarning(ex, "Az időjárás-szolgáltatás nem elérhető vagy hibás választ adott.");
             return null;
         }

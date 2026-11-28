@@ -51,7 +51,27 @@ app.UseExceptionHandler();
 app.UseStatusCodePages();
 
 if (builder.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
-    await app.InitializeAsync();
+{
+    var startupOk = false;
+    for (var attempt = 1; attempt <= 5 && !startupOk; attempt++)
+    {
+        try
+        {
+            await app.InitializeAsync();
+            startupOk = true;
+        }
+        catch (Exception ex) when (attempt < 5)
+        {
+            app.Logger.LogWarning(ex, "Adatbázis-inicializálás sikertelen ({Attempt}/5), újrapróbálás.", attempt);
+            await Task.Delay(TimeSpan.FromSeconds(3 * attempt));
+        }
+        catch (Exception ex)
+        {
+            app.Logger.LogCritical(ex, "Adatbázis-inicializálás véglegesen sikertelen, a szolgáltatás leáll.");
+            return 1;
+        }
+    }
+}
 
 if (app.Environment.IsDevelopment())
     app.MapOpenApi();
@@ -82,3 +102,4 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.MapControllers();
 
 app.Run();
+return 0;
