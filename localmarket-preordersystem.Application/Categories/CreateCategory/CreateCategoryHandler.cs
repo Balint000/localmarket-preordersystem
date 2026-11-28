@@ -14,8 +14,7 @@ namespace localmarket_preordersystem.Application.Categories.CreateCategory
             currentUser.RequireRole(Role.Admin);
             CreateCategoryValidator.Validate(command);
 
-            var existing = await categories.ListAsync(ct);
-            if (existing.Any(c => string.Equals(c.Name, command.Name.Trim(), StringComparison.OrdinalIgnoreCase)))
+            if (await categories.NameExistsAsync(command.Name.Trim(), null, ct))
                 throw new ConflictException("Ilyen nevű kategória már létezik.");
 
             var category = Category.Create(command.Name, command.Description ?? string.Empty);

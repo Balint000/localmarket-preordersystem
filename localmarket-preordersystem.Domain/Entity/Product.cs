@@ -26,6 +26,12 @@ namespace localmarket_preordersystem.Domain.Entity
         /// <summary>A feltöltött termékkép fájlneve (a tárolóban); null, ha nincs kép.</summary>
         public string? ImageFileName { get; private set; }
 
+        /// <summary>
+        /// Archivált (törölt) termék: rendelési előzménye miatt nem törölhető fizikailag, de a kínálatban nem
+        /// jelenik meg, nem tehető kosárba és nem rendelhető. A név újra felhasználható.
+        /// </summary>
+        public bool IsArchived { get; private set; }
+
         private readonly List<Allergy> _allergies = new();
         public IReadOnlyCollection<Allergy> Allergies => _allergies.AsReadOnly();
 
@@ -66,6 +72,7 @@ namespace localmarket_preordersystem.Domain.Entity
 
         public void UpdateDetails(string name, string description, IEnumerable<Category> categories, IEnumerable<Allergy> allergies)
         {
+            EnsureNotArchived();
             if (string.IsNullOrWhiteSpace(name))
                 throw new DomainException("A termék nevének megadása kötelező.");
 
@@ -92,6 +99,14 @@ namespace localmarket_preordersystem.Domain.Entity
 
         public void ClearImage() => ImageFileName = null;
 
+        public void Archive() => IsArchived = true;
+
+        private void EnsureNotArchived()
+        {
+            if (IsArchived)
+                throw new DomainException($"A(z) '{Name}' termék törölve (archiválva) van, nem módosítható és nem rendelhető.");
+        }
+
         // Invariáns: legalább egy kategória kell (különben a termék a kategória-szűrésekben
         // sehol nem jelenne meg).
         private static List<Category> NormalizeCategories(IEnumerable<Category>? categories)
@@ -106,6 +121,7 @@ namespace localmarket_preordersystem.Domain.Entity
         /// <summary>A megadott dátumot tartalmazó hét kínálatának rögzítése (a hét hétfőjére normalizálva).</summary>
         public void AddWeeklyStock(DateTime weekStartDate, decimal quantity, Units unit, decimal unitPrice)
         {
+            EnsureNotArchived();
             var normalizedWeek = ProductStock.GetWeekStart(weekStartDate);
             if (_weeklyStocks.Any(s => s.WeekStartDate == normalizedWeek))
                 throw new DomainException("Erre a hétre már van rögzített kínálat ehhez a termékhez.");
@@ -116,6 +132,7 @@ namespace localmarket_preordersystem.Domain.Entity
         /// <summary>Már rögzített heti kínálat módosítása. A hét nem változtatható, csak a mennyiség, egység, ár.</summary>
         public void UpdateWeeklyStock(DateTime weekStartDate, decimal quantity, Units unit, decimal unitPrice)
         {
+            EnsureNotArchived();
             var stock = GetStockForWeek(weekStartDate)
                 ?? throw new DomainException("Erre a hétre nincs rögzített kínálat ennél a terméknél.");
 
@@ -129,14 +146,32 @@ namespace localmarket_preordersystem.Domain.Entity
             return _weeklyStocks.FirstOrDefault(s => s.WeekStartDate == normalizedWeek);
         }
 
-        /// <summary>Az aktuális, vagy ha az nincs, a legközelebbi jövőbeli hét kínálata (árjelzéshez).</summary>
-        public ProductStock? GetNextAvailableStock(DateTime today)
+        /// <summary>
+        /// A legközelebbi még rendelhető hét kínálata (ár- és mennyiségjelzéshez, kosárhoz). Az aktuális hét csak
+        /// akkor számít, ha a piacon van még nyitvatartás a héten; különben a következő meghirdetett hét jön.
+        /// (Ha a piac nincs betöltve, az aktuális hetet is figyelembe vesszük.)
+        /// </summary>
+        public ProductStock? GetNextAvailableStock(DateTime now)
         {
-            var currentWeek = ProductStock.GetWeekStart(today);
+            if (IsArchived) return null;
+            var currentWeek = ProductStock.GetWeekStart(now);
+            var currentWeekOpen = Producer?.Market is not { } market || market.HasOpeningLeftInWeek(now);
             return _weeklyStocks
-                .Where(s => s.WeekStartDate >= currentWeek)
+                .Where(s => s.WeekStartDate > currentWeek || (s.WeekStartDate == currentWeek && currentWeekOpen))
                 .OrderBy(s => s.WeekStartDate)
                 .FirstOrDefault();
+        }
+
+        /// <summary>
+        /// A lezárt hetek kínálata (a hét utolsó piacnapja után), legújabb elöl: ebből látja az árus, mennyi maradt.
+        /// </summary>
+        public IEnumerable<ProductStock> GetClosedWeekStocks(DateTime now)
+        {
+            var currentWeek = ProductStock.GetWeekStart(now);
+            var currentWeekOpen = Producer?.Market is not { } market || market.HasOpeningLeftInWeek(now);
+            return _weeklyStocks
+                .Where(s => s.WeekStartDate < currentWeek || (s.WeekStartDate == currentWeek && !currentWeekOpen))
+                .OrderByDescending(s => s.WeekStartDate);
         }
 
         /// <summary>
@@ -145,6 +180,7 @@ namespace localmarket_preordersystem.Domain.Entity
         /// </summary>
         public ProductStock ReserveStockForPickup(DateTime pickupDate, decimal quantity)
         {
+            EnsureNotArchived();
             var stock = GetStockForWeek(pickupDate)
                 ?? throw new DomainException(
                     $"A(z) '{Name}' termék nem elérhető a(z) {pickupDate:yyyy-MM-dd} napot tartalmazó héten.");

@@ -1,11 +1,14 @@
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
+using localmarket_preordersystem.api.Background;
 using localmarket_preordersystem.api.Extensions;
 using localmarket_preordersystem.api.Middleware;
 using localmarket_preordersystem.Application;
 using localmarket_preordersystem.Application.Common.Time;
+using localmarket_preordersystem.Application.Orders;
 using localmarket_preordersystem.Application.Products;
 using localmarket_preordersystem.Infrastructure;
+using localmarket_preordersystem.Infrastructure.Auth;
 using localmarket_preordersystem.Infrastructure.Storage;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.FileProviders;
@@ -21,7 +24,11 @@ builder.Services.AddOpenApi();
 // A "ma" és az idősávok időpontjai a piac helyi idejében értendők (a konténer UTC-ben fut),
 // ezért a TimeProvider az App:TimeZone időzónát használja. Az AddApplication TryAdd-ja nem írja felül.
 builder.Services.AddSingleton<TimeProvider>(ZonedTimeProvider.Create(builder.Configuration["App:TimeZone"] ?? "Europe/Budapest"));
+builder.Services.AddSingleton(new OrderPolicy(
+    TimeSpan.FromHours(Math.Clamp(builder.Configuration.GetValue("Orders:CustomerCancellationCutoffHours", 12), 0, 7 * 24))));
 builder.Services.AddApplication();
+if (builder.Configuration.GetValue("Orders:ExpiryEnabled", true))
+    builder.Services.AddHostedService<OrderExpiryService>();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddApiAuth();
 
@@ -33,9 +40,13 @@ var authPerMinute = builder.Configuration.GetValue("RateLimit:AuthPerMinute", 60
 builder.Services.AddRateLimiter(o =>
 {
     o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    // Bejelentkezett kérésnél felhasználónként, egyébként IP szerint számolunk. A Blazor Server kliens
+    // miatt minden kérés ugyanarról az IP-ről jön, így az IP-alapú kulcs csak a vendégforgalomra marad.
     o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
         RateLimitPartition.GetFixedWindowLimiter(
-            ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            ctx.User.FindFirst(JwtClaimNames.UserId)?.Value is { } userId
+                ? "user:" + userId
+                : "ip:" + (ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown"),
             _ => new FixedWindowRateLimiterOptions { PermitLimit = generalPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
     o.AddPolicy("auth", ctx => RateLimitPartition.GetFixedWindowLimiter(
         ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
@@ -94,8 +105,8 @@ app.UseStaticFiles(new StaticFileOptions
 });
 
 app.UseCors();
-app.UseRateLimiter();
 app.UseAuthentication();
+app.UseRateLimiter(); // a hitelesítés után, hogy a felhasználó szerinti kulcs elérhető legyen
 app.UseAuthorization();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));

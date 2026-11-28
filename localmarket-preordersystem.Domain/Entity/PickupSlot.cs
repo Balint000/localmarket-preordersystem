@@ -35,6 +35,8 @@ namespace localmarket_preordersystem.Domain.Entity
                 throw new DomainException($"A piac ezen a napon ({date.DayOfWeek}) nem tart nyitva.");
             if (endTime <= startTime)
                 throw new DomainException("Az átvételi időpont vége nem lehet korábbi vagy egyenlő a kezdésnél.");
+            if (!producer.Market.CoversTime(startTime, endTime))
+                throw OutsideHours(producer.Market);
             if (capacity <= 0)
                 throw new DomainException("Az átvételi időpont kapacitásának pozitívnak kell lennie.");
 
@@ -52,7 +54,25 @@ namespace localmarket_preordersystem.Domain.Entity
 
         public bool HasFreeCapacity() => BookedCount < Capacity;
 
+        private static DomainException OutsideHours(Market market) =>
+            new($"Az átvételi időpont a piac nyitvatartásán belül lehet ({market.OpensAt:HH\\:mm}–{market.ClosesAt:HH\\:mm}).");
+
+        /// <summary>Foglalható-e most az idősáv (nem járt le, van hely, az árus aktív, a piac aznap nyitva van).</summary>
+        public bool IsBookable(DateTime now) =>
+            !HasEnded(now) && HasFreeCapacity()
+            && Producer?.Market is { IsActive: true } market
+            && Producer.CanListProducts()
+            && market.OpeningDays.Contains(Date.DayOfWeek)
+            && market.CoversTime(StartTime, EndTime);
+
         public bool HasEnded(DateTime now) => Date.Date.Add(EndTime.ToTimeSpan()) <= now;
+
+        /// <summary>
+        /// Átfedi-e ez az idősáv a megadott napi időablakot. Az egymáshoz csak érintkező sávok
+        /// (pl. 8–10 és 10–12) nem számítanak átfedésnek.
+        /// </summary>
+        public bool Overlaps(DateTime date, TimeOnly startTime, TimeOnly endTime)
+            => Date.Date == date.Date && StartTime < endTime && startTime < EndTime;
 
         /// <summary>
         /// Egy hely lefoglalása (pl. új Order létrehozásakor). Konkurens foglalás ellen a
@@ -62,6 +82,17 @@ namespace localmarket_preordersystem.Domain.Entity
         {
             if (HasEnded(now))
                 throw new DomainException("Ez az átvételi időpont már lejárt.");
+            // a meghirdetés óta a piac vagy az árus állapota változhatott: foglaláskor újra ellenőrizzük
+            var market = Producer?.Market
+                ?? throw new DomainException("Az idősáv árusa vagy piaca nincs betöltve, a foglalás nem ellenőrizhető.");
+            if (!Producer.CanListProducts())
+                throw new DomainException("Ez az árus jelenleg nem fogad rendelést.");
+            if (!market.IsActive)
+                throw new DomainException("A piac jelenleg szünetel, nem fogad rendelést.");
+            if (!market.OpeningDays.Contains(Date.DayOfWeek))
+                throw new DomainException("A piac ezen a napon már nem tart nyitva, ez az időpont nem foglalható.");
+            if (!market.CoversTime(StartTime, EndTime))
+                throw new DomainException("Ez az időpont kívül esik a piac jelenlegi nyitvatartásán, nem foglalható.");
             if (!HasFreeCapacity())
                 throw new DomainException("Ez az átvételi időpont betelt, nem foglalható le további rendelés.");
 
@@ -102,6 +133,8 @@ namespace localmarket_preordersystem.Domain.Entity
                     throw new DomainException("Az árushoz nincs betöltve a piac adata, az átvételi idősáv nem ellenőrizhető.");
                 if (!Producer.Market.OpeningDays.Contains(newDate.DayOfWeek))
                     throw new DomainException($"A piac ezen a napon ({newDate.DayOfWeek}) nem tart nyitva.");
+                if (!Producer.Market.CoversTime(startTime, endTime))
+                    throw OutsideHours(Producer.Market);
                 if (newDate.Add(endTime.ToTimeSpan()) <= now)
                     throw new DomainException("Múltbeli időpont nem hirdethető meg.");
             }

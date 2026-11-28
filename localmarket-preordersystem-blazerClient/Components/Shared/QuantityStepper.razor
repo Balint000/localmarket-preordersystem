@@ -1,4 +1,5 @@
-@* Mennyiség-léptető: −/+ gombok és közvetlen beírás. A végső szabályt (darabos egység, készlet) a backend ellenőrzi. *@
+@* Mennyiség-léptető: −/+ gombok és közvetlen beírás. A beírt értéket a lépték (Step) többszörösére kerekíti
+   (pl. kg: 0,5; 1; 1,5…), a felső korlátot pedig lefelé igazítja. A végső szabályt a backend is ellenőrzi. *@
 <div class="lm-stepper @(Small ? "sm" : "")" role="group" aria-label="@Label">
     <button type="button" aria-label="Kevesebb" disabled="@(Disabled || Value - Step < Min)" @onclick="() => SetAsync(Value - Step)"><Icon Name="minus" Size="16" /></button>
     <input id="@Id" type="number" inputmode="decimal" aria-label="@Label" min="@Fmt(Min)" step="@Fmt(Step)"
@@ -21,9 +22,11 @@
 
     private async Task SetAsync(decimal v)
     {
+        if (Step > 0)
+            v = Math.Round(v / Step, MidpointRounding.AwayFromZero) * Step;
         v = Math.Round(v, 3);
         if (v < Min) v = Min;
-        if (Max is { } m && v > m) v = m;
+        if (Max is { } m && v > m) v = Step > 0 ? Math.Max(Min, Math.Floor(m / Step) * Step) : m;
         await ValueChanged.InvokeAsync(v);
     }
 

@@ -28,7 +28,7 @@ services:
       db:
         condition: service_healthy
     environment:
-      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_ENVIRONMENT: "${ASPNETCORE_ENVIRONMENT:-Development}"
       ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=${POSTGRES_DB:-localmarket};Username=${POSTGRES_USER:-localmarket};Password=${POSTGRES_PASSWORD:?Állítsd be a POSTGRES_PASSWORD-öt a .env fájlban}"
       Database__MigrateOnStartup: "${MIGRATE_ON_STARTUP:-true}"
       Jwt__Secret: "${JWT_SECRET:?Állítsd be a JWT_SECRET-et a .env fájlban (min. 32 karakter)}"
@@ -50,7 +50,7 @@ services:
     depends_on:
       - api
     environment:
-      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_ENVIRONMENT: "${ASPNETCORE_ENVIRONMENT:-Development}"
       Api__BaseUrl: http://api:8080
       # a böngésző által elérhető API-cím (a feltöltött termékképekhez)
       Api__PublicBaseUrl: "${API_PUBLIC_URL:-http://localhost:5205}"

@@ -91,8 +91,8 @@ namespace localmarket_preordersystem.Domain.Entity
                 throw new DomainException("A lefoglalandó mennyiségnek pozitívnak kell lennie.");
             if (decimal.Round(quantity, 3) != quantity)
                 throw new DomainException("A mennyiség legfeljebb három tizedesjegyet tartalmazhat.");
-            if (Unit.IsCountable() && quantity != decimal.Truncate(quantity))
-                throw new DomainException("Ennél a terméknél csak egész mennyiség rendelhető.");
+            if (!Unit.IsValidOrderQuantity(quantity))
+                throw new DomainException($"Ennél a terméknél a mennyiség {Unit.OrderStep():0.###} egységenként rendelhető (pl. {Unit.OrderStep():0.###}, {Unit.OrderStep() * 2:0.###}, {Unit.OrderStep() * 3:0.###}).");
             if (quantity > AvailableQuantity)
                 throw new DomainException("Nincs elég elérhető készlet ehhez a mennyiséghez.");
 

@@ -19,7 +19,7 @@ namespace localmarket_preordersystem.Domain.Entity
 
         public ProducerStatus Status { get; private set; } = ProducerStatus.Pending;
 
-        public List<Product?> Products { get; set; } = new();
+        public List<Product> Products { get; set; } = new();
 
         public List<PickupSlot> PickupSlots { get; private set; } = new();
 
@@ -82,12 +82,21 @@ namespace localmarket_preordersystem.Domain.Entity
             Name = name.Trim();
         }
 
-        public void UpdateStallNumber(int stallNumber)
+        /// <summary>
+        /// Fix stand kiosztása (piacvezető). 0 = nincs kiosztva. Hogy a stand létezik-e a piac elrendezésében,
+        /// és nem foglalt-e, az Application ellenőrzi (más árusok adatára van szükség).
+        /// </summary>
+        public void AssignStall(int stallNumber)
         {
             if (stallNumber < 0)
                 throw new DomainException("A standszám nem lehet negatív.");
-
+            if (stallNumber > 0 && Market is { } market && market.Layout.Stalls.Count > 0 && !market.Layout.HasStall(stallNumber))
+                throw new DomainException($"A(z) {stallNumber}. stand nem szerepel a piac elrendezésében.");
             StallNumber = stallNumber;
         }
+
+        public void UnassignStall() => StallNumber = 0;
+
+        public bool HasStall => StallNumber > 0;
     }
 }

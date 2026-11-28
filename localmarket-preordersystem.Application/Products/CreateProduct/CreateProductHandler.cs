@@ -34,7 +34,7 @@ namespace localmarket_preordersystem.Application.Products.CreateProduct
             var product = Product.Create(producer, command.Name, command.Description ?? string.Empty, found, command.Allergies);
             await products.AddAsync(product, ct);
             await uow.SaveChangesAsync(ct);
-            return ProductDto.From(product, time.GetLocalNow().Date);
+            return ProductDto.From(product, time.GetLocalNow().DateTime);
         }
     }
 }

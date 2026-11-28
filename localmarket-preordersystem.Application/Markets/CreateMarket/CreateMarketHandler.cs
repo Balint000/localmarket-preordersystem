@@ -15,7 +15,7 @@ namespace localmarket_preordersystem.Application.Markets.CreateMarket
             currentUser.RequireRole(Role.Admin);
             CreateMarketValidator.Validate(command);
 
-            var market = Market.Create(command.Name, command.Address, command.OpeningDays);
+            var market = Market.Create(command.Name, command.Address, command.OpeningDays, command.OpensAt, command.ClosesAt);
             market.UpdateLocation(command.Latitude, command.Longitude);
 
             await markets.AddAsync(market, ct);

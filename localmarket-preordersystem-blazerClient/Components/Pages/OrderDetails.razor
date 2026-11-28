@@ -57,6 +57,13 @@
                     {
                         <hr class="my-3" />
                         <button type="button" class="btn btn-outline-danger w-100" @onclick="() => _confirmCancel = true"><Icon Name="x-circle" />Rendelés lemondása</button>
+                        <p class="small text-muted mt-2 mb-0">Elfogadott rendelést legkésőbb 12 órával az átvételi időpont előtt mondhatsz le; utána jelezd az árusnak.</p>
+                    }
+                    @* Vita csak lezárt átadás után nyitható (átvéve / nem átvett); a piacvezető dönt. *@
+                    @if (CanDispute)
+                    {
+                        <hr class="my-3" />
+                        <button type="button" class="btn btn-outline-danger w-100" @onclick="() => { _disputeNote = string.Empty; _confirmDispute = true; }"><Icon Name="scale" />Probléma jelzése (vita)</button>
                     }
                 </div>
             </div>
@@ -66,6 +73,14 @@
                        Message="A lefoglalt készlet és az átvételi időpont felszabadul. Ezt nem lehet visszavonni."
                        ConfirmText="Igen, lemondom" CancelText="Megtartom"
                        OnConfirm="CancelAsync" OnCancel="() => _confirmCancel = false" />
+
+        <ConfirmDialog Visible="_confirmDispute" Title="Probléma jelzése" Danger="true" Busy="_busy" IconName="scale"
+                       Message="Írd le, mi nem stimmelt (pl. hiányzó tétel, nem adták ki a rendelést). A vitát a piacvezető dönti el."
+                       ConfirmText="Vitát nyitok" CancelText="Mégse" ConfirmDisabled="string.IsNullOrWhiteSpace(_disputeNote)"
+                       OnConfirm="DisputeAsync" OnCancel="() => _confirmDispute = false">
+            <label class="form-label" for="dispute-note">Indoklás (kötelező, max. 1000 karakter)</label>
+            <textarea id="dispute-note" class="form-control" rows="3" maxlength="1000" @bind="_disputeNote" @bind:event="oninput"></textarea>
+        </ConfirmDialog>
     }
 </ChildContent>
 </PageContainer>
@@ -75,7 +90,13 @@
 
     private OrderInfo? _order;
     private ApiProblem? _problem;
-    private bool _loading = true, _busy, _confirmCancel, _exporting;
+    private bool _loading = true, _busy, _confirmCancel, _confirmDispute, _exporting;
+    private string _disputeNote = string.Empty;
+
+    // Vita: átvétel / „nem jött el” után, vagy ha az átvételi idősáv lejárt, de az árus nem zárta le az átadást
+    // (pl. nem adta ki a rendelést). A piac helyi ideje számít; a végső döntést a backend hozza.
+    private bool CanDispute => _order is { } o && (o.Status is "PickedUp" or "NotPickedUp"
+        || (o.Status is "Accepted" or "PartiallyFulfilled" or "Ready" && MarketClock.Now >= o.PickupDate.Date.Add(o.PickupEnd.ToTimeSpan())));
 
     protected override async Task OnParametersSetAsync() => await LoadAsync();
 
@@ -95,6 +116,17 @@
         var result = await Api.CancelAsync(Id);
         _confirmCancel = false;
         if (result.IsSuccess) { _order = result.Value; _problem = null; Toasts.Success("Rendelés lemondva."); }
+        else { Toasts.Error(result.Problem!.Message); await LoadAsync(); }
+        _busy = false;
+    }
+
+    private async Task DisputeAsync()
+    {
+        if (_busy || string.IsNullOrWhiteSpace(_disputeNote)) return;
+        _busy = true;
+        var result = await Api.DisputeAsync(Id, _disputeNote.Trim());
+        _confirmDispute = false;
+        if (result.IsSuccess) { _order = result.Value; _problem = null; Toasts.Success("A vitát rögzítettük, a piacvezető dönt."); }
         else { Toasts.Error(result.Problem!.Message); await LoadAsync(); }
         _busy = false;
     }

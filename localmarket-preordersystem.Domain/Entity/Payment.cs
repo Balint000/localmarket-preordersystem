@@ -49,10 +49,6 @@ namespace localmarket_preordersystem.Domain.Entity
             Status = PaymentStatus.Completed;
         }
 
-        public void MarkError()
-        {
-            Status = PaymentStatus.Error;
-        }
 
         public void Refund()
         {

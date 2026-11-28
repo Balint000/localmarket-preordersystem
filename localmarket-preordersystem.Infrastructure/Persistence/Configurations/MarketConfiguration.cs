@@ -14,6 +14,13 @@ internal sealed class MarketConfiguration : IEntityTypeConfiguration<Market>
 
         builder.Property(market => market.Name).HasMaxLength(200).IsRequired();
         builder.Property(market => market.Address).HasMaxLength(500).IsRequired();
+        builder.Property(market => market.OpensAt).HasColumnType("time without time zone");
+        builder.Property(market => market.ClosesAt).HasColumnType("time without time zone");
+        // az elrendezés értékobjektum: egy jsonb oszlopban ({ columns, rows, stalls: [...] })
+        builder.Property(market => market.Layout)
+            .HasColumnType("jsonb")
+            .HasConversion(MarketLayoutJson.Converter, MarketLayoutJson.Comparer)
+            .IsRequired();
         builder.Property<List<DayOfWeek>>("_openingDays")
             .HasColumnName("OpeningDays")
             .HasColumnType("integer[]")

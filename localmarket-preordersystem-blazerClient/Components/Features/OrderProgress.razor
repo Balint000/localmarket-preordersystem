@@ -59,6 +59,9 @@
                 case "Rejected":
                     yield return new("Elutasítva", "x", "stop");
                     break;
+                case "Expired":
+                    yield return new("Lejárt", "clock", "stop");
+                    break;
                 case "NotPickedUp":
                     yield return new("Elfogadva", "check", "done");
                     yield return new("Átvehető", "package", "done");
@@ -78,17 +81,21 @@
 
     private string? Hint => (Status, ForVendor) switch
     {
-        ("Pending", false) => "A termelő még nem igazolta vissza a rendelést. Amíg ez nem történik meg, bármikor lemondhatod.",
+        ("Pending", false) => "A termelő még nem igazolta vissza a rendelést. Amíg ez nem történik meg, az átvételi időpont kezdetéig lemondhatod.",
         ("Pending", true) => "Fogadd el, teljesítsd részben, vagy utasítsd el indoklással.",
-        ("Accepted" or "PartiallyFulfilled", false) => "A termelő elfogadta a rendelést, és összekészíti. Itt látod majd, amikor átvehető.",
+        ("Accepted" or "PartiallyFulfilled", false) => "A termelő elfogadta a rendelést, és összekészíti. Lemondani legkésőbb 12 órával az átvételi időpont előtt tudod.",
         ("Accepted" or "PartiallyFulfilled", true) => "Ha összekészítetted a tételeket, jelöld átvehetőnek.",
         ("Ready", false) => "Átvehető! Gyere a standhoz a választott időpontban.",
         ("Ready", true) => "Az átadás után jelöld átvettnek. Ha a vásárló nem jött el, jelöld meg azt is.",
-        ("PickedUp", _) => "A rendelés lezárult. Köszönjük, hogy helyben vásároltál!",
+        ("PickedUp", true) => "A rendelés lezárult.",
         ("Disputed", _) => "A vitát a piacvezető dönti el; a döntésig a rendelés nem módosítható.",
         ("Rejected", false) => "A termelő ezt a rendelést nem tudta vállalni. A lefoglalt időpont felszabadult.",
         ("Cancelled", _) => "A rendelés le van mondva; a lefoglalt készlet és időpont felszabadult.",
-        ("NotPickedUp", _) => "A rendelést a megadott időpontban nem vették át.",
+        ("NotPickedUp", false) => "A termelő szerint a rendelést nem vetted át. Ha ez tévedés, vitát nyithatsz; a piacvezető dönt.",
+        ("NotPickedUp", true) => "A rendelést a megadott időpontban nem vették át.",
+        ("PickedUp", false) => "A rendelés lezárult. Ha valami nem stimmelt az átvételnél, vitát nyithatsz.",
+        ("Expired", false) => "A termelő az átvételi időpontig nem igazolta vissza a rendelést, ezért lezártuk. A lefoglalt készlet és időpont felszabadult.",
+        ("Expired", true) => "Az átvételi időpont végéig nem döntöttél a rendelésről, ezért a rendszer lezárta.",
         _ => null
     };
 }

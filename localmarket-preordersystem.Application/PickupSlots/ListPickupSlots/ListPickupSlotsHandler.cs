@@ -9,7 +9,7 @@ using localmarket_preordersystem.Application.Categories;
 
 namespace localmarket_preordersystem.Application.PickupSlots.ListPickupSlots
 {
-    /// <summary>Egy árus még le nem járt idősávjai (vásárlóknak a rendeléshez). Nyilvános.</summary>
+    /// <summary>Egy árus még le nem járt idősávjai (vásárlóknak a rendeléshez). Nyilvános. Az IsBookable jelzi, foglalható-e.</summary>
     public sealed class ListPickupSlotsHandler(IPickupSlotRepository slots, TimeProvider time)
     {
         public async Task<IReadOnlyList<PickupSlotDto>> HandleAsync(int producerId, CancellationToken ct = default)
@@ -18,7 +18,7 @@ namespace localmarket_preordersystem.Application.PickupSlots.ListPickupSlots
             var list = await slots.ListByProducerAsync(producerId, now.Date, ct);
             return list.Where(s => !s.HasEnded(now))
                        .OrderBy(s => s.Date).ThenBy(s => s.StartTime)
-                       .Select(PickupSlotDto.From).ToList();
+                       .Select(s => PickupSlotDto.From(s, now)).ToList();
         }
     }
 }

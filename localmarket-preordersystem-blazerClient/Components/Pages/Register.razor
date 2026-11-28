@@ -97,7 +97,7 @@
                                     <div class="validation-message">@nameError</div>
                                 }
                             </div>
-                            <div class="col-sm-8">
+                            <div class="col-12">
                                 <label class="form-label" for="market">Piac</label>
                                 <InputSelect id="market" class="form-select" @bind-Value="_form.MarketId">
                                     <option value="">Válassz piacot...</option>
@@ -111,11 +111,7 @@
                                     <div class="validation-message">@marketError</div>
                                 }
                             </div>
-                            <div class="col-sm-4">
-                                <label class="form-label" for="stall">Standszám</label>
-                                <InputNumber id="stall" class="form-control" @bind-Value="_form.StallNumber" min="0" />
-                            </div>
-                            <div class="col-12"><div class="lm-callout info mb-0"><Icon Name="info" /><div class="lm-callout-body">Az árusfiókot a piacvezető hagyja jóvá. Addig is be tudsz jelentkezni, de terméket csak utána hirdethetsz.</div></div></div>
+                            <div class="col-12"><div class="lm-callout info mb-0"><Icon Name="info" /><div class="lm-callout-body">Az árusfiókot a piacvezető hagyja jóvá, és ő osztja ki a fix standodat a piac elrendezése alapján. Addig is be tudsz jelentkezni, de terméket csak a jóváhagyás után hirdethetsz.</div></div></div>
                         }
                     </div>
 

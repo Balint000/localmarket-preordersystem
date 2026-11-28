@@ -14,13 +14,17 @@ public sealed class AuthApi(ApiClient api)
 public sealed class CatalogApi(ApiClient api)
 {
     public Task<ApiResult<IReadOnlyList<MarketInfo>>> MarketsAsync(CancellationToken ct = default) => api.GetAsync<IReadOnlyList<MarketInfo>>("api/markets", ct);
+    public Task<ApiResult<MarketLayoutInfo>> MarketLayoutAsync(int marketId, CancellationToken ct = default) => api.GetAsync<MarketLayoutInfo>($"api/markets/{marketId}/layout", ct);
     public Task<ApiResult<IReadOnlyList<CategoryInfo>>> CategoriesAsync(CancellationToken ct = default) => api.GetAsync<IReadOnlyList<CategoryInfo>>("api/categories", ct);
 
-    public Task<ApiResult<IReadOnlyList<ProductInfo>>> SearchProductsAsync(string? text, int? categoryId, IEnumerable<string> excludeAllergies, CancellationToken ct = default)
+    public Task<ApiResult<IReadOnlyList<ProductInfo>>> SearchProductsAsync(string? text, int? categoryId, IEnumerable<string> excludeAllergies,
+        int? marketId = null, int? producerId = null, CancellationToken ct = default)
     {
         var query = new List<string>();
         if (!string.IsNullOrWhiteSpace(text)) query.Add("text=" + Uri.EscapeDataString(text.Trim()));
         if (categoryId is int c) query.Add("categoryId=" + c);
+        if (marketId is int m) query.Add("marketId=" + m);
+        if (producerId is int pr) query.Add("producerId=" + pr);
         query.AddRange(excludeAllergies.Select(a => "excludeAllergies=" + Uri.EscapeDataString(a)));
         var url = "api/products" + (query.Count > 0 ? "?" + string.Join('&', query) : "");
         return api.GetAllPagesAsync<ProductInfo>(url, ct);
@@ -72,7 +76,7 @@ public sealed class OrdersApi(ApiClient api, CartService cart)
     public Task<ApiResult<IReadOnlyList<OrderInfo>>> ForProducerAsync(string? status, CancellationToken ct = default) => api.GetAllPagesAsync<OrderInfo>("api/orders/producer" + StatusQuery(status), ct);
     public Task<ApiResult<OrderInfo>> GetAsync(int id, CancellationToken ct = default) => api.GetAsync<OrderInfo>($"api/orders/{id}", ct);
 
-    public Task<ApiResult<OrderInfo>> CancelAsync(int id) => api.PostAsync<OrderInfo>($"api/orders/{id}/cancel");
+    public Task<ApiResult<OrderInfo>> CancelAsync(int id, string? reason = null) => api.PostAsync<OrderInfo>($"api/orders/{id}/cancel", reason is null ? null : new CancelRequest(reason));
     public Task<ApiResult<OrderInfo>> AcceptAsync(int id) => api.PostAsync<OrderInfo>($"api/orders/{id}/accept");
     public Task<ApiResult<OrderInfo>> AcceptPartiallyAsync(int id, IReadOnlyList<FulfilledLineRequest> lines) => api.PostAsync<OrderInfo>($"api/orders/{id}/accept-partially", new PartialRequest(lines));
     public Task<ApiResult<OrderInfo>> RejectAsync(int id, string reason) => api.PostAsync<OrderInfo>($"api/orders/{id}/reject", new ReasonRequest(reason));
@@ -84,7 +88,8 @@ public sealed class OrdersApi(ApiClient api, CartService cart)
     public Task<ApiResult<OrderInfo>> DisputeAsync(int id, string note) => api.PostAsync<OrderInfo>($"api/orders/{id}/dispute", new NoteRequest(note));
 
     public Task<ApiResult<DownloadedFile>> ExportOrderAsync(int id, string format) => api.GetFileAsync($"api/export/orders/{id}?format={format}");
-    public Task<ApiResult<DownloadedFile>> ExportPickingListAsync(DateTime date, string format) => api.GetFileAsync($"api/export/picking-list?date={date:yyyy-MM-dd}&format={format}");
+    public Task<ApiResult<DownloadedFile>> ExportPickingListAsync(DateTime date, string format, int? producerId = null)
+        => api.GetFileAsync($"api/export/picking-list?date={date:yyyy-MM-dd}&format={format}" + (producerId is { } p ? $"&producerId={p}" : ""));
 
     private static string StatusQuery(string? status) => string.IsNullOrEmpty(status) ? "" : "?status=" + Uri.EscapeDataString(status);
 }
@@ -99,7 +104,11 @@ public sealed class VendorApi(ApiClient api)
     public Task<ApiResult<ProducerInfo>> GetMineAsync(CancellationToken ct = default) => api.GetAsync<ProducerInfo>("api/producers/me", ct);
     public Task<ApiResult<ProducerInfo>> UpdateMineAsync(UpdateMyProducerRequest r) => api.PutAsync<ProducerInfo>("api/producers/me", r, default);
     public Task<ApiResult<ProductInfo>> SetImageAsync(int id, string fileName, string contentType, byte[] content) => api.PutFileAsync<ProductInfo>($"api/products/{id}/image", fileName, contentType, content);
-    public Task<ApiResult<Unit>> DeleteProductAsync(int id) => api.DeleteAsync<Unit>($"api/products/{id}");
+    /// <summary>Árus: saját termék törlése (aktív rendelés nélkül). Piacvezető: bármelyik, indoklással (az aktív rendeléseket lemondja).</summary>
+    public Task<ApiResult<DeleteProductResult>> DeleteProductAsync(int id, string? reason = null)
+        => api.DeleteAsync<DeleteProductResult>($"api/products/{id}" + (string.IsNullOrWhiteSpace(reason) ? "" : "?reason=" + Uri.EscapeDataString(reason)));
+    public Task<ApiResult<IReadOnlyList<StockReviewLine>>> StockReviewAsync(int weeks = 4, CancellationToken ct = default)
+        => api.GetAsync<IReadOnlyList<StockReviewLine>>($"api/producers/me/stock-review?weeks={weeks}", ct);
     public Task<ApiResult<PickupSlotInfo>> UpdatePickupSlotAsync(int id, CreatePickupSlotRequest r) => api.PutAsync<PickupSlotInfo>($"api/pickup-slots/{id}", r, default);
     public Task<ApiResult<Unit>> DeletePickupSlotAsync(int id) => api.DeleteAsync<Unit>($"api/pickup-slots/{id}");
     public Task<ApiResult<ProductInfo>> DeleteImageAsync(int id) => api.DeleteAsync<ProductInfo>($"api/products/{id}/image");
@@ -115,6 +124,20 @@ public sealed class AdminApi(ApiClient api)
     public Task<ApiResult<CategoryInfo>> CreateCategoryAsync(CreateCategoryRequest r) => api.PostAsync<CategoryInfo>("api/categories", r);
     public Task<ApiResult<CategoryInfo>> UpdateCategoryAsync(int id, CreateCategoryRequest r) => api.PutAsync<CategoryInfo>($"api/categories/{id}", r, default);
     public Task<ApiResult<Unit>> DeleteCategoryAsync(int id) => api.DeleteAsync<Unit>($"api/categories/{id}");
+
+    public Task<ApiResult<MarketLayoutInfo>> SaveMarketLayoutAsync(int marketId, MarketLayoutRequest r) => api.PutAsync<MarketLayoutInfo>($"api/markets/{marketId}/layout", r, default);
+    public Task<ApiResult<ProducerInfo>> AssignStallAsync(int producerId, int stallNumber, bool swap = false) => api.PutAsync<ProducerInfo>($"api/producers/{producerId}/stall", new AssignStallRequest(stallNumber, swap), default);
+
+    public Task<ApiResult<IReadOnlyList<UserInfo>>> UsersAsync(string? role, bool? isActive, string? search, CancellationToken ct = default)
+    {
+        var q = new List<string>();
+        if (!string.IsNullOrEmpty(role)) q.Add("role=" + Uri.EscapeDataString(role));
+        if (isActive is { } a) q.Add("isActive=" + (a ? "true" : "false"));
+        if (!string.IsNullOrWhiteSpace(search)) q.Add("search=" + Uri.EscapeDataString(search.Trim()));
+        return api.GetAsync<IReadOnlyList<UserInfo>>("api/users" + (q.Count > 0 ? "?" + string.Join('&', q) : ""), ct);
+    }
+
+    public Task<ApiResult<UserInfo>> SetUserActiveAsync(int id, bool active) => api.PostAsync<UserInfo>($"api/users/{id}/{(active ? "activate" : "deactivate")}");
 
     public Task<ApiResult<IReadOnlyList<TopProductInfo>>> TopProductsAsync(DateTime? from, DateTime? to, int top = 10) => api.GetAsync<IReadOnlyList<TopProductInfo>>("api/reports/top-products" + Range(from, to, "top=" + top), default);
     public Task<ApiResult<CancellationRateInfo>> CancellationRateAsync(DateTime? from, DateTime? to) => api.GetAsync<CancellationRateInfo>("api/reports/cancellation-rate" + Range(from, to), default);

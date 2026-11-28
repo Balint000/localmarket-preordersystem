@@ -9,6 +9,30 @@
 
 <PageContainer Title="Átvételi időpontok" Subtitle="Ezek közül választanak a vásárlók rendeléskor">
     <ChildContent>
+        @if (_market is not null)
+        {
+            <div class="lm-card mb-4" aria-labelledby="mk-title">
+                <div class="lm-card-title"><h2 id="mk-title"><Icon Name="calendar" />A piacod nyitvatartása</h2><span class="small text-muted">@_market.Name</span></div>
+                <div class="lm-days" role="img" aria-label="Piacnapok: @(_market.OpeningDays.Count == 0 ? "nincs megadva" : string.Join(", ", _market.OpeningDays.Select(Labels.Day)))">
+                    @foreach (var d in Labels.DayKeys)
+                    {
+                        <span class="lm-day @(_market.OpeningDays.Contains(d) ? "on" : "")" aria-hidden="true">@Labels.DayAbbr(d)</span>
+                    }
+                </div>
+                <div class="small mt-2"><Icon Name="clock" Size="14" /> Nyitva: <strong>@_market.HoursText</strong>@(_market.IsActive ? "" : " – a piac jelenleg szünetel")</div>
+                @if (NextMarketDays.Count > 0)
+                {
+                    <div class="small text-muted mt-1">Következő piacnapok: @string.Join(", ", NextMarketDays.Select(d => $"{Labels.DateShort(d)} ({Labels.Day(d.DayOfWeek.ToString())})"))</div>
+                }
+                <div class="form-text">Átvételi időpontot csak piacnapra, a nyitvatartáson belül hirdethetsz.</div>
+                <div class="small mt-2"><Icon Name="pin" Size="14" /> Standod: <strong>@(_myStall > 0 ? $"{_myStall}. stand" : "még nincs kiosztva (a piacvezető osztja ki)")</strong></div>
+                @if (_layout is { Stalls.Count: > 0 })
+                {
+                    <div class="mt-2" style="max-width:40rem"><MarketMap Layout="_layout" Highlight="@(_myStall > 0 ? (int?)_myStall : null)" HighlightText="a te standod" /></div>
+                }
+            </div>
+        }
+
         <div class="row g-4">
             <div class="col-lg-4">
                 <div class="lm-card">
@@ -39,6 +63,7 @@
                                 <tr class="@(_editId == s.Id ? "table-active" : "")"><td><strong>@Labels.DateShort(s.Date)</strong><div class="small text-muted">@Labels.DayRelative(s.Date)</div></td><td>@Labels.Time(s.StartTime)–@Labels.Time(s.EndTime)</td>
                                     <td class="lm-bar-cell">
                                         <div class="small mb-1">@s.BookedCount / @s.Capacity foglalt, @s.FreeCapacity szabad</div>
+                                        @if (!s.IsBookable && s.FreeCapacity > 0) { <div class="small text-danger mb-1">Nem foglalható: a piac szünetel vagy ezen a napon zárva.</div> }
                                         <div class="lm-meter @(s.FreeCapacity == 0 ? "bad" : "")" aria-hidden="true"><span style="width:@(s.Capacity > 0 ? s.BookedCount * 100 / s.Capacity : 0)%"></span></div>
                                     </td>
                                     <td class="text-end text-nowrap">
@@ -69,11 +94,34 @@
     private int _capacity = 10;
     private int? _editId;
     private PickupSlotInfo? _deleting;
+    private MarketInfo? _market;
+    private MarketLayoutInfo? _layout;
+    private int _myStall;
+
+    private IReadOnlyList<DateTime> NextMarketDays => _market is null || !_market.IsActive
+        ? []
+        : Enumerable.Range(0, 28).Select(i => DateTime.Today.AddDays(i))
+            .Where(d => _market.OpeningDays.Contains(d.DayOfWeek.ToString())).Take(4).ToList();
 
     protected override async Task OnInitializedAsync()
     {
         await Auth.GetAuthenticationStateAsync();
         await LoadAsync();
+    }
+
+    // a saját piac: az árus-profilból a piac azonosítója, majd a piaclistából a nyitvatartás
+    private async Task LoadMarketAsync()
+    {
+        var me = await Vendor.GetMineAsync();
+        var markets = await Catalog.MarketsAsync();
+        if (me.IsSuccess && markets.IsSuccess)
+        {
+            _market = markets.Value!.FirstOrDefault(m => m.Id == me.Value!.MarketId);
+            _myStall = me.Value!.StallNumber;
+            var layout = await Catalog.MarketLayoutAsync(me.Value!.MarketId);
+            if (layout.IsSuccess) _layout = layout.Value;
+            if (_market?.OpensAt is { } o && _editId is null && _from < o) _from = o;
+        }
     }
 
     private async Task LoadAsync()
@@ -87,6 +135,7 @@
         {
             var r = await Catalog.PickupSlotsAsync(pid);
             if (r.IsSuccess) _slots = r.Value!; else _problem = r.Problem;
+            if (_market is null) await LoadMarketAsync();
         }
         _loading = false;
     }

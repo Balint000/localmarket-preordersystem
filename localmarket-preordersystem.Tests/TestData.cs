@@ -8,6 +8,11 @@ internal static class TestData
 {
     public static readonly DateTime Now = new(2026, 11, 16, 10, 0, 0);
     public static readonly DateTime Saturday = new(2026, 11, 21);
+    /// <summary>Az átvétel napja, az idősáv (9–12) közben.</summary>
+    public static readonly DateTime OnPickupDay = new(2026, 11, 21, 10, 0, 0);
+    /// <summary>Az idősáv vége után.</summary>
+    public static readonly DateTime AfterPickup = new(2026, 11, 21, 13, 0, 0);
+    public static readonly TimeSpan Cutoff = TimeSpan.FromHours(12);
 
     public static Producer ApprovedProducer(DayOfWeek openOn = DayOfWeek.Saturday)
     {
@@ -44,9 +49,9 @@ internal static class TestData
     public static (Order Order, Product Product, PickupSlot Slot) PickedUpOrder()
     {
         var data = PendingOrder();
-        data.Order.Accept();
-        data.Order.MarkReady();
-        data.Order.MarkPickedUp();
+        data.Order.Accept(Now);
+        data.Order.MarkReady(Now);
+        data.Order.MarkPickedUp(OnPickupDay);
         return data;
     }
 }

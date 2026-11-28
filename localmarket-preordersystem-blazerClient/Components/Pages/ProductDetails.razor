@@ -5,6 +5,7 @@
 @inject AuthStateService Auth
 @inject ToastService Toasts
 @inject NavigationManager Navigation
+@inject VendorApi Vendor
 
 <PageTitle>@(_product?.Name ?? "Termék") – LocalMarket</PageTitle>
 
@@ -94,19 +95,49 @@
             </div>
         </div>
 
+        @if (Auth.Role == "Admin" && !_product.IsArchived)
+        {
+            <div class="lm-callout warn mt-3"><Icon Name="warning" />
+                <div class="lm-callout-body">
+                    <strong>Piacvezetői művelet</strong>
+                    A termék törlésekor a rá vonatkozó aktív (függő vagy elfogadott) rendelések lemondásra kerülnek, a vásárlók látják az indoklást.
+                    <div class="mt-2"><button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => { _deleteReason = string.Empty; _confirmDelete = true; }"><Icon Name="trash" Size="16" />Termék törlése</button></div>
+                </div>
+            </div>
+        }
+        @if (_product.IsArchived)
+        {
+            <div class="lm-callout bad mt-3"><Icon Name="x-circle" /><div class="lm-callout-body">Ez a termék törölve lett a kínálatból, már nem rendelhető.</div></div>
+        }
+
+        <ConfirmDialog Visible="_confirmDelete" Title="@($"Termék törlése: {_product.Name}")" Danger="true" Busy="_deleting"
+                       ConfirmText="Törlöm" CancelText="Mégse" ConfirmDisabled="string.IsNullOrWhiteSpace(_deleteReason)"
+                       Message="Ha a termékre volt rendelés, archiválódik (az előzmény megmarad), különben véglegesen törlődik."
+                       OnConfirm="DeleteAsync" OnCancel="() => _confirmDelete = false">
+            <label class="form-label" for="del-reason">Indoklás (kötelező; a lemondott rendeléseknél a vásárló látja)</label>
+            <textarea id="del-reason" class="form-control" rows="3" maxlength="500" @bind="_deleteReason" @bind:event="oninput"></textarea>
+        </ConfirmDialog>
+
         <div class="row g-4 mt-1">
             <div class="col-lg-5">
                 <div class="lm-card h-100">
                     <div class="lm-card-title"><h2><Icon Name="store" />Az árusról</h2></div>
                     <dl class="lm-facts">
-                        <dt>Árus</dt><dd class="fw-bold">@_product.ProducerName</dd>
-                        @if (_producer is not null) { <dt>Stand</dt><dd>@_producer.StallNumber. számú stand</dd> }
+                        <dt>Árus</dt><dd class="fw-bold">@_product.ProducerName<div><a class="small fw-normal" href="products?producerId=@_product.ProducerId">Az árus további termékei</a></div></dd>
+                        @if (_producer is not null) { <dt>Stand</dt><dd>@(_producer.StallNumber > 0 ? $"{_producer.StallNumber}. számú stand" : "még nincs kiosztva")</dd> }
                         @if (_market is not null)
                         {
                             <dt>Piac</dt><dd>@_market.Name<div class="small text-muted">@_market.Address</div></dd>
-                            <dt>Nyitva</dt><dd>@(_market.OpeningDays.Count == 0 ? "–" : string.Join(", ", _market.OpeningDays.Select(Labels.Day)))</dd>
+                            <dt>Nyitva</dt><dd>@(_market.OpeningDays.Count == 0 ? "–" : string.Join(", ", _market.OpeningDays.Select(Labels.Day)))<div class="small text-muted">@_market.HoursText</div></dd>
                         }
                     </dl>
+                    @if (_layout is { Stalls.Count: > 0 } && _producer is { StallNumber: > 0 })
+                    {
+                        <div class="mt-3">
+                            <div class="small fw-bold mb-1">Hol találod a piacon?</div>
+                            <MarketMap Layout="_layout" Highlight="_producer.StallNumber" HighlightText="@($"{_producer.Name} standja")" ShowNames="false" />
+                        </div>
+                    }
                     @if (_weather is { ForecastAvailable: true } w)
                     {
                         <div class="lm-weather">
@@ -166,9 +197,12 @@
     private ApiProblem? _problem, _addProblem;
     private bool _loading = true, _adding;
     private decimal _quantity = 1;
+    private bool _confirmDelete, _deleting;
+    private string _deleteReason = string.Empty;
 
     private ProducerInfo? _producer;
     private MarketInfo? _market;
+    private MarketLayoutInfo? _layout;
     private MarketWeatherInfo? _weather;
     private IReadOnlyList<PickupSlotInfo> _slots = [];
 
@@ -189,22 +223,24 @@
         var result = await Catalog.ProductAsync(Id);
         if (result.IsSuccess) _product = result.Value; else { _product = null; _problem = result.Problem; }
         _loading = false;
-        if (_product?.NextStock is { } st) _quantity = Math.Max(MinQty(st), st.Unit is "Gram" or "Millilitre" or "Decagram" ? Step(st) : 1m);
+        if (_product?.NextStock is { } st) _quantity = Math.Max(Step(st), 1m); // kg/l: 1, g: 100, darab: 1
         if (_product is not null) await LoadExtrasAsync(_product);
     }
 
     // kiegészítő információk: hiba esetén egyszerűen kimaradnak, a termék megrendelhetőségét nem érintik
     private async Task LoadExtrasAsync(ProductInfo product)
     {
-        _producer = null; _market = null; _weather = null; _slots = [];
+        _producer = null; _market = null; _weather = null; _slots = []; _layout = null;
         var producers = await Catalog.ProducersAsync();
         _producer = producers.Value?.FirstOrDefault(p => p.Id == product.ProducerId);
         var slots = await Catalog.PickupSlotsAsync(product.ProducerId);
-        _slots = slots.Value?.Where(s => s.Date.Date >= DateTime.Today && s.FreeCapacity > 0).OrderBy(s => s.Date).ThenBy(s => s.StartTime).Take(8).ToList() ?? [];
+        _slots = slots.Value?.Where(s => s.Date.Date >= DateTime.Today && s.FreeCapacity > 0 && s.IsBookable).OrderBy(s => s.Date).ThenBy(s => s.StartTime).Take(8).ToList() ?? [];
         if (_producer is not null)
         {
             var markets = await Catalog.MarketsAsync();
             _market = markets.Value?.FirstOrDefault(m => m.Id == _producer.MarketId);
+            var layout = await Catalog.MarketLayoutAsync(_producer.MarketId);
+            if (layout.IsSuccess) _layout = layout.Value;
             if (_market is { Latitude: not null } && NextOpening(_market) is { } day)
             {
                 var w = await Catalog.WeatherAsync(_market.Id, day);
@@ -223,17 +259,28 @@
         return null;
     }
 
-    // darabos egység (Domain: UnitsExtensions.IsCountable): csak egész mennyiség
-    // a léptetés csak kényelmi; beírni bármilyen pozitív mennyiséget lehet, a szabályt a backend kényszeríti
-    private static decimal Step(ProductStockInfo s) => s.Unit switch
+    // A rendelési léptéket a backend adja (Domain: UnitsExtensions.OrderStep): kg/l 0,5-ösével, dkg 10-esével,
+    // g/ml 100-asával, darabos egészenként. A legkisebb rendelhető mennyiség maga a lépték.
+    private static decimal Step(ProductStockInfo s) => s.OrderStep > 0 ? s.OrderStep : 1m;
+    private static decimal MinQty(ProductStockInfo s) => Step(s);
+
+    private async Task DeleteAsync()
     {
-        "Kilogram" or "Litre" => 0.5m,
-        "Decagram" => 10m,
-        "Gram" or "Millilitre" => 100m,
-        _ => 1m
-    };
-    private static decimal MinQty(ProductStockInfo s) => IsCountable(s.Unit) ? 1m : s.Unit is "Kilogram" or "Litre" ? 0.1m : 1m;
-    private static bool IsCountable(string unit) => unit is "Piece" or "Bundle" or "Box" or "Pack" or "Bottle" or "Jar" or "Bunch" or "Tray";
+        if (_deleting || _product is null || string.IsNullOrWhiteSpace(_deleteReason)) return;
+        _deleting = true;
+        var r = await Vendor.DeleteProductAsync(_product.Id, _deleteReason.Trim());
+        _deleting = false;
+        _confirmDelete = false;
+        if (r.IsSuccess && r.Value is { } res)
+        {
+            var what = res.Archived ? "archiválva" : "törölve";
+            var cancelled = res.CancelledOrderIds.Count > 0 ? $", {res.CancelledOrderIds.Count} rendelés lemondva" : "";
+            var untouched = res.UntouchedOrderIds.Count > 0 ? $"; {res.UntouchedOrderIds.Count} lejárt idősávú rendelés nem változott" : "";
+            Toasts.Success($"A termék {what}{cancelled}{untouched}.");
+            Navigation.NavigateTo("products");
+        }
+        else Toasts.Error(r.Problem?.Message ?? "A törlés nem sikerült.");
+    }
 
     private async Task AddToCartAsync()
     {

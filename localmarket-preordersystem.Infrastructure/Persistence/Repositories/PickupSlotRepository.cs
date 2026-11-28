@@ -17,7 +17,10 @@ internal sealed class PickupSlotRepository(MarketDbContext context) : IPickupSlo
 
     public async Task<IReadOnlyList<PickupSlot>> ListByProducerAsync(int producerId, DateTime? fromDate = null, CancellationToken cancellationToken = default)
     {
-        var query = context.PickupSlots.AsNoTracking().Where(s => s.ProducerId == producerId);
+        // az árus és a piac kell a foglalhatóság (nyitvatartás, aktív piac) kiszámításához
+        var query = context.PickupSlots.AsNoTracking()
+            .Include(s => s.Producer).ThenInclude(p => p.Market)
+            .Where(s => s.ProducerId == producerId);
 
         if (fromDate.HasValue)
             query = query.Where(s => s.Date >= fromDate.Value.Date);

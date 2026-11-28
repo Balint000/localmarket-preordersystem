@@ -22,6 +22,12 @@ internal sealed class ProducerRepository(MarketDbContext context) : IProducerRep
         return await query.OrderBy(p => p.Name).ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Producer>> ListByMarketForUpdateAsync(int marketId, CancellationToken cancellationToken = default)
+        => await context.Producers.Include(p => p.Market)
+            .Where(p => p.MarketId == marketId)
+            .OrderBy(p => p.Id)
+            .ToListAsync(cancellationToken);
+
     public async Task AddAsync(Producer producer, CancellationToken cancellationToken = default)
         => await context.Producers.AddAsync(producer, cancellationToken);
 }

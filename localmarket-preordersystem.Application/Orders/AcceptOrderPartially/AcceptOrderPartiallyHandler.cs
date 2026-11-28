@@ -22,7 +22,7 @@ namespace localmarket_preordersystem.Application.Orders.AcceptOrderPartially
             .ThrowIfInvalid();
     }
 
-    public sealed class AcceptOrderPartiallyHandler(IOrderRepository orders, IProductRepository products, IAuditLogRepository audit, IUnitOfWork uow, ICurrentUserService currentUser)
+    public sealed class AcceptOrderPartiallyHandler(IOrderRepository orders, IProductRepository products, IAuditLogRepository audit, IUnitOfWork uow, ICurrentUserService currentUser, TimeProvider time)
     {
         public async Task<OrderDto> HandleAsync(AcceptOrderPartiallyCommand command, CancellationToken ct = default)
         {
@@ -31,7 +31,7 @@ namespace localmarket_preordersystem.Application.Orders.AcceptOrderPartially
             AcceptOrderPartiallyValidator.Validate(command);
 
             var before = order.Status;
-            var released = order.AcceptPartially(command.Lines.ToDictionary(l => l.ProductId, l => l.Quantity));
+            var released = order.AcceptPartially(command.Lines.ToDictionary(l => l.ProductId, l => l.Quantity), time.GetLocalNow().DateTime);
             // a rendelés az idősávot továbbra is foglalja, csak a hiányzó mennyiség kerül vissza a készletbe
             await OrderSupport.ReleaseAsync(products, order, released, releaseSlot: false, ct);
             await OrderSupport.AuditStatusAsync(audit, currentUser, "OrderPartiallyFulfilled", order, before, ct);

@@ -10,7 +10,7 @@ namespace localmarket_preordersystem.Application.Cart.RemoveFromCart
 {
     public sealed record RemoveFromCartCommand(int ProductId);
 
-    public sealed class RemoveFromCartHandler(ICartRepository carts, IUnitOfWork uow, ICurrentUserService currentUser)
+    public sealed class RemoveFromCartHandler(ICartRepository carts, IUnitOfWork uow, ICurrentUserService currentUser, TimeProvider time)
     {
         public async Task<CartDto> HandleAsync(RemoveFromCartCommand command, CancellationToken ct = default)
         {
@@ -19,7 +19,7 @@ namespace localmarket_preordersystem.Application.Cart.RemoveFromCart
             var cart = await carts.GetByUserIdAsync(userId, ct) ?? throw new NotFoundException("A kosár üres.");
             cart.RemoveItem(command.ProductId);
             await uow.SaveChangesAsync(ct);
-            return CartDto.From(cart);
+            return CartDto.From(cart, time.GetLocalNow().DateTime);
         }
     }
 }

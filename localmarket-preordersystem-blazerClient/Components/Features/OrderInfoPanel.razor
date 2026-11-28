@@ -22,7 +22,7 @@
 </dl>
 @if (!string.IsNullOrWhiteSpace(Order.RejectionReason))
 {
-    <div class="lm-callout bad mt-3 mb-0"><Icon Name="x-circle" /><div class="lm-callout-body"><strong>Az elutasítás oka</strong>@Order.RejectionReason</div></div>
+    <div class="lm-callout bad mt-3 mb-0"><Icon Name="x-circle" /><div class="lm-callout-body"><strong>@(Order.Status == "Cancelled" ? "A lemondás oka" : "Az elutasítás oka")</strong>@Order.RejectionReason</div></div>
 }
 @if (!string.IsNullOrWhiteSpace(Order.DisputeNote))
 {

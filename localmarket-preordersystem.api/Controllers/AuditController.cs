@@ -11,8 +11,11 @@ namespace localmarket_preordersystem.api.Controllers;
 [Route("api/audit")]
 public class AuditController : ControllerBase
 {
-    // FE: opcionális szűrés entityName (pl. "Order") és entityId szerint; a lista lapozott.
+    // FE: opcionális szűrés entityName (pl. "Order") és entityId szerint; a lapozás adatbázis-szinten történik.
     [HttpGet]
     public async Task<IActionResult> List([FromQuery] string? entityName, [FromQuery] int? entityId, [FromQuery] PageRequest paging, ListAuditLogsHandler handler, CancellationToken ct)
-        => Ok((await handler.HandleAsync(new ListAuditLogsQuery(entityName, entityId), ct)).ToPaged(paging));
+    {
+        var page = await handler.HandleAsync(new ListAuditLogsQuery(entityName, entityId, paging.Page, paging.PageSize), ct);
+        return Ok(new PagedResult<AuditLogDto>(page.Items, page.Total, paging.Page, paging.PageSize));
+    }
 }

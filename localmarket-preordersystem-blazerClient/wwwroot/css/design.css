@@ -3340,3 +3340,72 @@ hr {
         padding-left: 0 !important;
     }
 }
+
+/* ===================== Piac-térkép (felülnézet) és elrendezés-szerkesztő ===================== */
+.lm-map {
+    --lm-map-cell: minmax(1.6rem, 1fr);
+    display: grid;
+    gap: 3px;
+    padding: .6rem;
+    border-radius: 14px;
+    background:
+        repeating-linear-gradient(45deg, transparent 0 10px, rgba(0, 0, 0, .018) 10px 20px),
+        var(--lm-sunken);
+    border: 1px solid var(--lm-line);
+    position: relative;
+    user-select: none;
+    overflow-x: auto;
+}
+.lm-map-cell {
+    border-radius: 4px;
+    min-height: 1.6rem;
+    aspect-ratio: 1 / 1;
+}
+.lm-map.editable .lm-map-cell {
+    background: rgba(255, 255, 255, .45);
+    outline: 1px dashed var(--lm-line-strong);
+    outline-offset: -1px;
+    cursor: copy;
+}
+.lm-map.editable .lm-map-cell:hover { background: var(--lm-leaf-soft); }
+.lm-map-stall {
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: .1rem;
+    padding: .2rem;
+    border-radius: 8px;
+    background: var(--lm-surface);
+    border: 2px solid var(--lm-line-strong);
+    box-shadow: var(--lm-shadow-sm);
+    font-size: .72rem;
+    line-height: 1.1;
+    text-align: center;
+    overflow: hidden;
+    color: var(--lm-ink);
+}
+.lm-map-stall::before { /* napellenző-csík, mint a piaci standokon */
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 5px;
+    background: repeating-linear-gradient(90deg, var(--lm-paprika) 0 8px, #fff 8px 16px);
+    opacity: .85;
+}
+.lm-map-stall { position: relative; }
+.lm-map-stall .num { font-weight: 800; font-size: .85rem; }
+.lm-map-stall .who { color: var(--lm-muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lm-map-stall.taken { background: var(--lm-leaf-soft); border-color: var(--lm-leaf); }
+.lm-map-stall.pending { background: var(--lm-honey-soft); border-color: var(--lm-honey); }
+.lm-map-stall.highlight { background: var(--lm-paprika-soft); border-color: var(--lm-paprika); box-shadow: 0 0 0 3px rgba(200, 54, 30, .25); }
+.lm-map.editable .lm-map-stall { cursor: grab; }
+.lm-map-stall.selected { outline: 3px solid var(--lm-focus); outline-offset: 1px; }
+.lm-map.dragging .lm-map-stall { pointer-events: none; opacity: .75; } /* húzás közben a cellák kapják az ejtést */
+.lm-map-legend { display: flex; flex-wrap: wrap; gap: .75rem; font-size: .8rem; color: var(--lm-muted); margin-top: .5rem; }
+.lm-map-legend span::before { content: ""; display: inline-block; width: .8rem; height: .8rem; border-radius: 3px; margin-right: .3rem; vertical-align: -1px; border: 2px solid var(--lm-line-strong); background: var(--lm-surface); }
+.lm-map-legend .taken::before { background: var(--lm-leaf-soft); border-color: var(--lm-leaf); }
+.lm-map-legend .pending::before { background: var(--lm-honey-soft); border-color: var(--lm-honey); }
+.lm-map-legend .highlight::before { background: var(--lm-paprika-soft); border-color: var(--lm-paprika); }
+.lm-map-entrance { font-size: .75rem; color: var(--lm-muted); text-align: center; margin-top: .25rem; letter-spacing: .08em; text-transform: uppercase; }

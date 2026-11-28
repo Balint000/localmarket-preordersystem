@@ -8,13 +8,13 @@ using localmarket_preordersystem.Domain.ValueObject;
 
 namespace localmarket_preordersystem.Application.Cart.GetCart
 {
-    public sealed class GetCartHandler(ICartRepository carts, ICurrentUserService currentUser)
+    public sealed class GetCartHandler(ICartRepository carts, ICurrentUserService currentUser, TimeProvider time)
     {
         public async Task<CartDto> HandleAsync(CancellationToken ct = default)
         {
             currentUser.RequireRole(Role.Customer);
             var cart = await carts.GetByUserIdAsync(currentUser.RequireUserId(), ct);
-            return cart is null ? CartDto.Empty : CartDto.From(cart);
+            return cart is null ? CartDto.Empty : CartDto.From(cart, time.GetLocalNow().DateTime);
         }
     }
 }

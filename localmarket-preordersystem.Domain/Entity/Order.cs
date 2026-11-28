@@ -9,9 +9,12 @@ namespace localmarket_preordersystem.Domain.Entity
     /// </summary>
     public class Order
     {
+        // Vita: átvétel / „nem jött el” után bármikor, illetve elfogadott, de lezáratlan rendelésnél az átvételi
+        // idősáv vége után (pl. az árus nem adta ki és nem is jelölte). Átadás előtt nem nyitható, így a vita
+        // lezárása sem hagyhat élő (jövőbeli) foglalást: a lejárt idősáv foglalása már nem számít.
         private static readonly Dictionary<OrderStatus, OrderStatus[]> AllowedTransitions = new()
         {
-            [OrderStatus.Pending] = [OrderStatus.Accepted, OrderStatus.PartiallyFulfilled, OrderStatus.Rejected, OrderStatus.Cancelled],
+            [OrderStatus.Pending] = [OrderStatus.Accepted, OrderStatus.PartiallyFulfilled, OrderStatus.Rejected, OrderStatus.Cancelled, OrderStatus.Expired],
             [OrderStatus.Accepted] = [OrderStatus.Ready, OrderStatus.PickedUp, OrderStatus.Cancelled, OrderStatus.NotPickedUp, OrderStatus.Disputed],
             [OrderStatus.PartiallyFulfilled] = [OrderStatus.Ready, OrderStatus.PickedUp, OrderStatus.Cancelled, OrderStatus.NotPickedUp, OrderStatus.Disputed],
             [OrderStatus.Ready] = [OrderStatus.PickedUp, OrderStatus.Cancelled, OrderStatus.NotPickedUp, OrderStatus.Disputed],
@@ -20,6 +23,7 @@ namespace localmarket_preordersystem.Domain.Entity
             [OrderStatus.Disputed] = [OrderStatus.PickedUp, OrderStatus.Cancelled],
             [OrderStatus.Cancelled] = [],
             [OrderStatus.Rejected] = [],
+            [OrderStatus.Expired] = [],
         };
 
         public int Id { get; private set; }
@@ -88,6 +92,8 @@ namespace localmarket_preordersystem.Domain.Entity
                     throw new DomainException($"A(z) '{product.Name}' termék nem ennek az árusnak a kínálatából való.");
                 if (quantity <= 0)
                     throw new DomainException("A rendelt mennyiségnek pozitívnak kell lennie.");
+                if (product.IsArchived)
+                    throw new DomainException($"A(z) '{product.Name}' termék már nem rendelhető.");
 
                 var stock = product.ReserveStockForPickup(slot.Date, quantity);
                 order._items.Add(OrderItem.Create(product, stock, quantity));
@@ -109,37 +115,47 @@ namespace localmarket_preordersystem.Domain.Entity
             Payment = Payment.Create(this, TotalAmount, method);
         }
 
-        public void Accept() => Transition(OrderStatus.Accepted);
+        /// <summary>Teljes elfogadás: minden tétel a rendelt mennyiségben teljesül. Lejárt idősávra már nem.</summary>
+        public void Accept(DateTime now)
+        {
+            EnsurePickupNotEnded(now, "Lejárt átvételi időpontú rendelés már nem fogadható el.");
+            Transition(OrderStatus.Accepted);
+            foreach (var item in _items)
+                item.SetFulfilled(item.Quantity);
+        }
 
         /// <summary>
         /// Részleges teljesítés: tételenként a vállalt mennyiség (hiányzó tétel = 0).
         /// Visszaadja a felszabadítandó különbözetet.
         /// </summary>
-        public IReadOnlyList<ReservedItem> AcceptPartially(IReadOnlyDictionary<int, decimal> fulfilledByProductId)
+        public IReadOnlyList<ReservedItem> AcceptPartially(IReadOnlyDictionary<int, decimal> fulfilledByProductId, DateTime now)
         {
             ArgumentNullException.ThrowIfNull(fulfilledByProductId);
             EnsureCanMoveTo(OrderStatus.PartiallyFulfilled);
+            EnsurePickupNotEnded(now, "Lejárt átvételi időpontú rendelés már nem fogadható el.");
 
             foreach (var key in fulfilledByProductId.Keys)
                 if (_items.All(i => i.ProductId != key))
                     throw new DomainException("A megadott termék nem szerepel a rendelésben.");
 
+            // előbb csak ellenőrzünk, hogy hibánál ne maradjon félig módosított tétel
+            var plan = _items
+                .Select(i => (Item: i, Fulfilled: fulfilledByProductId.TryGetValue(i.ProductId, out var f) ? f : 0m))
+                .ToList();
+            var invalid = plan.FirstOrDefault(p => p.Fulfilled < 0 || p.Fulfilled > p.Item.Quantity);
+            if (invalid.Item is not null)
+                throw new DomainException($"A(z) '{invalid.Item.ProductName}' teljesített mennyisége 0 és {invalid.Item.Quantity} között lehet.");
+            if (plan.All(p => p.Fulfilled <= 0))
+                throw new DomainException("Részleges teljesítésnél legalább egy tételből kell vállalni; különben utasítsd el a rendelést.");
+            if (plan.All(p => p.Fulfilled >= p.Item.Quantity))
+                throw new DomainException("Minden tétel teljes mennyisége vállalva van, használd az elfogadást.");
+
             var released = new List<ReservedItem>();
-            var anyFulfilled = false;
-            var anyShort = false;
-            foreach (var item in _items)
+            foreach (var (item, fulfilled) in plan)
             {
-                var fulfilled = fulfilledByProductId.TryGetValue(item.ProductId, out var f) ? f : 0m;
                 var shortfall = item.SetFulfilled(fulfilled);
                 if (shortfall > 0) released.Add(new ReservedItem(item.ProductId, shortfall));
-                anyFulfilled |= fulfilled > 0;
-                anyShort |= fulfilled < item.Quantity;
             }
-
-            if (!anyFulfilled)
-                throw new DomainException("Részleges teljesítésnél legalább egy tételből kell vállalni; különben utasítsd el a rendelést.");
-            if (!anyShort)
-                throw new DomainException("Minden tétel teljes mennyisége vállalva van, használd az elfogadást.");
 
             Status = OrderStatus.PartiallyFulfilled;
             if (Payment is { Status: PaymentStatus.Pending })
@@ -158,10 +174,56 @@ namespace localmarket_preordersystem.Domain.Entity
             return held;
         }
 
-        public IReadOnlyList<ReservedItem> Cancel()
+        /// <summary>
+        /// Vevői lemondás. A még el nem fogadott rendelés az idősáv kezdetéig mondható le; az elfogadott
+        /// (az árus már készül rá) csak a lemondási határidőig: az idősáv kezdete előtt <paramref name="cutoff"/>-fal.
+        /// </summary>
+        public IReadOnlyList<ReservedItem> CancelByCustomer(DateTime now, TimeSpan cutoff)
         {
-            // a vitatott rendelésről kizárólag a piacvezető dönt (ResolveDisputeAsCancelled / AsPickedUp)
             EnsureNotDisputed();
+            EnsureCanMoveTo(OrderStatus.Cancelled);
+            var start = PickupStartsAt();
+            var deadline = Status == OrderStatus.Pending ? start : start - cutoff;
+            if (now >= deadline)
+                throw new DomainException(Status == OrderStatus.Pending
+                    ? "Az átvételi időpont már elkezdődött, a rendelés nem mondható le."
+                    : $"A lemondási határidő ({deadline:yyyy-MM-dd HH:mm}) lejárt. Ha mégsem tudsz menni, jelezd az árusnak.");
+            return CancelCore();
+        }
+
+        /// <summary>
+        /// Az árus vagy a piacvezető lemondja az aktív rendelést (pl. elfagyott a termés, elmarad a piacnap).
+        /// Indoklás kötelező, a vevő látja. Az idősáv vége után már nem: ott átvétel / nem átvétel / vita a lezárás.
+        /// </summary>
+        public IReadOnlyList<ReservedItem> CancelBySeller(DateTime now, string reason)
+        {
+            if (string.IsNullOrWhiteSpace(reason))
+                throw new DomainException("Az árusi vagy piacvezetői lemondáshoz indoklás megadása kötelező.");
+            EnsureNotDisputed();
+            EnsureCanMoveTo(OrderStatus.Cancelled);
+            EnsurePickupNotEnded(now, "Lezárult átvételi időpont után a rendelés nem mondható le: jelöld átvettnek vagy nem átvettnek.");
+            var held = CancelCore();
+            RejectionReason = reason.Trim();
+            return held;
+        }
+
+        /// <summary>
+        /// Automatikus lezárás: az árus az idősáv végéig nem válaszolt a függő rendelésre. A foglalás felszabadul.
+        /// </summary>
+        public IReadOnlyList<ReservedItem> Expire(DateTime now)
+        {
+            if (Status != OrderStatus.Pending)
+                throw new DomainException("Csak függő rendelés járhat le.");
+            if (!PickupSlot.HasEnded(now))
+                throw new DomainException("A rendelés még nem járt le: az átvételi időpont még nem ért véget.");
+            var held = GetHeldReservations();
+            Transition(OrderStatus.Expired);
+            Payment?.Cancel();
+            return held;
+        }
+
+        private IReadOnlyList<ReservedItem> CancelCore()
+        {
             var held = GetHeldReservations();
             Transition(OrderStatus.Cancelled);
             if (Payment is { Status: PaymentStatus.Pending or PaymentStatus.Error })
@@ -169,22 +231,40 @@ namespace localmarket_preordersystem.Domain.Entity
             return held;
         }
 
-        public void MarkReady() => Transition(OrderStatus.Ready);
+        public void MarkReady(DateTime now)
+        {
+            EnsurePickupNotEnded(now, "Lejárt átvételi időpontú rendelés már nem jelölhető átvehetőnek.");
+            Transition(OrderStatus.Ready);
+        }
 
-        public void MarkPickedUp()
+        /// <summary>Átadás rögzítése: legkorábban az átvétel napján (előre, véletlenül ne lehessen lezárni).</summary>
+        public void MarkPickedUp(DateTime now)
         {
             EnsureNotDisputed();
+            EnsureCanMoveTo(OrderStatus.PickedUp);
+            if (now < PickupSlot.Date.Date)
+                throw new DomainException("Átvettnek legkorábban az átvétel napján jelölhető.");
             Transition(OrderStatus.PickedUp);
             if (Payment is { Status: PaymentStatus.Pending })
                 Payment.MarkCompleted();
         }
 
-        public void MarkNotPickedUp() => Transition(OrderStatus.NotPickedUp);
+        /// <summary>„Nem jött el”: csak az átvételi idősáv vége után (addig a vevő még megérkezhet).</summary>
+        public void MarkNotPickedUp(DateTime now)
+        {
+            EnsureCanMoveTo(OrderStatus.NotPickedUp);
+            if (!PickupSlot.HasEnded(now))
+                throw new DomainException("„Nem jött el” csak az átvételi időpont vége után jelölhető.");
+            Transition(OrderStatus.NotPickedUp);
+        }
 
-        public void Dispute(string note)
+        public void Dispute(string note, DateTime now)
         {
             if (string.IsNullOrWhiteSpace(note))
                 throw new DomainException("Vitatáshoz indoklás megadása kötelező.");
+            EnsureCanMoveTo(OrderStatus.Disputed);
+            if (HoldsReservations && !PickupSlot.HasEnded(now))
+                throw new DomainException("Átadás előtt nem nyitható vita: ha nem tudsz menni, mondd le a rendelést. Ha az átadás elmarad, az átvételi idő vége után jelezheted.");
             Transition(OrderStatus.Disputed);
             DisputeNote = note.Trim();
         }
@@ -216,6 +296,14 @@ namespace localmarket_preordersystem.Domain.Entity
 
         private string AppendNote(string note) =>
             string.IsNullOrWhiteSpace(note) ? DisputeNote ?? string.Empty : $"{DisputeNote} | Döntés: {note.Trim()}";
+
+        private DateTime PickupStartsAt() => PickupSlot.Date.Date.Add(PickupSlot.StartTime.ToTimeSpan());
+
+        private void EnsurePickupNotEnded(DateTime now, string message)
+        {
+            if (PickupSlot.HasEnded(now))
+                throw new DomainException(message);
+        }
 
         private void EnsureNotDisputed()
         {

@@ -54,13 +54,27 @@ public class ProductStockTests
     }
 
     [Fact]
-    public void Weight_units_accept_fractions_up_to_three_decimals()
+    public void Kilograms_are_ordered_in_half_steps()
     {
         var stock = Stock(5m, Units.Kilogram);
-        stock.Reserve(0.25m);
-        stock.Reserve(0.125m);
-        Assert.Throws<DomainException>(() => stock.Reserve(0.0005m));
+        stock.Reserve(0.5m);
+        stock.Reserve(1.5m);
+        Assert.Throws<DomainException>(() => stock.Reserve(0.1m));
+        Assert.Throws<DomainException>(() => stock.Reserve(2.6m));
+        Assert.Throws<DomainException>(() => stock.Reserve(0.25m));
+        Assert.Equal(2m, stock.ReservedQuantity);
     }
+
+    [Theory]
+    [InlineData(Units.Kilogram, 0.5)]
+    [InlineData(Units.Litre, 0.5)]
+    [InlineData(Units.Decagram, 10)]
+    [InlineData(Units.Gram, 100)]
+    [InlineData(Units.Millilitre, 100)]
+    [InlineData(Units.Piece, 1)]
+    [InlineData(Units.Jar, 1)]
+    public void Order_step_matches_the_unit(Units unit, double expected)
+        => Assert.Equal((decimal)expected, unit.OrderStep());
 
     [Fact]
     public void Countable_units_accept_only_whole_quantities()

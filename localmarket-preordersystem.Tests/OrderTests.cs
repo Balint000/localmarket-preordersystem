@@ -53,7 +53,7 @@ public class OrderTests
     {
         var (order, product, _) = TestData.PendingOrder(2m);
 
-        var held = order.Cancel();
+        var held = order.CancelByCustomer(TestData.Now, TestData.Cutoff);
 
         Assert.Equal(OrderStatus.Cancelled, order.Status);
         Assert.Equal(PaymentStatus.Cancelled, order.Payment!.Status);
@@ -88,7 +88,7 @@ public class OrderTests
     {
         var (order, product, _) = TestData.PendingOrder(4m);
 
-        var released = order.AcceptPartially(new Dictionary<int, decimal> { [product.Id] = 1m });
+        var released = order.AcceptPartially(new Dictionary<int, decimal> { [product.Id] = 1m }, TestData.Now);
 
         Assert.Equal(OrderStatus.PartiallyFulfilled, order.Status);
         Assert.Equal(3m, Assert.Single(released).Quantity);
@@ -100,7 +100,7 @@ public class OrderTests
     public void AcceptPartially_with_nothing_fulfilled_is_rejected()
     {
         var (order, product, _) = TestData.PendingOrder(2m);
-        Assert.Throws<DomainException>(() => order.AcceptPartially(new Dictionary<int, decimal> { [product.Id] = 0m }));
+        Assert.Throws<DomainException>(() => order.AcceptPartially(new Dictionary<int, decimal> { [product.Id] = 0m }, TestData.Now));
     }
 
     [Fact]
@@ -117,24 +117,24 @@ public class OrderTests
     public void Invalid_transition_is_rejected()
     {
         var (order, _, _) = TestData.PendingOrder();
-        Assert.Throws<DomainException>(() => order.MarkReady());      // Pending -> Ready nem engedett
-        Assert.Throws<DomainException>(() => order.MarkPickedUp());   // Pending -> PickedUp nem engedett
+        Assert.Throws<DomainException>(() => order.MarkReady(TestData.Now));             // Pending -> Ready nem engedett
+        Assert.Throws<DomainException>(() => order.MarkPickedUp(TestData.OnPickupDay));  // Pending -> PickedUp nem engedett
     }
 
     [Fact]
     public void Terminal_states_cannot_change()
     {
         var (order, _, _) = TestData.PendingOrder();
-        order.Cancel();
-        Assert.Throws<DomainException>(() => order.Accept());
-        Assert.Throws<DomainException>(() => order.Cancel());
+        order.CancelByCustomer(TestData.Now, TestData.Cutoff);
+        Assert.Throws<DomainException>(() => order.Accept(TestData.Now));
+        Assert.Throws<DomainException>(() => order.CancelByCustomer(TestData.Now, TestData.Cutoff));
     }
 
     [Fact]
     public void Dispute_requires_a_note()
     {
         var (order, _, _) = TestData.PickedUpOrder();
-        Assert.Throws<DomainException>(() => order.Dispute(""));
+        Assert.Throws<DomainException>(() => order.Dispute("", TestData.AfterPickup));
     }
 
     // --- regresszió: a vitatott rendelést csak a piacvezető zárhatja le ---
@@ -143,9 +143,10 @@ public class OrderTests
     public void Disputed_order_cannot_be_cancelled_by_the_normal_cancel_path()
     {
         var (order, _, _) = TestData.PickedUpOrder();
-        order.Dispute("Nem kaptam meg");
+        order.Dispute("Nem kaptam meg", TestData.AfterPickup);
 
-        Assert.Throws<DomainException>(() => order.Cancel());
+        Assert.Throws<DomainException>(() => order.CancelByCustomer(TestData.OnPickupDay, TestData.Cutoff));
+        Assert.Throws<DomainException>(() => order.CancelBySeller(TestData.OnPickupDay, "x"));
         Assert.Equal(OrderStatus.Disputed, order.Status);
     }
 
@@ -153,16 +154,16 @@ public class OrderTests
     public void Disputed_order_cannot_be_marked_picked_up_by_the_normal_path()
     {
         var (order, _, _) = TestData.PickedUpOrder();
-        order.Dispute("Nem kaptam meg");
+        order.Dispute("Nem kaptam meg", TestData.AfterPickup);
 
-        Assert.Throws<DomainException>(() => order.MarkPickedUp());
+        Assert.Throws<DomainException>(() => order.MarkPickedUp(TestData.OnPickupDay));
     }
 
     [Fact]
     public void Resolve_dispute_as_cancelled_refunds_a_completed_payment()
     {
         var (order, _, _) = TestData.PickedUpOrder();
-        order.Dispute("Nem kaptam meg");
+        order.Dispute("Nem kaptam meg", TestData.AfterPickup);
 
         order.ResolveDisputeAsCancelled("Jogos a panasz");
 
@@ -176,9 +177,9 @@ public class OrderTests
     {
         // NotPickedUp -> Disputed útvonal: a fizetés még függőben van
         var (order, _, _) = TestData.PendingOrder();
-        order.Accept();
-        order.MarkNotPickedUp();
-        order.Dispute("Ott voltam, de nem adták ki");
+        order.Accept(TestData.Now);
+        order.MarkNotPickedUp(TestData.AfterPickup);
+        order.Dispute("Ott voltam, de nem adták ki", TestData.AfterPickup);
         Assert.Equal(PaymentStatus.Pending, order.Payment!.Status);
 
         order.ResolveDisputeAsPickedUp("Átvettnek tekintjük");

@@ -22,6 +22,8 @@ namespace localmarket_preordersystem.Application.Markets.UpdateMarket
             market.UpdateDetails(command.Name, command.Address);
             market.SetOpeningDays(command.OpeningDays);
             market.UpdateLocation(command.Latitude, command.Longitude);
+            // a már meghirdetett, nyitvatartáson kívül eső idősávok megmaradnak, de nem foglalhatók (PickupSlot.IsBookable)
+            market.SetOpeningHours(command.OpensAt ?? market.OpensAt, command.ClosesAt ?? market.ClosesAt);
             if (command.IsActive) market.Activate(); else market.Deactivate();
 
             var after = MarketDto.From(market);

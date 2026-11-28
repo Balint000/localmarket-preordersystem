@@ -174,11 +174,18 @@ namespace localmarket_preordersystem.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<TimeOnly>("ClosesAt")
+                        .HasColumnType("time without time zone");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
                     b.Property<double?>("Latitude")
                         .HasColumnType("double precision");
+
+                    b.Property<string>("Layout")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
 
                     b.Property<double?>("Longitude")
                         .HasColumnType("double precision");
@@ -187,6 +194,9 @@ namespace localmarket_preordersystem.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<TimeOnly>("OpensAt")
+                        .HasColumnType("time without time zone");
 
                     b.PrimitiveCollection<int[]>("_openingDays")
                         .IsRequired()
@@ -441,6 +451,9 @@ namespace localmarket_preordersystem.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -457,7 +470,8 @@ namespace localmarket_preordersystem.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ProducerId", "Name")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"IsArchived\" = false");
 
                     b.ToTable("Products", (string)null);
                 });

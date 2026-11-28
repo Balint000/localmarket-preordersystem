@@ -30,7 +30,7 @@
                         <tr>
                             <td><strong>@p.Name</strong>@if (!string.IsNullOrWhiteSpace(p.RejectionReason)) { <div class="small text-muted">Indoklás: @p.RejectionReason</div> }</td>
                             <td>@MarketName(p.MarketId)</td>
-                            <td>@p.StallNumber</td>
+                            <td>@if (p.StallNumber > 0) { @($"{p.StallNumber}.") } else { <a class="small" href="admin/markets/@p.MarketId/layout">kiosztás</a> }</td>
                             <td>@Labels.Date(p.RegisteredAt)</td>
                             <td><span class="lm-badge @Labels.ProducerStatusClass(p.Status)">@Labels.ProducerStatus(p.Status)</span></td>
                             <td class="text-end text-nowrap">

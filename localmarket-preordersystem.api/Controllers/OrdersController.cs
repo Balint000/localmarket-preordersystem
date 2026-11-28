@@ -18,6 +18,7 @@ using localmarket_preordersystem.Application.Orders.ResolveDispute;
 using localmarket_preordersystem.Domain.ValueObject;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace localmarket_preordersystem.api.Controllers;
 
@@ -51,10 +52,10 @@ public class OrdersController : ControllerBase
     public async Task<IActionResult> Get(int id, GetOrderHandler handler, CancellationToken ct)
         => Ok(await handler.HandleAsync(id, ct));
 
+    // Vevő (saját, lemondási határidőig), árus (saját, indoklással), piacvezető (bármelyik, indoklással).
     [HttpPost("{id:int}/cancel")]
-    [Authorize(Policy = Policies.Customer)]
-    public async Task<IActionResult> Cancel(int id, CancelOrderHandler handler, CancellationToken ct)
-        => Ok(await handler.HandleAsync(new CancelOrderCommand(id), ct));
+    public async Task<IActionResult> Cancel(int id, [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] CancelRequest? body, CancelOrderHandler handler, CancellationToken ct)
+        => Ok(await handler.HandleAsync(new CancelOrderCommand(id, body?.Reason), ct));
 
     [HttpPost("{id:int}/accept")]
     [Authorize(Policy = Policies.Producer)]

@@ -12,6 +12,19 @@
                 <input id="text" type="search" class="form-control" placeholder="Keresés, pl. paradicsom" aria-label="Keresés terméknévre"
                        value="@_text" @oninput="OnTextInputAsync" autocomplete="off" />
             </div>
+            @if (_markets.Count > 1)
+            {
+                <label class="visually-hidden" for="market">Piac</label>
+                <select id="market" class="form-select" value="@(_marketId?.ToString() ?? "")" @onchange="OnMarketChangedAsync" aria-label="Piac">
+                    <option value="">Minden piac</option>
+                    @foreach (var m in _markets) { <option value="@m.Id">@m.Name</option> }
+                </select>
+            }
+            <label class="visually-hidden" for="producer">Árus</label>
+            <select id="producer" class="form-select" value="@(_producerId?.ToString() ?? "")" @onchange="OnProducerChangedAsync" aria-label="Árus">
+                <option value="">Minden árus</option>
+                @foreach (var p in VisibleProducers) { <option value="@p.Id">@p.Name@(p.StallNumber > 0 ? $" ({p.StallNumber}. stand)" : "")</option> }
+            </select>
             <label class="visually-hidden" for="sort">Rendezés</label>
             <select id="sort" class="form-select" @bind="_sort">
                 <option value="name">Név szerint (A–Z)</option>
@@ -97,17 +110,49 @@
     private string _sort = "name";
     private string _text = "";
     private int? _categoryId;
+    private int? _marketId, _producerId;
+    private IReadOnlyList<MarketInfo> _markets = [];
+    private IReadOnlyList<ProducerInfo> _producers = [];
+
+    // piacválasztás után csak az adott piac árusai választhatók
+    private IEnumerable<ProducerInfo> VisibleProducers =>
+        (_marketId is int m ? _producers.Where(p => p.MarketId == m) : _producers).OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase);
 
     private CancellationTokenSource? _debounce;
     private int _requestVersion;
 
-    private bool HasFilters => !string.IsNullOrWhiteSpace(_text) || _categoryId is not null || _excluded.Count > 0;
+    private bool HasFilters => !string.IsNullOrWhiteSpace(_text) || _categoryId is not null || _excluded.Count > 0
+                               || _marketId is not null || _producerId is not null;
+
+    [SupplyParameterFromQuery(Name = "marketId")] public int? MarketIdQuery { get; set; }
+    [SupplyParameterFromQuery(Name = "producerId")] public int? ProducerIdQuery { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
-        var categories = await Catalog.CategoriesAsync();
-        if (categories.IsSuccess) _categories = categories.Value!;
+        _marketId = MarketIdQuery;
+        _producerId = ProducerIdQuery;
+        var categories = Catalog.CategoriesAsync();
+        var markets = Catalog.MarketsAsync();
+        var producers = Catalog.ProducersAsync();
+        await Task.WhenAll(categories, markets, producers);
+        if (categories.Result.IsSuccess) _categories = categories.Result.Value!;
+        if (markets.Result.IsSuccess) _markets = markets.Result.Value!.Where(m => m.IsActive).ToList();
+        if (producers.Result.IsSuccess) _producers = producers.Result.Value!;
         await SearchAsync();
+    }
+
+    private async Task OnMarketChangedAsync(ChangeEventArgs e)
+    {
+        _marketId = int.TryParse(e.Value?.ToString(), out var id) ? id : null;
+        // más piac árusa nem maradhat kiválasztva
+        if (_producerId is int p && _marketId is int m && _producers.FirstOrDefault(x => x.Id == p)?.MarketId != m) _producerId = null;
+        await SearchNowAsync();
+    }
+
+    private async Task OnProducerChangedAsync(ChangeEventArgs e)
+    {
+        _producerId = int.TryParse(e.Value?.ToString(), out var id) ? id : null;
+        await SearchNowAsync();
     }
 
     // gépelés közben kis késleltetéssel keresünk, hogy ne menjen kérés minden leütésre
@@ -145,6 +190,8 @@
     {
         _text = "";
         _categoryId = null;
+        _marketId = null;
+        _producerId = null;
         _excluded.Clear();
         await SearchNowAsync();
     }
@@ -155,7 +202,7 @@
         var version = ++_requestVersion;
         _loading = true;
         _problem = null;
-        var result = await Catalog.SearchProductsAsync(_text, _categoryId, _excluded.ToList());
+        var result = await Catalog.SearchProductsAsync(_text, _categoryId, _excluded.ToList(), _marketId, _producerId);
         if (version != _requestVersion) return;
 
         if (result.IsSuccess) _products = result.Value!;

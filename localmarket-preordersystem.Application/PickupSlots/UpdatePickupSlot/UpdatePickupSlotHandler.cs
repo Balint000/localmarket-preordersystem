@@ -32,9 +32,12 @@ namespace localmarket_preordersystem.Application.PickupSlots.UpdatePickupSlot
             if (slot.ProducerId != producerId)
                 throw new ForbiddenAccessException("Csak a saját átvételi időpontodat módosíthatod.");
 
-            var before = PickupSlotDto.From(slot);
-            slot.Update(command.Date, command.StartTime, command.EndTime, command.Capacity, time.GetLocalNow().DateTime);
-            var after = PickupSlotDto.From(slot);
+            await PickupSlotSupport.EnsureNoOverlapAsync(slots, producerId, command.Date, command.StartTime, command.EndTime, slot.Id, ct);
+
+            var now = time.GetLocalNow().DateTime;
+            var before = PickupSlotDto.From(slot, now);
+            slot.Update(command.Date, command.StartTime, command.EndTime, command.Capacity, now);
+            var after = PickupSlotDto.From(slot, now);
 
             await audit.RecordAsync(currentUser, "PickupSlotUpdated", "PickupSlot", slot.Id, before, after, ct);
             await uow.SaveChangesAsync(ct);

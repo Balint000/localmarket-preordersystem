@@ -10,7 +10,7 @@ namespace localmarket_preordersystem.Application.PickupSlots.DeletePickupSlot
     /// Átvételi idősáv törlése — az árus csak a SAJÁTJÁT törölheti. Foglalt idősáv nem törölhető,
     /// és az sem, amelyre valaha rendelés hivatkozott (rendelési előzmények épsége).
     /// </summary>
-    public sealed class DeletePickupSlotHandler(IPickupSlotRepository slots, IOrderRepository orders, IAuditLogRepository audit, IUnitOfWork uow, ICurrentUserService currentUser)
+    public sealed class DeletePickupSlotHandler(IPickupSlotRepository slots, IOrderRepository orders, IAuditLogRepository audit, IUnitOfWork uow, ICurrentUserService currentUser, TimeProvider time)
     {
         public async Task HandleAsync(DeletePickupSlotCommand command, CancellationToken ct = default)
         {
@@ -25,7 +25,7 @@ namespace localmarket_preordersystem.Application.PickupSlots.DeletePickupSlot
             if (await orders.AnyForPickupSlotAsync(slot.Id, ct))
                 throw new ConflictException("Az időponthoz tartozik (akár lemondott) rendelés, ezért nem törölhető.");
 
-            var before = PickupSlotDto.From(slot);
+            var before = PickupSlotDto.From(slot, time.GetLocalNow().DateTime);
             slots.Remove(slot);
             await audit.RecordAsync(currentUser, "PickupSlotDeleted", "PickupSlot", before.Id, before, null, ct);
             await uow.SaveChangesAsync(ct);

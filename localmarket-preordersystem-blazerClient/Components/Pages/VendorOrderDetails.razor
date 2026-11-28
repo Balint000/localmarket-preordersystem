@@ -45,10 +45,12 @@
                             break;
                         case "Accepted" or "PartiallyFulfilled":
                             <button class="btn btn-primary" disabled="@_busy" @onclick='() => RunAsync(() => Api.ReadyAsync(Id), "Átvehetőnek jelölve.")'><Icon Name="package" />Átvehetőnek jelölöm</button>
+                            <button class="btn btn-outline-danger" disabled="@_busy" @onclick="() => _dialog = Dialog.Cancel">Mégsem tudom teljesíteni</button>
                             break;
                         case "Ready":
                             <button class="btn btn-primary" disabled="@_busy" @onclick='() => RunAsync(() => Api.PickedUpAsync(Id), "Átvettnek jelölve.")'><Icon Name="hand" />Átvette</button>
                             <button class="btn btn-outline-danger" disabled="@_busy" @onclick='() => _dialog = Dialog.NotPickedUp'>Nem jött el</button>
+                            <button class="btn btn-outline-danger" disabled="@_busy" @onclick="() => _dialog = Dialog.Cancel">Mégsem tudom teljesíteni</button>
                             break;
                         case "PickedUp" or "NotPickedUp":
                             <button class="btn btn-outline-danger" disabled="@_busy" @onclick="() => _dialog = Dialog.Dispute"><Icon Name="scale" />Vitatom</button>
@@ -87,6 +89,13 @@
             <textarea id="reason" class="form-control" rows="3" maxlength="1000" @bind="_text" @bind:event="oninput"></textarea>
         </ConfirmDialog>
 
+        <ConfirmDialog Visible="_dialog == Dialog.Cancel" Title="Rendelés lemondása" Danger="true" Busy="_busy"
+                       ConfirmText="Lemondom" Message="A készlet és az időpont felszabadul, a vásárló látja az indoklást." ConfirmDisabled="string.IsNullOrWhiteSpace(_text)"
+                       OnConfirm='() => RunAsync(() => Api.CancelAsync(Id, _text.Trim()), "Rendelés lemondva.")' OnCancel="CloseDialog">
+            <label class="form-label" for="cancel-reason">Indoklás (kötelező, pl. elfagyott a termés)</label>
+            <textarea id="cancel-reason" class="form-control" rows="3" maxlength="500" @bind="_text" @bind:event="oninput"></textarea>
+        </ConfirmDialog>
+
         <ConfirmDialog Visible="_dialog == Dialog.Dispute" Title="Rendelés vitatása" Danger="true" Busy="_busy"
                        ConfirmText="Vitát nyitok" Message="A vitát a piacvezető dönti el." ConfirmDisabled="string.IsNullOrWhiteSpace(_text)"
                        OnConfirm='() => RunAsync(() => Api.DisputeAsync(Id, _text.Trim()), "A vitát rögzítettük, a piacvezető dönt.")' OnCancel="CloseDialog">
@@ -112,7 +121,7 @@
 </PageContainer>
 
 @code {
-    private enum Dialog { None, Reject, Dispute, Partial, NotPickedUp }
+    private enum Dialog { None, Reject, Dispute, Partial, NotPickedUp, Cancel }
 
     [Parameter] public int Id { get; set; }
 
@@ -138,7 +147,7 @@
     {
         "Pending" => ("Új rendelés vár válaszra", "Fogadd el, ha mindent tudsz teljesíteni; ha nem, add meg, mennyit vállalsz."),
         "Accepted" or "PartiallyFulfilled" => ("Készítsd össze a rendelést", $"Átvétel: {Labels.DateLong(_order.PickupDate)}, {Labels.Time(_order.PickupStart)}–{Labels.Time(_order.PickupEnd)}."),
-        "Ready" => ("Átadásra vár", "Ha a vásárló átvette, jelöld meg; ha nem jött el, azt is."),
+        "Ready" => ("Átadásra vár", "Az átvétel napján jelöld átvettnek; ha a vásárló az időpont végéig nem jött el, jelöld „nem jött el”-nek."),
         "PickedUp" or "NotPickedUp" => ("Lezárt rendelés", "Ha valami nem stimmelt, vitát nyithatsz; a piacvezető dönt."),
         _ => null
     };

@@ -3,6 +3,7 @@
 @inject CatalogApi Catalog
 @inject AdminApi Admin
 @inject ToastService Toasts
+@inject NavigationManager Navigation
 
 <PageTitle>Piacok – LocalMarket</PageTitle>
 
@@ -29,11 +30,15 @@
                                 <span class="lm-day @(m.OpeningDays.Contains(d) ? "on" : "")" aria-hidden="true">@Labels.DayAbbr(d)</span>
                             }
                         </div>
-                        <div class="small mt-2 @(m.Latitude is null ? "text-danger" : "text-muted")">
+                        <div class="small mt-2"><Icon Name="clock" Size="14" /> Nyitvatartás: @m.HoursText</div>
+                        <div class="small mt-1 @(m.Latitude is null ? "text-danger" : "text-muted")">
                             <Icon Name="@(m.Latitude is null ? "warning" : "pin")" Size="14" />
                             @(m.Latitude is null ? "Nincs koordináta, ezért időjárás sem kérhető le" : $"{m.Latitude:0.0000}, {m.Longitude:0.0000}")
                         </div>
-                        <div class="mt-auto pt-3"><button class="btn btn-outline-primary btn-sm" @onclick="() => OpenEdit(m)"><Icon Name="pencil" Size="16" />Szerkesztés</button></div>
+                        <div class="mt-auto pt-3 d-flex gap-2 flex-wrap">
+                            <button class="btn btn-outline-primary btn-sm" @onclick="() => OpenEdit(m)"><Icon Name="pencil" Size="16" />Szerkesztés</button>
+                            <a class="btn btn-outline-secondary btn-sm" href="admin/markets/@m.Id/layout"><Icon Name="pin" Size="16" />Elrendezés, standok</a>
+                        </div>
                     </article>
                 }
             </div>
@@ -62,6 +67,11 @@
                 }
             </fieldset>
             <div class="row g-2 mb-2">
+                <div class="col"><label class="form-label" for="m-open">Nyitás</label><input id="m-open" type="time" class="form-control" @bind="_opensAt" /></div>
+                <div class="col"><label class="form-label" for="m-close">Zárás</label><input id="m-close" type="time" class="form-control" @bind="_closesAt" /></div>
+            </div>
+            <div class="form-text mb-2">Az árusok átvételi időpontjai ezen belül lehetnek. A már meghirdetett, kívül eső időpontok megmaradnak, de nem foglalhatók.</div>
+            <div class="row g-2 mb-2">
                 <div class="col"><label class="form-label" for="m-lat">Szélesség</label><input id="m-lat" class="form-control" inputmode="decimal" placeholder="pl. 46.8417" @bind="_lat" /></div>
                 <div class="col"><label class="form-label" for="m-lon">Hosszúság</label><input id="m-lon" class="form-control" inputmode="decimal" placeholder="pl. 16.8416" @bind="_lon" /></div>
             </div>
@@ -81,6 +91,7 @@
     private int? _editId;
     private string _name = "", _address = "", _lat = "", _lon = "";
     private readonly HashSet<string> _days = new();
+    private TimeOnly _opensAt = new(7, 0), _closesAt = new(13, 0);
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
@@ -94,7 +105,7 @@
 
     private void OpenNew()
     {
-        _editId = null; _name = _address = _lat = _lon = ""; _active = true; _days.Clear(); _saveProblem = null; _editing = true;
+        _editId = null; _name = _address = _lat = _lon = ""; _active = true; _days.Clear(); _opensAt = new(7, 0); _closesAt = new(13, 0); _saveProblem = null; _editing = true;
     }
 
     private void OpenEdit(MarketInfo m)
@@ -103,6 +114,7 @@
         _lat = m.Latitude?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "";
         _lon = m.Longitude?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "";
         _days.Clear(); foreach (var d in m.OpeningDays) _days.Add(d);
+        _opensAt = m.OpensAt ?? new(7, 0); _closesAt = m.ClosesAt ?? new(13, 0);
         _saveProblem = null; _editing = true;
     }
 
@@ -122,12 +134,30 @@
             _saveProblem = new ApiProblem(ApiFailure.Validation, "Hibás koordináta", "Add meg mindkét koordinátát számként (pl. 46.8417), vagy hagyd üresen mindkettőt.", new Dictionary<string, string[]>());
             return;
         }
+        if (_closesAt <= _opensAt)
+        {
+            _saveProblem = new ApiProblem(ApiFailure.Validation, "Hibás nyitvatartás", "A zárás időpontja a nyitás után kell legyen.", new Dictionary<string, string[]>());
+            return;
+        }
         _busy = true; _saveProblem = null;
         var days = Labels.DayKeys.Where(_days.Contains).ToList();
         var r = _editId is int id
-            ? await Admin.UpdateMarketAsync(id, new UpdateMarketRequest(_name.Trim(), _address.Trim(), days, lat, lon, _active))
-            : await Admin.CreateMarketAsync(new CreateMarketRequest(_name.Trim(), _address.Trim(), days, lat, lon));
-        if (r.IsSuccess) { Toasts.Success("Piac elmentve."); _editing = false; await LoadAsync(); }
+            ? await Admin.UpdateMarketAsync(id, new UpdateMarketRequest(_name.Trim(), _address.Trim(), days, lat, lon, _active, _opensAt, _closesAt))
+            : await Admin.CreateMarketAsync(new CreateMarketRequest(_name.Trim(), _address.Trim(), days, lat, lon, _opensAt, _closesAt));
+        if (r.IsSuccess)
+        {
+            _editing = false;
+            if (_editId is null)
+            {
+                // új piac: rögtön az elrendezés (standok) megtervezése következik
+                Toasts.Success("Piac létrehozva. Most rendezd be a standokat.");
+                _busy = false;
+                Navigation.NavigateTo($"admin/markets/{r.Value!.Id}/layout");
+                return;
+            }
+            Toasts.Success("Piac elmentve.");
+            await LoadAsync();
+        }
         else _saveProblem = r.Problem;
         _busy = false;
     }

@@ -41,6 +41,9 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 
         builder.Navigation(product => product.Categories).UsePropertyAccessMode(PropertyAccessMode.Field);
         builder.Navigation(product => product.WeeklyStocks).UsePropertyAccessMode(PropertyAccessMode.Field);
-        builder.HasIndex(product => new { product.ProducerId, product.Name }).IsUnique();
+        // archivált (törölt) termék neve újra felhasználható
+        builder.HasIndex(product => new { product.ProducerId, product.Name })
+            .IsUnique()
+            .HasFilter("\"IsArchived\" = false");
     }
 }

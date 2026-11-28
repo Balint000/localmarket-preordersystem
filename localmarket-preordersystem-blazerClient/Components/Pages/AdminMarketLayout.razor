@@ -1,0 +1,380 @@
+@page "/admin/markets/{Id:int}/layout"
+@attribute [Authorize(Roles = "Admin")]
+@inject CatalogApi Catalog
+@inject AdminApi Admin
+@inject ToastService Toasts
+
+<PageTitle>Piac elrendezése – LocalMarket</PageTitle>
+
+<PageContainer Title="@($"Elrendezés: {_marketName}")" BackHref="admin/markets" BackText="Piacok"
+               Subtitle="Felülnézet: kattints egy üres cellára új standhoz, húzd a standokat a helyükre, majd oszd ki őket az árusoknak.">
+    <Actions>
+        <button type="button" class="btn btn-primary" disabled="@(_busy || !_dirty)" @onclick="SaveAsync"><Icon Name="check" />Elrendezés mentése</button>
+    </Actions>
+    <ChildContent>
+    @if (_loading) { <LoadingIndicator /> }
+    else if (_problem is not null) { <ErrorMessage Problem="_problem" OnRetry="LoadAsync" /> }
+    else
+    {
+        @if (_dirty)
+        {
+            <div class="lm-callout warn"><Icon Name="warning" /><div class="lm-callout-body">Nem mentett módosítások. Standot kiosztani a mentés után lehet.</div></div>
+        }
+        @if (_unassigned.Count > 0)
+        {
+            <div class="lm-callout bad"><Icon Name="info" />
+                <div class="lm-callout-body"><strong>Kiosztás nélkül maradt árusok</strong>
+                    @foreach (var u in _unassigned) { <div class="small">@u.ProducerName (korábban @u.PreviousStallNumber. stand): @u.Reason</div> }
+                </div>
+            </div>
+        }
+
+        <div class="row g-4">
+            <div class="col-xl-8">
+                <div class="lm-card">
+                    <div class="lm-card-title">
+                        <h2><Icon Name="pin" />Felülnézet</h2>
+                        <span class="small text-muted">@_stalls.Count stand · @_stalls.Count(s => s.ProducerId is not null) kiosztva</span>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2 align-items-end mb-3">
+                        <div><label class="form-label small mb-0" for="ly-cols">Szélesség (cella)</label>
+                            <input id="ly-cols" type="number" class="form-control form-control-sm" style="width:6rem" min="4" max="40" value="@_columns" @onchange="e => ResizeGrid(e, true)" /></div>
+                        <div><label class="form-label small mb-0" for="ly-rows">Mélység (cella)</label>
+                            <input id="ly-rows" type="number" class="form-control form-control-sm" style="width:6rem" min="4" max="30" value="@_rows" @onchange="e => ResizeGrid(e, false)" /></div>
+                        <div><label class="form-label small mb-0" for="ly-nw">Új stand mérete</label>
+                            <div class="d-flex gap-1">
+                                <input id="ly-nw" type="number" class="form-control form-control-sm" style="width:4.2rem" min="1" max="6" @bind="_newW" aria-label="Új stand szélessége" />
+                                <span class="align-self-center">×</span>
+                                <input type="number" class="form-control form-control-sm" style="width:4.2rem" min="1" max="6" @bind="_newH" aria-label="Új stand mélysége" />
+                            </div></div>
+                        <div class="ms-auto d-flex gap-2 flex-wrap">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => ApplyTemplate(Template.TwoRows)">Sablon: két standsor</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => ApplyTemplate(Template.Ring)">Sablon: körben</button>
+                        </div>
+                    </div>
+
+                    <div class="lm-map editable @(_dragging is not null ? "dragging" : "")"
+                         style="grid-template-columns: repeat(@_columns, var(--lm-map-cell)); grid-template-rows: repeat(@_rows, auto);">
+                        @for (var y = 0; y < _rows; y++)
+                        {
+                            for (var x = 0; x < _columns; x++)
+                            {
+                                var cx = x; var cy = y;
+                                <div class="lm-map-cell" style="grid-column:@(cx + 1); grid-row:@(cy + 1)"
+                                     title="@($"{cx + 1}. oszlop, {cy + 1}. sor")"
+                                     @onclick="() => AddStallAt(cx, cy)"
+                                     @ondragover:preventDefault="true" @ondrop="() => DropAt(cx, cy)"></div>
+                            }
+                        }
+                        @foreach (var s in _stalls)
+                        {
+                            var stall = s;
+                            <div class="lm-map-stall @StallCss(stall)" draggable="true" tabindex="0" role="button"
+                                 aria-label="@($"{stall.Number}. stand{(stall.ProducerName is { } n ? ", " + n : ", szabad")}. Kijelöléshez kattints.")"
+                                 style="grid-column:@(stall.X + 1) / span @stall.Width; grid-row:@(stall.Y + 1) / span @stall.Height"
+                                 @onclick="() => Select(stall)" @ondragstart="() => StartDrag(stall)" @ondragend="() => _dragging = null">
+                                <span class="num">@stall.Number</span>
+                                @if ((stall.ProducerName ?? stall.Label) is { } text) { <span class="who">@text</span> }
+                            </div>
+                        }
+                    </div>
+                    <div class="lm-map-entrance">▲ bejárat / közlekedő sáv a rács szélén ▲</div>
+                    <div class="lm-map-legend"><span class="taken">kiosztott</span><span class="pending">jóváhagyásra váró árusnak kiosztva</span><span>szabad</span></div>
+                    <p class="small text-muted mt-2 mb-0">Tipp: a húzott stand bal felső sarka oda kerül, ahová ejted. Érintőképernyőn a kijelölt standot a jobb oldali nyilakkal mozgathatod.</p>
+                </div>
+            </div>
+
+            <div class="col-xl-4">
+                <div class="lm-card mb-4">
+                    @if (_selected is null)
+                    {
+                        <div class="lm-card-title"><h2><Icon Name="info" />Kijelölt stand</h2></div>
+                        <p class="text-muted small mb-0">Kattints egy standra a szerkesztéshez és a kiosztáshoz, vagy egy üres cellára új stand felvételéhez.</p>
+                    }
+                    else
+                    {
+                        var sel = _selected;
+                        <div class="lm-card-title"><h2><Icon Name="pencil" />@sel.Number. stand</h2>
+                            <button type="button" class="lm-icon-btn" aria-label="Stand törlése" title="Stand törlése" @onclick="DeleteSelected"><Icon Name="trash" Size="18" /></button></div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-6"><label class="form-label small mb-0" for="st-num">Standszám</label>
+                                <input id="st-num" type="number" class="form-control form-control-sm" min="1" max="999" value="@sel.Number" @onchange="Renumber" /></div>
+                            <div class="col-6"><label class="form-label small mb-0" for="st-label">Felirat</label>
+                                <input id="st-label" class="form-control form-control-sm" maxlength="40" placeholder="pl. hűtött" value="@sel.Label" @onchange="e => { sel.Label = e.Value?.ToString(); _dirty = true; }" /></div>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+                            <span class="small text-muted">Mozgatás:</span>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" aria-label="Balra" @onclick="() => Move(-1, 0)"><Icon Name="arrow-left" Size="16" /></button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" aria-label="Fel" @onclick="() => Move(0, -1)">↑</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" aria-label="Le" @onclick="() => Move(0, 1)">↓</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" aria-label="Jobbra" @onclick="() => Move(1, 0)"><Icon Name="arrow-right" Size="16" /></button>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+                            <span class="small text-muted">Méret: @sel.Width × @sel.Height</span>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => Resize(1, 0)">szélesebb</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => Resize(-1, 0)">keskenyebb</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => Resize(0, 1)">mélyebb</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => Resize(0, -1)">sekélyebb</button>
+                        </div>
+
+                        <h3 class="h6">Kiosztás</h3>
+                        @if (sel.ProducerId is not null)
+                        {
+                            <p class="mb-2">@sel.ProducerName @(sel.ProducerStatus == "Pending" ? "(jóváhagyásra vár)" : "")</p>
+                            <button type="button" class="btn btn-outline-danger btn-sm" disabled="@(_busy || _dirty)" @onclick="() => AssignAsync(sel.ProducerId.Value, 0)">Kiosztás visszavonása</button>
+                        }
+                        else
+                        {
+                            <label class="form-label small" for="st-prod">Árus</label>
+                            <select id="st-prod" class="form-select form-select-sm mb-2" @bind="_assignProducerId">
+                                <option value="">– válassz árust –</option>
+                                @foreach (var p in AssignableProducers)
+                                {
+                                    <option value="@p.Id">@p.Name@(p.StallNumber > 0 ? $" (most: {p.StallNumber}. stand)" : "")@(p.Status == "Pending" ? " – jóváhagyásra vár" : "")</option>
+                                }
+                            </select>
+                            <p class="small text-muted mb-2">Ha az árusnak már van standja, az a kiosztással felszabadul (egy árusnak egy fix standja van).</p>
+                            <button type="button" class="btn btn-primary btn-sm" disabled="@(_busy || _dirty || !int.TryParse(_assignProducerId, out _))" @onclick="AssignSelectedAsync">Kiosztom</button>
+                        }
+                    }
+                </div>
+
+                <div class="lm-card">
+                    <div class="lm-card-title"><h2><Icon Name="users" />Kiosztásra váró árusok</h2></div>
+                    @{ var waiting = _producers.Where(p => p.Status != "Rejected" && p.StallNumber <= 0).ToList(); }
+                    @if (waiting.Count == 0) { <p class="small text-muted mb-0">Minden árusnak van standja.</p> }
+                    else
+                    {
+                        <ul class="list-unstyled small mb-0">
+                            @foreach (var p in waiting) { <li class="mb-1"><strong>@p.Name</strong>@(p.Status == "Pending" ? " – jóváhagyásra vár" : "")</li> }
+                        </ul>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+    </ChildContent>
+</PageContainer>
+
+@code {
+    private enum Template { TwoRows, Ring }
+
+    /// <summary>Szerkeszthető stand (a mentésig csak a kliensben él).</summary>
+    private sealed class EditStall
+    {
+        public int Number { get; set; }
+        public int X { get; set; }
+        public int Y { get; set; }
+        public int Width { get; set; } = 1;
+        public int Height { get; set; } = 1;
+        public string? Label { get; set; }
+        public int? ProducerId { get; set; }
+        public string? ProducerName { get; set; }
+        public string? ProducerStatus { get; set; }
+    }
+
+    [Parameter] public int Id { get; set; }
+
+    private string _marketName = "";
+    private int _columns = 12, _rows = 8, _newW = 2, _newH = 2;
+    private List<EditStall> _stalls = [];
+    private IReadOnlyList<ProducerInfo> _producers = [];
+    private IReadOnlyList<UnassignedProducerInfo> _unassigned = [];
+    private EditStall? _selected, _dragging;
+    private bool _loading = true, _busy, _dirty;
+    private string _assignProducerId = "";
+    private ApiProblem? _problem;
+
+    private IEnumerable<ProducerInfo> AssignableProducers =>
+        _producers.Where(p => p.Status != "Rejected").OrderBy(p => p.StallNumber > 0).ThenBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase);
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true; _problem = null;
+        var layout = Catalog.MarketLayoutAsync(Id);
+        var producers = Catalog.ProducersAsync(null, Id);
+        await Task.WhenAll(layout, producers);
+        if (!layout.Result.IsSuccess) { _problem = layout.Result.Problem; _loading = false; return; }
+        if (producers.Result.IsSuccess) _producers = producers.Result.Value!;
+        Apply(layout.Result.Value!);
+        _loading = false;
+    }
+
+    private void Apply(MarketLayoutInfo l)
+    {
+        _marketName = l.MarketName;
+        _columns = l.Columns; _rows = l.Rows;
+        var selectedNumber = _selected?.Number;
+        _stalls = l.Stalls.Select(s => new EditStall
+        {
+            Number = s.Number, X = s.X, Y = s.Y, Width = s.Width, Height = s.Height, Label = s.Label,
+            ProducerId = s.ProducerId, ProducerName = s.ProducerName, ProducerStatus = s.ProducerStatus
+        }).ToList();
+        _selected = _stalls.FirstOrDefault(s => s.Number == selectedNumber);
+        _dirty = false;
+    }
+
+    private string StallCss(EditStall s) =>
+        (s == _selected ? "selected " : "") + (s.ProducerStatus == "Pending" ? "pending" : s.ProducerId is not null ? "taken" : "");
+
+    // --- rács-geometria
+    private bool Fits(EditStall? self, int x, int y, int w, int h) =>
+        x >= 0 && y >= 0 && x + w <= _columns && y + h <= _rows
+        && !_stalls.Any(o => o != self && x < o.X + o.Width && o.X < x + w && y < o.Y + o.Height && o.Y < y + h);
+
+    private int NextNumber() => _stalls.Count == 0 ? 1 : Enumerable.Range(1, 999).First(n => _stalls.All(s => s.Number != n));
+
+    private void AddStallAt(int x, int y)
+    {
+        var w = Math.Clamp(_newW, 1, 6); var h = Math.Clamp(_newH, 1, 6);
+        if (!Fits(null, x, y, w, h))
+        {
+            Toasts.Error($"Ide nem fér el egy {w}×{h}-es stand (kilóg vagy átfed egy másikat).");
+            return;
+        }
+        var stall = new EditStall { Number = NextNumber(), X = x, Y = y, Width = w, Height = h };
+        _stalls.Add(stall);
+        _selected = stall;
+        _dirty = true;
+    }
+
+    private void Select(EditStall s) { _selected = s; _assignProducerId = ""; }
+
+    private void StartDrag(EditStall s) { _dragging = s; _selected = s; }
+
+    private void DropAt(int x, int y)
+    {
+        var s = _dragging;
+        _dragging = null;
+        if (s is null) return;
+        if (!Fits(s, x, y, s.Width, s.Height)) { Toasts.Error("Ide nem tehető: kilóg vagy átfed egy másik standot."); return; }
+        s.X = x; s.Y = y; _dirty = true;
+    }
+
+    private void Move(int dx, int dy)
+    {
+        if (_selected is not { } s) return;
+        if (Fits(s, s.X + dx, s.Y + dy, s.Width, s.Height)) { s.X += dx; s.Y += dy; _dirty = true; }
+    }
+
+    private void Resize(int dw, int dh)
+    {
+        if (_selected is not { } s) return;
+        var w = s.Width + dw; var h = s.Height + dh;
+        if (w is < 1 or > 6 || h is < 1 or > 6) return;
+        if (Fits(s, s.X, s.Y, w, h)) { s.Width = w; s.Height = h; _dirty = true; }
+        else Toasts.Error("Így nem fér el: kilógna vagy átfedne egy másik standot.");
+    }
+
+    private void Renumber(ChangeEventArgs e)
+    {
+        if (_selected is not { } s) return;
+        if (!int.TryParse(e.Value?.ToString(), out var n) || n is < 1 or > 999) { Toasts.Error("A standszám 1 és 999 között lehet."); return; }
+        if (_stalls.Any(o => o != s && o.Number == n)) { Toasts.Error($"A(z) {n}. standszám már foglalt."); return; }
+        if (s.ProducerId is not null && n != s.Number)
+            Toasts.Error($"Figyelem: {s.ProducerName} a régi számhoz volt kiosztva; mentés után újra ki kell osztani.");
+        s.Number = n; _dirty = true;
+    }
+
+    private void DeleteSelected()
+    {
+        if (_selected is not { } s) return;
+        if (s.ProducerId is not null)
+            Toasts.Error($"{s.ProducerName} standja megszűnik; mentés után kiosztás nélkül marad.");
+        _stalls.Remove(s);
+        _selected = null;
+        _dirty = true;
+    }
+
+    private void ResizeGrid(ChangeEventArgs e, bool columns)
+    {
+        if (!int.TryParse(e.Value?.ToString(), out var v)) return;
+        v = columns ? Math.Clamp(v, 4, 40) : Math.Clamp(v, 4, 30);
+        var tooBig = _stalls.Any(s => columns ? s.X + s.Width > v : s.Y + s.Height > v);
+        if (tooBig) { Toasts.Error("Előbb mozgasd beljebb a standokat, különben kilógnának."); return; }
+        if (columns) _columns = v; else _rows = v;
+        _dirty = true;
+    }
+
+    private void ApplyTemplate(Template t)
+    {
+        // a kiosztott standszámok megmaradnak, ha a sablonban is szerepelnek (a mentés után is az árusnál maradnak)
+        var assigned = _stalls.Where(s => s.ProducerId is not null).ToDictionary(s => s.Number);
+        var w = Math.Clamp(_newW, 1, 6); var h = Math.Clamp(_newH, 1, 6);
+        var list = new List<EditStall>();
+        if (t == Template.TwoRows)
+        {
+            // két, egymással szemben álló sor, köztük közlekedő sáv
+            var perRow = Math.Max(1, (_columns - 2) / w);
+            var gap = Math.Max(1, _rows - 2 * h - 2);
+            for (var i = 0; i < perRow; i++) list.Add(new EditStall { X = 1 + i * w, Y = 1, Width = w, Height = h });
+            for (var i = 0; i < perRow; i++) list.Add(new EditStall { X = 1 + i * w, Y = 1 + h + gap, Width = w, Height = h });
+        }
+        else
+        {
+            // körben a rács szélén, középen szabad tér
+            for (var x = 0; x + w <= _columns; x += w) list.Add(new EditStall { X = x, Y = 0, Width = w, Height = h });
+            for (var x = 0; x + w <= _columns; x += w) list.Add(new EditStall { X = x, Y = _rows - h, Width = w, Height = h });
+            for (var y = h; y + h <= _rows - h; y += h)
+            {
+                list.Add(new EditStall { X = 0, Y = y, Width = w, Height = h });
+                list.Add(new EditStall { X = _columns - w, Y = y, Width = w, Height = h });
+            }
+        }
+        list = list.Where(s => s.X + s.Width <= _columns && s.Y + s.Height <= _rows && s.Y >= 0).ToList();
+        for (var i = 0; i < list.Count; i++)
+        {
+            list[i].Number = i + 1;
+            if (assigned.TryGetValue(i + 1, out var a)) { list[i].ProducerId = a.ProducerId; list[i].ProducerName = a.ProducerName; list[i].ProducerStatus = a.ProducerStatus; }
+        }
+        if (list.Count == 0) { Toasts.Error("A sablon nem fér el ebben a rácsméretben."); return; }
+        _stalls = list;
+        _selected = null;
+        _dirty = true;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_busy) return;
+        _busy = true;
+        var r = await Admin.SaveMarketLayoutAsync(Id, new MarketLayoutRequest(_columns, _rows,
+            _stalls.Select(s => new StallInputRequest(s.Number, s.X, s.Y, s.Width, s.Height, string.IsNullOrWhiteSpace(s.Label) ? null : s.Label.Trim())).ToList()));
+        _busy = false;
+        if (r.IsSuccess)
+        {
+            Apply(r.Value!);
+            _unassigned = r.Value!.UnassignedProducers;
+            Toasts.Success("Elrendezés elmentve.");
+            await ReloadProducersAsync();
+        }
+        else Toasts.Error(r.Problem!.Message);
+    }
+
+    private Task AssignSelectedAsync()
+        => _selected is { } s && int.TryParse(_assignProducerId, out var pid) ? AssignAsync(pid, s.Number) : Task.CompletedTask;
+
+    private async Task AssignAsync(int producerId, int stallNumber)
+    {
+        if (_busy) return;
+        _busy = true;
+        var r = await Admin.AssignStallAsync(producerId, stallNumber);
+        _busy = false;
+        if (r.IsSuccess)
+        {
+            Toasts.Success(stallNumber == 0 ? "Kiosztás visszavonva." : $"{r.Value!.Name}: {stallNumber}. stand.");
+            _assignProducerId = "";
+            var layout = await Catalog.MarketLayoutAsync(Id);
+            if (layout.IsSuccess) Apply(layout.Value!);
+            await ReloadProducersAsync();
+        }
+        else Toasts.Error(r.Problem!.Message);
+    }
+
+    private async Task ReloadProducersAsync()
+    {
+        var p = await Catalog.ProducersAsync(null, Id);
+        if (p.IsSuccess) _producers = p.Value!;
+    }
+}

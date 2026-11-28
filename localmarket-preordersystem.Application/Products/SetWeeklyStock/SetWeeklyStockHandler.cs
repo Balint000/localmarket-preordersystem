@@ -21,7 +21,7 @@ namespace localmarket_preordersystem.Application.Products.SetWeeklyStock
             var producerId = currentUser.RequireProducerId();
             SetWeeklyStockValidator.Validate(command);
 
-            var today = time.GetLocalNow().Date;
+            var today = time.GetLocalNow().DateTime;
             if (ProductStock.GetWeekStart(command.WeekDate) < ProductStock.GetWeekStart(today))
                 throw new ValidationException(new Dictionary<string, string[]>
                 {
