@@ -40,7 +40,12 @@ public sealed record OrderInfo(
     int Id, int CustomerId, string? CustomerName, int ProducerId, string? ProducerName,
     int PickupSlotId, DateTime PickupDate, TimeOnly PickupStart, TimeOnly PickupEnd,
     string Status, decimal TotalAmount, DateTime CreatedAt, string? DisputeNote, string? RejectionReason,
-    PaymentInfo? Payment, IReadOnlyList<OrderItemInfo> Items);
+    PaymentInfo? Payment, IReadOnlyList<OrderItemInfo> Items,
+    int? MarketId = null, string? MarketName = null, int? StallNumber = null)
+{
+    /// <summary>Még előtte álló átvétel (a térképen ezt kell megtalálni).</summary>
+    public bool IsUpcoming => Status is "Pending" or "Accepted" or "PartiallyFulfilled" or "Ready";
+}
 
 // kérések
 public sealed record LoginRequest(string Email, string Password);

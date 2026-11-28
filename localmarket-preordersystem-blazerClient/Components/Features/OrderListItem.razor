@@ -7,6 +7,10 @@
         <div class="lm-order-meta">
             <span><Icon Name="calendar" />Átvétel: @Labels.DateShort(Order.PickupDate) @Labels.Time(Order.PickupStart)–@Labels.Time(Order.PickupEnd)</span>
             <span><Icon Name="package" />@Order.Items.Count tétel</span>
+            @if (!ShowCustomer && Order.StallNumber is int stall && Order.IsUpcoming)
+            {
+                <span class="lm-order-stall"><Icon Name="pin" />@stall. stand</span>
+            }
         </div>
     </div>
     <div class="lm-order-side">

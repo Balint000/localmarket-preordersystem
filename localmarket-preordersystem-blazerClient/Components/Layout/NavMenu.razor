@@ -16,7 +16,7 @@
             {
                 <a class="lm-icon-btn" href="cart" aria-label="@CartLabel">
                     <Icon Name="cart" />
-                    @if (Cart.ItemCount > 0) { <span class="lm-count" aria-hidden="true">@Cart.ItemCount</span> }
+                    @if (Cart.ItemCount > 0) { <span @key="Cart.ItemCount" class="lm-count bump" aria-hidden="true">@Cart.ItemCount</span> }
                 </a>
             }
             <button type="button" id="lm-menu-button" class="lm-icon-btn" aria-label="Menü megnyitása" aria-expanded="@(_open ? "true" : "false")"
@@ -52,9 +52,10 @@
                         <div class="lm-side-group" role="group" aria-labelledby="ng-shop">
                             <div class="lm-side-group-title" id="ng-shop">Vásárlás</div>
                             <NavLink class="lm-side-link" href="products"><Icon Name="bag" /><span>Termékek</span></NavLink>
+                            <NavLink class="lm-side-link" href="markets"><Icon Name="pin" /><span>Piacok</span></NavLink>
                             <NavLink class="lm-side-link" href="cart" Match="NavLinkMatch.All">
                                 <Icon Name="cart" /><span>Kosár</span>
-                                @if (Cart.ItemCount > 0) { <span class="lm-count"><span class="visually-hidden">tételek száma: </span>@Cart.ItemCount</span> }
+                                @if (Cart.ItemCount > 0) { <span @key="Cart.ItemCount" class="lm-count bump"><span class="visually-hidden">tételek száma: </span>@Cart.ItemCount</span> }
                             </NavLink>
                             <NavLink class="lm-side-link" href="orders"><Icon Name="receipt" /><span>Rendeléseim</span></NavLink>
                         </div>
@@ -71,6 +72,7 @@
                             <NavLink class="lm-side-link" href="vendor/products"><Icon Name="sprout" /><span>Termékeim</span></NavLink>
                             <NavLink class="lm-side-link" href="vendor/slots"><Icon Name="clock" /><span>Átvételi időpontok</span></NavLink>
                             <NavLink class="lm-side-link" href="products" Match="NavLinkMatch.All"><Icon Name="store" /><span>A piac kínálata</span></NavLink>
+                            <NavLink class="lm-side-link" href="markets"><Icon Name="pin" /><span>Piacok és standok</span></NavLink>
                         </div>
                         break;
 
@@ -108,6 +110,7 @@
                 </a>
                 <nav class="lm-topbar-nav" aria-label="Főmenü">
                     <NavLink class="lm-toplink" href="products" aria-label="Termékek"><Icon Name="bag" /><span>Termékek</span></NavLink>
+                    <NavLink class="lm-toplink" href="markets" aria-label="Piacok"><Icon Name="pin" /><span>Piacok</span></NavLink>
                 </nav>
                 <div class="lm-topbar-actions">
                     <ThemeToggle />

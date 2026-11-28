@@ -18,6 +18,8 @@ A policy-k: `api/Extensions/AuthorizationExtensions.cs`.
 | Termék törlése | nem | nem | igen (saját, aktív rendelés nélkül) | igen (bármelyik; az aktív rendeléseket indoklással lemondja) |
 | Piac nyitvatartásának megtekintése | igen | igen | igen | igen |
 | Piac térképe (standok, kiosztott árusok) | igen | igen | igen | igen (a függő árusokat is látja) |
+| Piacok áttekintő oldal (`/markets`) | igen | igen | igen | igen |
+| Átvételi stand a saját rendelésnél (térképen kiemelve) | nem | igen (saját) | nem | nem |
 | Piac elrendezése, fix stand kiosztása | nem | nem | nem (a saját standját látja, nem módosíthatja) | igen |
 | Termékek szűrése piacra / árusra | igen | igen | igen | igen |
 | Heti maradék-visszajelzés (lezárt hetek) | nem | nem | igen (saját) | nem |

@@ -1,0 +1,55 @@
+@* A vevő következő piacnapja: mely standoknál kell átvennie a rendeléseit (több árus = több kiemelt stand). *@
+@inject OrdersApi Orders
+@inject CatalogApi Catalog
+
+@if (_day is not null && _layout is not null)
+{
+    <section class="lm-card lm-pickup mb-4" aria-labelledby="next-pickup-title">
+        <div class="lm-pickup-head">
+            <div>
+                <h2 id="next-pickup-title" class="h5 mb-1">Következő átvétel: @Labels.DateLong(_day.Value)</h2>
+                <p class="mb-0 text-muted small">@_layout.MarketName: @(_stops.Count == 1 ? "egy standnál" : $"{_stops.Count} standnál") vár rád rendelés.</p>
+            </div>
+        </div>
+        <ol class="lm-stops">
+            @foreach (var o in _stops)
+            {
+                <li class="@ProducerColor.Css(o.ProducerId)">
+                    <a href="orders/@o.Id">
+                        <span class="lm-stall-badge sm" aria-hidden="true">@(o.StallNumber?.ToString() ?? "?")</span>
+                        <span><strong class="lm-producer-name">@o.ProducerName</strong>
+                            <span class="d-block small text-muted">@(o.StallNumber is int s ? $"{s}. stand" : "stand még nincs kiosztva"), @Labels.Time(o.PickupStart)–@Labels.Time(o.PickupEnd)</span></span>
+                    </a>
+                </li>
+            }
+        </ol>
+        <MarketMap Layout="_layout" HighlightMany="_highlights" OnlyHighlightedInLegend="true" ShowLegend="false" />
+    </section>
+}
+
+@code {
+    private DateTime? _day;
+    private MarketLayoutInfo? _layout;
+    private List<OrderInfo> _stops = [];
+    private IReadOnlyCollection<int> _highlights = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var mine = await Orders.MineAsync(null);
+        if (!mine.IsSuccess) return;
+
+        // a legközelebbi piacnap közelgő átvételei (egy piacon), időrendben
+        var upcoming = mine.Value!.Where(o => o.IsUpcoming && o.PickupDate.Date >= MarketClock.Now.Date && o.MarketId is not null).ToList();
+        var first = upcoming.OrderBy(o => o.PickupDate).ThenBy(o => o.PickupStart).FirstOrDefault();
+        if (first is null) return;
+
+        _stops = upcoming.Where(o => o.PickupDate.Date == first.PickupDate.Date && o.MarketId == first.MarketId)
+            .OrderBy(o => o.PickupStart).ThenBy(o => o.StallNumber).ToList();
+        var layout = await Catalog.MarketLayoutAsync(first.MarketId!.Value);
+        if (!layout.IsSuccess || layout.Value!.Stalls.Count == 0) return;
+
+        _layout = layout.Value;
+        _day = first.PickupDate.Date;
+        _highlights = _stops.Where(o => o.StallNumber is not null).Select(o => o.StallNumber!.Value).Distinct().ToList();
+    }
+}

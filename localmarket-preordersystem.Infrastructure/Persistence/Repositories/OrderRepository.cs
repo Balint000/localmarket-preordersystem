@@ -11,7 +11,7 @@ internal sealed class OrderRepository(MarketDbContext context) : IOrderRepositor
     private IQueryable<Order> ForUpdate() => context.Orders
         .Include(o => o.Items).ThenInclude(i => i.Product).ThenInclude(p => p.WeeklyStocks)
         .Include(o => o.Payment)
-        .Include(o => o.PickupSlot).ThenInclude(s => s.Producer)
+        .Include(o => o.PickupSlot).ThenInclude(s => s.Producer).ThenInclude(p => p.Market)
         .Include(o => o.User)
         .AsSplitQuery();
 
@@ -19,7 +19,7 @@ internal sealed class OrderRepository(MarketDbContext context) : IOrderRepositor
     private IQueryable<Order> ForRead() => context.Orders.AsNoTracking()
         .Include(o => o.Items).ThenInclude(i => i.Product)
         .Include(o => o.Payment)
-        .Include(o => o.PickupSlot).ThenInclude(s => s.Producer)
+        .Include(o => o.PickupSlot).ThenInclude(s => s.Producer).ThenInclude(p => p.Market)
         .Include(o => o.User)
         .AsSplitQuery();
 

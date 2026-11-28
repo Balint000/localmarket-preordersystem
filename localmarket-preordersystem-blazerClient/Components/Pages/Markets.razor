@@ -1,0 +1,117 @@
+@page "/markets"
+@inject CatalogApi Catalog
+
+<PageTitle>Piacok – LocalMarket</PageTitle>
+
+<PageContainer Title="Piacok" Subtitle="Mikor vannak nyitva, és melyik standnál találod a termelőket.">
+    @if (_loading) { <LoadingIndicator Text="Piacok betöltése…" /> }
+    else if (_problem is not null) { <ErrorMessage Problem="_problem" OnRetry="LoadAsync" /> }
+    else if (_markets.Count == 0)
+    {
+        <EmptyState Title="Jelenleg nincs működő piac" IconName="pin" Text="Amint a piacvezető megnyit egy piacot, itt látod a nyitvatartását és a standokat." />
+    }
+    else
+    {
+        @foreach (var m in _markets)
+        {
+            var view = m;
+            <section class="lm-market" aria-labelledby="@($"mk-{view.Market.Id}")">
+                <header class="lm-market-head">
+                    <div>
+                        <h2 id="@($"mk-{view.Market.Id}")">@view.Market.Name</h2>
+                        <p class="text-muted mb-0">@view.Market.Address</p>
+                    </div>
+                    <a class="btn btn-primary" href="products?marketId=@view.Market.Id"><Icon Name="bag" />A piac kínálata</a>
+                </header>
+
+                <dl class="lm-market-facts">
+                    <div>
+                        <dt>Piacnapok</dt>
+                        <dd>
+                            <span class="lm-days" aria-label="@(view.Market.OpeningDays.Count == 0 ? "nincs megadva" : string.Join(", ", view.Market.OpeningDays.Select(Labels.Day)))">
+                                @foreach (var d in Labels.DayKeys)
+                                {
+                                    <span class="lm-day @(view.Market.OpeningDays.Contains(d) ? "on" : "")" aria-hidden="true">@Labels.DayAbbr(d)</span>
+                                }
+                            </span>
+                        </dd>
+                    </div>
+                    <div><dt>Nyitva</dt><dd>@view.Market.HoursText</dd></div>
+                    <div>
+                        <dt>Következő piacnap</dt>
+                        <dd>@(view.NextDay is { } nd ? $"{Labels.DateLong(nd)} ({Labels.DayRelative(nd)})" : "nincs a következő héten")</dd>
+                    </div>
+                    @if (view.Weather is { ForecastAvailable: true } w)
+                    {
+                        <div class="lm-market-weather">
+                            <dt>Időjárás aznap</dt>
+                            <dd><Icon Name="@Labels.WeatherIcon(w)" />@Labels.Qty((decimal)(w.TemperatureMinC ?? 0))–@Labels.Qty((decimal)(w.TemperatureMaxC ?? 0)) °C<span class="text-muted">, @w.Description</span></dd>
+                        </div>
+                    }
+                    <div><dt>Termelők</dt><dd>@view.ProducerCount</dd></div>
+                </dl>
+
+                @if (view.Layout is { Stalls.Count: > 0 } layout)
+                {
+                    <div class="lm-market-map">
+                        <MarketMap Layout="layout" />
+                    </div>
+                }
+                else
+                {
+                    <p class="small text-muted">A standok elrendezése még nincs megadva.</p>
+                }
+            </section>
+        }
+    }
+</PageContainer>
+
+@code {
+    private sealed record MarketView(MarketInfo Market, MarketLayoutInfo? Layout, DateTime? NextDay, MarketWeatherInfo? Weather, int ProducerCount);
+
+    private List<MarketView> _markets = [];
+    private bool _loading = true;
+    private ApiProblem? _problem;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true; _problem = null;
+        var markets = await Catalog.MarketsAsync();
+        if (!markets.IsSuccess) { _problem = markets.Problem; _loading = false; return; }
+        var producers = await Catalog.ProducersAsync("Approved");
+        IReadOnlyList<ProducerInfo> approved = producers.IsSuccess ? producers.Value! : [];
+
+        var views = new List<MarketView>();
+        foreach (var m in markets.Value!.Where(m => m.IsActive))
+        {
+            // a térkép és az időjárás kiegészítő: hiba esetén egyszerűen kimarad
+            var layout = await Catalog.MarketLayoutAsync(m.Id);
+            var next = NextOpening(m);
+            MarketWeatherInfo? weather = null;
+            if (next is { } day && m.Latitude is not null)
+            {
+                var w = await Catalog.WeatherAsync(m.Id, day);
+                if (w.IsSuccess) weather = w.Value;
+            }
+            views.Add(new MarketView(m, layout.IsSuccess ? layout.Value : null, next, weather, approved.Count(p => p.MarketId == m.Id)));
+        }
+        _markets = views;
+        _loading = false;
+    }
+
+    /// <summary>A következő piacnap (ma is, ha még nem zárt be), a piac helyi ideje szerint.</summary>
+    private static DateTime? NextOpening(MarketInfo m)
+    {
+        var now = MarketClock.Now;
+        for (var i = 0; i < 7; i++)
+        {
+            var d = now.Date.AddDays(i);
+            if (!m.OpeningDays.Contains(d.DayOfWeek.ToString())) continue;
+            if (i == 0 && m.ClosesAt is { } c && TimeOnly.FromDateTime(now) >= c) continue;
+            return d;
+        }
+        return null;
+    }
+}

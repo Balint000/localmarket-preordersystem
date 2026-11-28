@@ -47,3 +47,7 @@ Mintaadatok: seedelt admin (`admin@localmarket.test`), vásárló (`vevo@localma
 | T39 | Stand megszűnése | Admin töröl egy kiosztott standot és ment | Az árus kiosztás nélkül marad, a válasz felsorolja |
 | T40 | Árus nem írhatja át a standját | `PUT /api/producers/me` más standszámmal | 403; a profilban a stand csak olvasható |
 | T41 | Térkép a vevőnek | A termékoldalon az árus standja kiemelve | A piac térképén az árus standja kiemelt színnel |
+| T42 | Átvételi stand a rendelésnél | Vevő megnyit egy aktív rendelést, amelynek árusa standot kapott | „Itt veheted át” kártya: árus neve az árus színével, standszám-tábla, a térképen a stand kiemelve |
+| T43 | Következő átvétel | Vevőnek több árusnál van rendelése ugyanarra a piacnapra | A Rendeléseim tetején a standok időrendben, a térképen mind kiemelve |
+| T44 | Piacok oldal | Vevő vagy vendég megnyitja a Piacok oldalt | Piacnapok, nyitvatartás, következő piacnap, időjárás, termelők száma, térkép árusonként színezve; „A piac kínálata” a szűrt terméklistára visz |
+| T45 | Csökkentett mozgás | Az operációs rendszerben a „csökkentett mozgás” be van kapcsolva | A stand-felvillanás, a kosárszámláló és a cédula animációja nem játszódik le |

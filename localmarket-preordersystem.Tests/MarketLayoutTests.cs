@@ -144,3 +144,28 @@ public class StallAssignmentHandlerTests
         Assert.Equal(1, dto.StallNumber);
     }
 }
+
+public class OrderPickupLocationTests
+{
+    [Fact]
+    public void Order_dto_tells_the_customer_the_market_and_the_stall()
+    {
+        var producer = TestData.ApprovedProducer();
+        producer.Market.SetLayout(MarketLayout.Create(10, 6, [new MarketStall(4, 0, 0, 2, 2)]));
+        producer.AssignStall(4);
+        var product = TestData.ProductWithStock(producer);
+        var order = Order.Place(TestData.Customer(), TestData.Slot(producer), [(product, 1m)], TestData.Now);
+
+        var dto = localmarket_preordersystem.Application.Orders.OrderDto.From(order);
+
+        Assert.Equal(4, dto.StallNumber);
+        Assert.Equal(producer.Market.Name, dto.MarketName);
+    }
+
+    [Fact]
+    public void Unassigned_stall_is_null_not_zero()
+    {
+        var (order, _, _) = TestData.PendingOrder();
+        Assert.Null(localmarket_preordersystem.Application.Orders.OrderDto.From(order).StallNumber);
+    }
+}

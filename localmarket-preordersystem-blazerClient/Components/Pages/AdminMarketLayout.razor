@@ -217,7 +217,9 @@
     }
 
     private string StallCss(EditStall s) =>
-        (s == _selected ? "selected " : "") + (s.ProducerStatus == "Pending" ? "pending" : s.ProducerId is not null ? "taken" : "");
+        (s == _selected ? "selected " : "")
+        + (s.ProducerId is int pid ? ProducerColor.Css(pid) + " taken" : "free")
+        + (s.ProducerStatus == "Pending" ? " pending" : "");
 
     // --- rács-geometria
     private bool Fits(EditStall? self, int x, int y, int w, int h) =>

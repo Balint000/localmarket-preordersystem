@@ -135,7 +135,7 @@
                     {
                         <div class="mt-3">
                             <div class="small fw-bold mb-1">Hol találod a piacon?</div>
-                            <MarketMap Layout="_layout" Highlight="_producer.StallNumber" HighlightText="@($"{_producer.Name} standja")" ShowNames="false" />
+                            <MarketMap Layout="_layout" Highlight="_producer.StallNumber" OnlyHighlightedInLegend="true" Compact="true" />
                         </div>
                     }
                     @if (_weather is { ForecastAvailable: true } w)

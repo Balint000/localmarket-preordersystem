@@ -28,7 +28,7 @@
                 <div class="small mt-2"><Icon Name="pin" Size="14" /> Standod: <strong>@(_myStall > 0 ? $"{_myStall}. stand" : "még nincs kiosztva (a piacvezető osztja ki)")</strong></div>
                 @if (_layout is { Stalls.Count: > 0 })
                 {
-                    <div class="mt-2" style="max-width:40rem"><MarketMap Layout="_layout" Highlight="@(_myStall > 0 ? (int?)_myStall : null)" HighlightText="a te standod" /></div>
+                    <div class="mt-2" style="max-width:40rem"><MarketMap Layout="_layout" Highlight="@(_myStall > 0 ? (int?)_myStall : null)" /></div>
                 }
             </div>
         }

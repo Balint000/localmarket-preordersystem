@@ -3,6 +3,7 @@
 @inject OrdersApi Api
 @inject FileDownloader Downloader
 @inject ToastService Toasts
+@inject CatalogApi Catalog
 
 <PageTitle>Rendelés #@Id – LocalMarket</PageTitle>
 
@@ -40,6 +41,31 @@
         }
 
         <div class="mb-4"><OrderProgress Status="@_order.Status" /></div>
+
+        @if (_order.IsUpcoming)
+        {
+            <section class="lm-card lm-pickup mb-4" aria-labelledby="pickup-title">
+                <div class="lm-pickup-head">
+                    <div>
+                        <h2 id="pickup-title" class="h5 mb-1">Itt veheted át</h2>
+                        <p class="mb-0">
+                            <strong class="@(_order.ProducerId > 0 ? ProducerColor.Css(_order.ProducerId) : "") lm-producer-name">@_order.ProducerName</strong>
+                            @if (_order.StallNumber is int st) { <span>, @st. stand</span> }
+                            <span class="text-muted d-block small">@(_order.MarketName ?? "A piacon"), @Labels.DateLong(_order.PickupDate), @Labels.Time(_order.PickupStart)–@Labels.Time(_order.PickupEnd)</span>
+                        </p>
+                    </div>
+                    @if (_order.StallNumber is int big) { <div class="lm-stall-badge" aria-hidden="true">@big</div> }
+                </div>
+                @if (_order.StallNumber is null)
+                {
+                    <p class="small text-muted mb-0">Az árus standját a piacvezető még nem osztotta ki; a piacon a termelő nevét keresd.</p>
+                }
+                else if (_layout is { Stalls.Count: > 0 })
+                {
+                    <MarketMap Layout="_layout" Highlight="_order.StallNumber" OnlyHighlightedInLegend="true" Compact="true" />
+                }
+            </section>
+        }
 
         <div class="row g-4">
             <div class="col-lg-7">
@@ -92,6 +118,7 @@
     private ApiProblem? _problem;
     private bool _loading = true, _busy, _confirmCancel, _confirmDispute, _exporting;
     private string _disputeNote = string.Empty;
+    private MarketLayoutInfo? _layout;
 
     // Vita: átvétel / „nem jött el” után, vagy ha az átvételi idősáv lejárt, de az árus nem zárta le az átadást
     // (pl. nem adta ki a rendelést). A piac helyi ideje számít; a végső döntést a backend hozza.
@@ -107,6 +134,12 @@
         var result = await Api.GetAsync(Id);
         if (result.IsSuccess) _order = result.Value; else { _order = null; _problem = result.Problem; }
         _loading = false;
+        // a térkép kiegészítő: ha nem tölthető be, a stand száma akkor is látszik
+        if (_order is { IsUpcoming: true, MarketId: int marketId, StallNumber: not null } && _layout?.MarketId != marketId)
+        {
+            var layout = await Catalog.MarketLayoutAsync(marketId);
+            _layout = layout.IsSuccess ? layout.Value : null;
+        }
     }
 
     private async Task CancelAsync()

@@ -3341,71 +3341,249 @@ hr {
     }
 }
 
-/* ===================== Piac-térkép (felülnézet) és elrendezés-szerkesztő ===================== */
-.lm-map {
-    --lm-map-cell: minmax(1.6rem, 1fr);
-    display: grid;
-    gap: 3px;
-    padding: .6rem;
-    border-radius: 14px;
+/* =====================================================================
+   19. v4 – piaci anyaghasználat (#90)
+   A felület két hangos eleme: a lógó árcédula és a piactérkép napellenzős
+   standjai. Minden más csendesebb lett: a szűrősáv nem kártya, a termékkép
+   egyszínű faláda-panel (színátmenet helyett), a mozgás csak válasz vagy
+   figyelemfelhívás.
+   ===================================================================== */
+
+/* ---- Árusonkénti színek (a térképen, a jelmagyarázatban, az átvételi listán) ---- */
+.pc-0 { --pc: #2d6a3e; }
+.pc-1 { --pc: #2b5d8c; }
+.pc-2 { --pc: #94590a; }
+.pc-3 { --pc: #7a3a86; }
+.pc-4 { --pc: #b0412a; }
+.pc-5 { --pc: #17706a; }
+.pc-6 { --pc: #5a6a1c; }
+.pc-7 { --pc: #8a3d5c; }
+[data-theme="dark"] .pc-0 { --pc: #6cc583; }
+[data-theme="dark"] .pc-1 { --pc: #82b3e3; }
+[data-theme="dark"] .pc-2 { --pc: #e2ad55; }
+[data-theme="dark"] .pc-3 { --pc: #cb93d6; }
+[data-theme="dark"] .pc-4 { --pc: #ee9079; }
+[data-theme="dark"] .pc-5 { --pc: #5ec6bc; }
+[data-theme="dark"] .pc-6 { --pc: #b8c86f; }
+[data-theme="dark"] .pc-7 { --pc: #e292b4; }
+
+.lm-producer-name { color: var(--pc, var(--lm-ink)); }
+
+/* ---- Szűrősáv: besüllyesztett sáv, nem újabb kártya ---- */
+.lm-filterbar {
+    background: var(--lm-sunken);
+    border: 0;
+    border-radius: var(--lm-r-sm);
+    padding: .9rem 1rem;
+}
+
+    .lm-filterbar-row > .form-select { flex: 1 1 11rem; width: auto; }
+
+    .lm-filterbar .form-control, .lm-filterbar .form-select, .lm-filterbar .lm-pill:not([aria-pressed="true"]) {
+        background-color: var(--lm-surface);
+    }
+
+/* ---- Termékkép: egyszínű faláda-panel (vízszintes lécek), a termék "matricaként" ül rajta ---- */
+.lm-product-img {
+    --crate: var(--lm-leaf-soft);
     background:
-        repeating-linear-gradient(45deg, transparent 0 10px, rgba(0, 0, 0, .018) 10px 20px),
+        repeating-linear-gradient(180deg, transparent 0 40px, rgba(60, 40, 10, .07) 40px 42px),
+        var(--crate);
+    justify-content: flex-end;
+    align-items: flex-start;
+    padding: 1rem 1.25rem;
+    font-size: 3.1rem;
+}
+
+    .lm-product-img > .lm-emoji {
+        filter: none;
+        transform: rotate(8deg);
+        transition: none;
+    }
+
+.lm-product:hover .lm-product-img > .lm-emoji { transform: rotate(8deg); }
+
+.look-green { background-color: #dcebd3; --crate: #dcebd3; }
+.look-red { background-color: #f6d9d3; --crate: #f6d9d3; }
+.look-yellow { background-color: #f6ebc4; --crate: #f6ebc4; }
+.look-brown { background-color: #ecdcc6; --crate: #ecdcc6; }
+.look-sand { background-color: #eee4d0; --crate: #eee4d0; }
+.look-amber { background-color: #f5dfa8; --crate: #f5dfa8; }
+.look-purple { background-color: #e6d8ee; --crate: #e6d8ee; }
+[data-theme="dark"] .look-green { --crate: #22372a; }
+[data-theme="dark"] .look-red { --crate: #3b2522; }
+[data-theme="dark"] .look-yellow { --crate: #3a3420; }
+[data-theme="dark"] .look-brown { --crate: #382c22; }
+[data-theme="dark"] .look-sand { --crate: #353025; }
+[data-theme="dark"] .look-amber { --crate: #3c2f17; }
+[data-theme="dark"] .look-purple { --crate: #30233a; }
+[data-theme="dark"] .lm-product-img {
+    background:
+        repeating-linear-gradient(180deg, transparent 0 40px, rgba(0, 0, 0, .22) 40px 42px),
+        var(--crate);
+}
+
+/* a kártya maga csendes: nincs árnyék-emelés, csak a keret erősödik; a cédula lendül meg */
+.lm-product { border-radius: var(--lm-r-sm); }
+.lm-product:hover { box-shadow: none; border-color: var(--lm-line-strong); }
+.lm-product-img .lm-tag-hang { transition: transform .45s cubic-bezier(.3, 1.6, .5, 1); }
+.lm-product:hover .lm-product-img .lm-tag-hang,
+.lm-product:focus-within .lm-product-img .lm-tag-hang { transform: rotate(-9deg); }
+
+/* ---- Kosár-számláló: megugrik, amikor változik (a komponens @key-jel újrarajzolja) ---- */
+@keyframes lm-bump {
+    0% { transform: scale(1); }
+    35% { transform: scale(1.35); }
+    100% { transform: scale(1); }
+}
+.lm-count.bump { animation: lm-bump .38s var(--lm-ease); }
+
+/* ---- Piactérkép (felülnézet) ---- */
+.lm-map {
+    --lm-map-cell: minmax(1.7rem, 2.6rem);
+    display: grid;
+    justify-content: center;
+    gap: 4px;
+    padding: .75rem;
+    border-radius: var(--lm-r-sm);
+    /* járólap: finom kockakő-minta */
+    background:
+        radial-gradient(circle at 1px 1px, rgba(0, 0, 0, .07) 1px, transparent 1.5px) 0 0 / 14px 14px,
         var(--lm-sunken);
     border: 1px solid var(--lm-line);
     position: relative;
     user-select: none;
     overflow-x: auto;
 }
-.lm-map-cell {
-    border-radius: 4px;
-    min-height: 1.6rem;
-    aspect-ratio: 1 / 1;
+.lm-map.compact { --lm-map-cell: minmax(1.25rem, 2rem); gap: 3px; padding: .5rem; }
+
+.lm-map-cell { border-radius: 3px; min-height: 1.5rem; aspect-ratio: 1 / 1; }
+.lm-map.compact .lm-map-cell { min-height: 1.15rem; }
+
+.lm-map-stall {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: .05rem;
+    padding: .55rem .35rem .3rem;
+    border-radius: 4px 4px 6px 6px;
+    background: var(--lm-surface);
+    border: 1px solid color-mix(in srgb, var(--pc, var(--lm-line-strong)) 45%, var(--lm-line));
+    font-size: .72rem;
+    line-height: 1.1;
+    text-align: left;
+    overflow: hidden;
+    color: var(--lm-ink);
 }
+
+    /* napellenző az árus színében */
+    .lm-map-stall::before {
+        content: "";
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 7px;
+        background: repeating-linear-gradient(90deg, var(--pc, var(--lm-line-strong)) 0 7px, color-mix(in srgb, var(--pc, var(--lm-line-strong)) 25%, var(--lm-surface)) 7px 14px);
+    }
+
+    .lm-map-stall.free { --pc: var(--lm-line-strong); background: color-mix(in srgb, var(--lm-surface) 70%, transparent); border-style: dashed; }
+    .lm-map-stall.taken { background: color-mix(in srgb, var(--pc, var(--lm-line-strong)) 10%, var(--lm-surface)); }
+    .lm-map-stall .num { font-family: var(--lm-font-display); font-weight: 800; font-size: .9rem; color: var(--lm-muted); }
+    .lm-map-stall .who { color: var(--pc, var(--lm-line-strong)); font-weight: 700; max-width: 100%; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; hyphens: auto; }
+    .lm-map-stall.free .who { color: var(--lm-muted); font-weight: 400; }
+    .lm-map-stall.pending { border-style: dashed; }
+    .lm-map-stall.dim { opacity: .45; }
+
+    /* a keresett stand: vastag keret, a szám tintaszínű, és háromszor felvillan, hogy a szem odataláljon */
+    .lm-map-stall.highlight {
+        opacity: 1;
+        border: 2px solid var(--lm-ink);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--pc, var(--lm-line-strong)) 35%, transparent);
+        z-index: 2;
+        animation: lm-stall-call 1.1s ease-out 3;
+    }
+    .lm-map-stall.highlight .num { color: var(--lm-ink); }
+
+@keyframes lm-stall-call {
+    0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--pc) 55%, transparent); }
+    100% { box-shadow: 0 0 0 12px color-mix(in srgb, var(--pc) 0%, transparent); }
+}
+
+/* jelmagyarázat: árusok a saját színükkel */
+.lm-map-key {
+    list-style: none;
+    margin: .75rem 0 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem 1.1rem;
+    font-size: var(--lm-fs-sm);
+}
+    .lm-map-key li { display: inline-flex; align-items: center; gap: .4rem; }
+    .lm-map-key .sw { width: .8rem; height: .8rem; border-radius: 2px; background: var(--pc); flex: none; }
+    .lm-map-key a, .lm-map-key li > span:not(.sw):not(.n) { color: var(--pc); font-weight: 700; text-decoration: none; }
+    .lm-map-key a:hover { text-decoration: underline; }
+    .lm-map-key .n { color: var(--lm-muted); }
+    .lm-map-key li.on { padding: .1rem .5rem .1rem .35rem; border-radius: var(--lm-r-pill); background: color-mix(in srgb, var(--pc) 12%, transparent); }
+
+/* szerkesztő (admin) */
 .lm-map.editable .lm-map-cell {
-    background: rgba(255, 255, 255, .45);
+    background: color-mix(in srgb, var(--lm-surface) 55%, transparent);
     outline: 1px dashed var(--lm-line-strong);
     outline-offset: -1px;
     cursor: copy;
 }
-.lm-map.editable .lm-map-cell:hover { background: var(--lm-leaf-soft); }
-.lm-map-stall {
-    z-index: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: .1rem;
-    padding: .2rem;
-    border-radius: 8px;
-    background: var(--lm-surface);
-    border: 2px solid var(--lm-line-strong);
-    box-shadow: var(--lm-shadow-sm);
-    font-size: .72rem;
-    line-height: 1.1;
-    text-align: center;
-    overflow: hidden;
-    color: var(--lm-ink);
-}
-.lm-map-stall::before { /* napellenző-csík, mint a piaci standokon */
-    content: "";
-    position: absolute;
-    inset: 0 0 auto 0;
-    height: 5px;
-    background: repeating-linear-gradient(90deg, var(--lm-paprika) 0 8px, #fff 8px 16px);
-    opacity: .85;
-}
-.lm-map-stall { position: relative; }
-.lm-map-stall .num { font-weight: 800; font-size: .85rem; }
-.lm-map-stall .who { color: var(--lm-muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lm-map-stall.taken { background: var(--lm-leaf-soft); border-color: var(--lm-leaf); }
-.lm-map-stall.pending { background: var(--lm-honey-soft); border-color: var(--lm-honey); }
-.lm-map-stall.highlight { background: var(--lm-paprika-soft); border-color: var(--lm-paprika); box-shadow: 0 0 0 3px rgba(200, 54, 30, .25); }
+    .lm-map.editable .lm-map-cell:hover { background: var(--lm-leaf-soft); }
 .lm-map.editable .lm-map-stall { cursor: grab; }
 .lm-map-stall.selected { outline: 3px solid var(--lm-focus); outline-offset: 1px; }
-.lm-map.dragging .lm-map-stall { pointer-events: none; opacity: .75; } /* húzás közben a cellák kapják az ejtést */
+.lm-map.dragging .lm-map-stall { pointer-events: none; opacity: .7; } /* húzás közben a cellák kapják az ejtést */
 .lm-map-legend { display: flex; flex-wrap: wrap; gap: .75rem; font-size: .8rem; color: var(--lm-muted); margin-top: .5rem; }
-.lm-map-legend span::before { content: ""; display: inline-block; width: .8rem; height: .8rem; border-radius: 3px; margin-right: .3rem; vertical-align: -1px; border: 2px solid var(--lm-line-strong); background: var(--lm-surface); }
-.lm-map-legend .taken::before { background: var(--lm-leaf-soft); border-color: var(--lm-leaf); }
-.lm-map-legend .pending::before { background: var(--lm-honey-soft); border-color: var(--lm-honey); }
-.lm-map-legend .highlight::before { background: var(--lm-paprika-soft); border-color: var(--lm-paprika); }
-.lm-map-entrance { font-size: .75rem; color: var(--lm-muted); text-align: center; margin-top: .25rem; letter-spacing: .08em; text-transform: uppercase; }
+    .lm-map-legend span::before { content: ""; display: inline-block; width: .8rem; height: .8rem; border-radius: 2px; margin-right: .3rem; vertical-align: -1px; border: 1px dashed var(--lm-line-strong); background: var(--lm-surface); }
+    .lm-map-legend .taken::before { border: 1px solid var(--lm-leaf); background: var(--lm-leaf-soft); }
+    .lm-map-legend .pending::before { border: 1px dashed var(--lm-honey); background: var(--lm-honey-soft); }
+.lm-map-entrance { font-size: var(--lm-fs-xs); color: var(--lm-muted); text-align: center; margin-top: .35rem; }
+
+/* ---- Standszám-tábla: zománctábla-szerű szám a vevő átvételi kártyáján ---- */
+.lm-stall-badge {
+    flex: none;
+    min-width: 3.6rem;
+    height: 3.6rem;
+    padding: 0 .5rem;
+    display: inline-grid;
+    place-items: center;
+    font-family: var(--lm-font-display);
+    font-weight: 800;
+    font-size: 1.9rem;
+    line-height: 1;
+    color: var(--lm-surface);
+    background: var(--lm-ink);
+    border-radius: 6px;
+    box-shadow: inset 0 0 0 3px var(--lm-ink), inset 0 0 0 5px var(--lm-surface);
+    font-variant-numeric: tabular-nums;
+}
+    .lm-stall-badge.sm { min-width: 2.2rem; height: 2.2rem; font-size: 1.05rem; box-shadow: inset 0 0 0 2px var(--lm-ink), inset 0 0 0 3px var(--lm-surface); }
+    li[class*="pc-"] .lm-stall-badge { background: var(--pc); box-shadow: inset 0 0 0 2px var(--pc), inset 0 0 0 3px var(--lm-surface); }
+
+.lm-pickup { border-left: 4px solid var(--lm-ink); }
+.lm-pickup-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: .9rem; }
+.lm-pickup .lm-producer-name { font-family: var(--lm-font-display); font-size: 1.15rem; }
+
+/* a következő piacnap megállói: sorrendben, időrendben (valódi sorrend, ezért számozott lista) */
+.lm-stops { list-style: none; padding: 0; margin: 0 0 1rem; display: grid; gap: .5rem; }
+    .lm-stops a { display: flex; align-items: center; gap: .75rem; text-decoration: none; color: inherit; padding: .35rem .25rem; border-radius: var(--lm-r-xs); }
+    .lm-stops a:hover { background: var(--lm-surface-2); }
+
+.lm-order-stall { color: var(--lm-ink); font-weight: 700; }
+
+/* ---- Piacok oldal ---- */
+.lm-market { padding: 1.5rem 0 2rem; border-top: 1px solid var(--lm-line); }
+    .lm-market:first-of-type { border-top: 0; padding-top: 0; }
+.lm-market-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .lm-market-head h2 { font-size: var(--lm-fs-xl); margin: 0 0 .2rem; }
+.lm-market-facts { display: flex; flex-wrap: wrap; gap: .75rem 2rem; margin: 0 0 1.25rem; }
+    .lm-market-facts dt { font-size: var(--lm-fs-sm); color: var(--lm-muted); font-weight: 400; }
+    .lm-market-facts dd { margin: 0; font-weight: 700; }
+    .lm-market-facts dd > .lm-icon { vertical-align: -.25em; margin-right: .3rem; }
+    .lm-market-facts .lm-days { margin: 0; }
+.lm-market-map { max-width: 58rem; }
