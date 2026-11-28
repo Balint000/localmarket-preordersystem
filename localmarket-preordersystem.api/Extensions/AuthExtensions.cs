@@ -17,6 +17,9 @@ public static class AuthExtensions
             .Configure<IOptions<JwtOptions>>((bearer, jwtAccessor) =>
             {
                 var jwt = jwtAccessor.Value;
+                if (string.IsNullOrWhiteSpace(jwt.Secret) || jwt.Secret.Length < 32)
+                    throw new InvalidOperationException("A Jwt:Secret hiányzik vagy rövidebb 32 karakternél.");
+
                 bearer.MapInboundClaims = false;
                 bearer.TokenValidationParameters = new TokenValidationParameters
                 {

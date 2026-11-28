@@ -1,4 +1,5 @@
-﻿using localmarket_preordersystem.Application.Common.Exceptions;
+﻿using Microsoft.Extensions.Logging;
+using localmarket_preordersystem.Application.Common.Exceptions;
 using localmarket_preordersystem.Application.Common.Extensions;
 using localmarket_preordersystem.Application.Common.Interfaces;
 using localmarket_preordersystem.Application.Common.Models;
@@ -18,7 +19,8 @@ namespace localmarket_preordersystem.Application.Orders.PlaceOrder
         public static void Validate(PlaceOrderCommand c) => new ValidationBuilder()
             .Must(nameof(c.PaymentMethod), Enum.IsDefined(c.PaymentMethod), "Érvénytelen fizetési mód.")
             .Must(nameof(c.Pickups), c.Pickups is { Count: > 0 }, "Minden árushoz meg kell adni az átvételi időpontot.")
-            .Must(nameof(c.Pickups), c.Pickups is null || c.Pickups.Select(p => p.ProducerId).Distinct().Count() == c.Pickups.Count, "Árusonként csak egy átvételi időpont adható meg.")
+            .Must(nameof(c.Pickups), c.Pickups is null || c.Pickups.All(p => p is not null), "Érvénytelen átvételi tétel.")
+            .Must(nameof(c.Pickups), c.Pickups is null || c.Pickups.Any(p => p is null) || c.Pickups.Select(p => p.ProducerId).Distinct().Count() == c.Pickups.Count, "Árusonként csak egy átvételi időpont adható meg.")
             .ThrowIfInvalid();
     }
 
@@ -35,7 +37,8 @@ namespace localmarket_preordersystem.Application.Orders.PlaceOrder
         IAuditLogRepository audit,
         IUnitOfWork uow,
         ICurrentUserService currentUser,
-        TimeProvider time)
+        TimeProvider time,
+        ILogger<PlaceOrderHandler> logger)
     {
         public async Task<IReadOnlyList<OrderDto>> HandleAsync(PlaceOrderCommand command, CancellationToken ct = default)
         {
@@ -79,7 +82,14 @@ namespace localmarket_preordersystem.Application.Orders.PlaceOrder
                         [nameof(command.Pickups)] = new[] { $"A(z) {slot.Id} időpont nem ehhez az árushoz tartozik." }
                     });
 
-                var lines = group.Select(i => (loaded[i.ProductId], i.Quantity)).ToList();
+                var lines = new List<(Product Product, decimal Quantity)>();
+                foreach (var i in group)
+                {
+                    if (!loaded.TryGetValue(i.ProductId, out var prod))
+                        throw new ConflictException("A kosárban lévő termék már nem elérhető, töltsd újra a kosarat.");
+                    lines.Add((prod, i.Quantity));
+                }
+
                 var order = Order.Place(customer, slot, lines, now);
                 order.SetPayment(command.PaymentMethod);
                 placed.Add(order);
@@ -91,9 +101,17 @@ namespace localmarket_preordersystem.Application.Orders.PlaceOrder
             await uow.SaveChangesAsync(ct);
 
             // naplózás a mentés után (az Id-k ekkor már megvannak)
-            foreach (var order in placed)
-                await audit.RecordAsync(currentUser, "OrderPlaced", "Order", order.Id, null, new { order.Status, order.ProducerId, order.TotalAmount }, ct);
-            await uow.SaveChangesAsync(ct);
+            try
+            {
+                foreach (var order in placed)
+                    await audit.RecordAsync(currentUser, "OrderPlaced", "Order", order.Id, null, new { order.Status, order.ProducerId, order.TotalAmount }, ct);
+                await uow.SaveChangesAsync(ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // a rendelés már mentve van, az audit hibája nem buktathatja a kérést
+                logger.LogError(ex, "OrderPlaced audit mentése sikertelen: {Ids}", string.Join(",", placed.Select(o => o.Id)));
+            }
 
             return placed.Select(OrderDto.From).ToList();
         }
